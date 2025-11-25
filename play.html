@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>He Maumahara</title>
+<link rel="shortcut icon" type="image/x-icon" href="images/icon.ico">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/roboto.css">
+<script>
+(function(){
+  var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (!isLocal) {
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);} 
+    var s = document.createElement('script');
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=G-5M5BTEYB52';
+    s.async = true;
+    s.onload = function(){
+      gtag('js', new Date());
+      gtag('config', 'G-5M5BTEYB52');
+    };
+    document.head.appendChild(s);
+  } else {
+    window.gtag = function(){};
+  }
+})();
+</script>
+</head>
+<body>
+
+<div id="blue"></div>
+<div id="background"></div>
+<a href="https://rauawaawatpm.co.nz"><div id="rkct-menu"></div></a>
+
+<div id="menu-icon">
+<a href="index.html" class="menu-txt">Menu</a>
+</div>
+
+<div id="lvl-container">
+<div id="title-play">Play</div>
+
+<div id="lvl-1"><a href="lvl-1.html" class="lvl-txt l1">Level 1</a></div>
+<div id="lvl-2"><a href="lvl-2.html" class="lvl-txt l2">Level 2</a></div>
+<div id="lvl-3"><a href="lvl-3.html" class="lvl-txt l3">Level 3</a></div>
+
+<div id="desc-1" class="desc">Memorize the order of the cards, which remains the same.</div>
+<div id="desc-2" class="desc">The order of the cards changes with every new game.</div>
+<div id="desc-3" class="desc">Match the card images to their correct names.</div>
+<div id="blur-fx"></div> 
+</div>
+
+</body>
+</html>

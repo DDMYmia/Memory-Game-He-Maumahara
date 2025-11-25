@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>He Maumahara</title>
+<link rel="shortcut icon" type="image/x-icon" href="images/icon.ico">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/roboto.css">
+<script>
+(function(){
+  var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (!isLocal) {
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);} 
+    var s = document.createElement('script');
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=G-5M5BTEYB52';
+    s.async = true;
+    s.onload = function(){
+      gtag('js', new Date());
+      gtag('config', 'G-5M5BTEYB52');
+    };
+    document.head.appendChild(s);
+  } else {
+    window.gtag = function(){};
+  }
+})();
+</script>
+</head>
+<body>
+
+<div id="background"></div> 
+<a href="https://rauawaawatpm.co.nz"><div id="rkct"></div></a>
+
+<div id="menu-icon">
+<a href="play.html" class="menu-txt">Menu</a>
+<br><br>
+<a href="#" class="menu-txt" onclick="showAllCards()" id="show-cards">Show Cards</a>
+<br><br>
+<a href="#" class="menu-txt" onclick="exportTelemetry()" id="export-telemetry">Export Telemetry</a>
+</div>
+
+<div id="cookie-txt">Click a card</div>
+<div id="glass-fx"></div>
+<div id="game-timer" class="unselect">0:00</div>
+<div id="game-board"></div>
+
+<div id="game-over">
+<div id="well-done-etc"><span id="current-score">0:00</span>! Well Done!</div>
+<input type="text" id="name" placeholder="Type your name here..">
+<button id="submit-score" onclick="submitScore()">Submit Score</button>
+</div>
+
+<div id="leaderboard-container">
+<h3>Level 1</h3>
+<div id="leaderboard-list"></div>
+</div>
+
+<script src="js/game-core.js"></script>
+<script src="js/lvl1.js"></script>
+
+</body>
+</html>

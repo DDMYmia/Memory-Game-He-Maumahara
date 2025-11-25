@@ -1,0 +1,194 @@
+/* ~~~~~~~~~~~~~~~ */
+/* ~ credits.css ~ */
+/* ~~~~~~~~~~~~~~~ */
+
+html {
+  scrollbar-color: #333 #000;
+}
+a {
+  text-decoration: none;
+  transition: 0.5s;
+}
+body {
+  background: #000;
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  height: 100vh;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+#background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('../images/background-1.jpg');
+  background-size: cover;
+  background-position: center;
+  filter: blur(15px);
+  transform: scale(2.2);
+  z-index: -1;
+}
+#rkct { 
+  position: absolute;
+  top: calc(25% + 9px);
+  left: calc(10% - 97.5px);
+  width: 195px;
+  height: 43px;
+  background: url('../images/rkct.png');
+  background-size: cover; 
+  filter: invert(1);
+}
+#rkct-menu { 
+  position: absolute;
+  top: 50px;
+  left: 50px;
+  width: 195px;
+  height: 43px;
+  background: url('../images/rkct.png');
+  background-size: cover; 
+  filter: invert(1);
+  z-index: 1;
+}
+#menu-container {
+  position: absolute;
+  top: calc(50% - 250px);
+  left: 0;
+  right: 0;
+  height: 550px;
+  z-index: 10;
+}
+#menu-icon {
+  position: fixed;
+  top: 57px;
+  right: 57px;
+  width: auto;
+  height: auto;
+  z-index: 1000;
+}
+#title {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: auto;
+  font-size: 108px;
+  font-weight: 100;
+  text-align: center;
+  color: #fff;
+}
+.unselect {
+  -moz-user-select: none;     
+  -ms-user-select: none;      
+  user-select: none;          
+}
+#credits-blue {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #0064bd4f;
+}
+#thanks {
+  position: absolute;
+  top: 180px;
+  left: calc(50% - 250px); 
+  width: 500px;
+  height: auto;
+  color: #fff;
+  font-size: 24px;
+  padding-bottom: 200px;
+  text-align: center;
+}
+.hl {
+  background: rgba(0, 147, 255, 0.4);
+  color: #fff;
+  font-size: 24px;
+  font-weight: bold;
+  padding: 10px 20px 10px 20px;
+  border-radius: 20px;
+}
+.menu-txt {
+  background-color: #fff3;
+  color: #fff;
+  font-size: 24px;
+  padding: 4px 20px 4px 20px;
+  font-weight: 400;
+  border-radius: 20px;
+  transition: 0.5s;
+}
+.menu-txt:hover {
+  background: rgba(0, 147, 255, 0.4);
+}
+.txt {
+  font-size: 36px;
+  font-weight: 300;
+  text-align: center;
+  background-color: #fff3;
+  color: #fff;
+  padding: 20px;
+  padding-left: 100px;
+  padding-right: 100px;
+  border-radius: 50px;
+  transition: 0.5s;
+}
+.txt:hover {
+  background-color: rgba(0, 147, 255, 0.4);
+}
+
+/* ~~~~~~~~~~~~~~~~~~~ */
+/* ~ max width 850px ~ */
+/* ~~~~~~~~~~~~~~~~~~~ */
+
+@media screen and (max-width: 1280px), screen and (max-height: 850px) 
+{
+  #background {
+    transform: scale(1.8);
+  }
+  #title {
+    position: absolute;
+    top: 100px;
+    left: 0;
+    right: 0; 
+    height: auto;
+    font-size: 84px;
+    font-weight: 100;
+    text-align: center;
+    color: #fff;
+  }
+  #rkct-menu {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: 195px;
+    height: 43px;
+    background: url('../images/rkct.png');
+    background-size: cover;
+    filter: invert(1);
+    z-index: 1;
+  }
+  #thanks {
+    top: 260px;
+    font-size: 18px;
+  }
+  #menu-icon {
+    top: 27px;
+    right: 27px;
+  }
+  .txt {
+    font-size: 24px;
+    font-weight: 300;
+    text-align: center;
+    background-color: #fff3;
+    color: #fff;
+    padding: 10px;
+    padding-left: 80px;
+    padding-right: 80px;
+    border-radius: 50px;
+    transition: 0.5s;
+  }
+}
