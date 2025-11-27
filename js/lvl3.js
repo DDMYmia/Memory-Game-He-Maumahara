@@ -1,6 +1,8 @@
 //
 
-let time = 0;
+// Level 3: 5 minutes (300 seconds)
+const INITIAL_TIME = 300;
+let time = INITIAL_TIME;
 let gameStart = 0;
 let gameStop = 0;
 
@@ -8,6 +10,7 @@ const totalPairs = 10;
 let cards = [];
 let flippedCards = [];
 let matchedPairs = 0;
+let streak = 0; // Track consecutive successful matches
 
 let showCards = 0;
 
@@ -60,14 +63,21 @@ function updateTimer() {
     timerElement.innerText = `${Math.floor(time / 60)}:${(time % 60).toString().padStart(2, '0')}`;
 }
 
-// Timer goes up by 1 every second
+// Timer counts down by 1 every second
 setInterval(() => {
     if (gameStart === 1) {
         if (gameStop === 0) {
-            time++;
-            score = time;
-			document.getElementById('current-score').innerHTML = `${Math.floor(time / 60)}:${(time % 60).toString().padStart(2, '0')}`;
-            updateTimer();
+            if (time > 0) {
+                time--;
+                // Score = time remaining + streak bonus (higher is better)
+                score = time + (streak * 10);
+				document.getElementById('current-score').innerHTML = `${Math.floor(time / 60)}:${(time % 60).toString().padStart(2, '0')}`;
+                updateTimer();
+            } else {
+                // Time's up - game over
+                gameStop = 1;
+                endGame();
+            }
         }
     }
 }, 1000);
@@ -206,7 +216,12 @@ function handleCardClick(event) {
                     card2.style.backgroundColor = "rgba(61, 146, 208, 0.3)";
 
                     matchedPairs++;
-                    telemetry.log('match', { result: 'success', pair: match1, pairs: matchedPairs });
+                    streak++; // Increment streak on successful match
+                    // Add 3 seconds when a pair is matched
+                    time += 3;
+                    // Update score with new streak value
+                    score = time + (streak * 10);
+                    telemetry.log('match', { result: 'success', pair: match1, pairs: matchedPairs, streak: streak });
 
                     if (matchedPairs === totalPairs) {
                         setTimeout(() => {
@@ -227,6 +242,8 @@ function handleCardClick(event) {
 
                         if (match1 != match2)
                         {
+                            streak = 0; // Reset streak on failed match
+                            score = time + (streak * 10); // Update score after streak reset
                             card1.style.background = "url('images/small-pattern.png')";
                             card2.style.background = "url('images/small-pattern.png')";
         
@@ -383,12 +400,14 @@ function showAllCards() {
  
 
 function endGame() {
+		// Calculate final score: time remaining + streak bonus
+		score = time + (streak * 10);
 		document.body.style.backgroundColor = "#00f";
 		document.getElementById('background').style.opacity = '0.7';
     document.getElementById('game-board').style.display = 'none';
     document.getElementById('game-over').style.display = 'block';
     document.getElementById('menu-icon').innerHTML = "<a href='play.html' class='menu-txt'>Menu</a><br><br><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>";
-    telemetry.log('end', { score, pairs: matchedPairs });
+    telemetry.log('end', { score, pairs: matchedPairs, streak: streak });
 }
 
 async function submitScore() {
@@ -419,6 +438,7 @@ window.onload = () => {
     leaderboard.openDatabase();
     telemetry.openDatabase();
     initializeGame();
+    updateTimer(); // Initialize timer display
 };
 
 // No code below this
