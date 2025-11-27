@@ -37,7 +37,7 @@ class Leaderboard {
         const getAllRequest = store.getAll();
         getAllRequest.onsuccess = () => {
           const allScores = getAllRequest.result || [];
-          allScores.sort((a, b) => a.score - b.score);
+          allScores.sort((a, b) => b.score - a.score); // Descending order (higher is better)
           const scoresToDelete = allScores.slice(10);
           scoresToDelete.forEach(entry => {
             store.delete(entry.id);
@@ -57,7 +57,8 @@ class Leaderboard {
       const transaction = this.db.transaction('scores', 'readonly');
       const store = transaction.objectStore('scores');
       const index = store.index('scoreIndex');
-      const request = index.openCursor(null, 'next');
+      // Use 'prev' direction to get highest scores first (descending order)
+      const request = index.openCursor(null, 'prev');
       const entries = [];
       request.onerror = event => {
         reject(event.target.error);
@@ -68,6 +69,8 @@ class Leaderboard {
           entries.push(cursor.value);
           cursor.continue();
         } else {
+          // Sort entries in descending order (highest first) as a safety measure
+          entries.sort((a, b) => b.score - a.score);
           while (entries.length < 10) {
             entries.push({ name: `Player ${entries.length + 1}`, score: 0 });
           }
