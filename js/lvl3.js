@@ -11,6 +11,7 @@ let cards = [];
 let flippedCards = [];
 let matchedPairs = 0;
 let streak = 0; // Track consecutive successful matches
+let lockBoard = false;
 
 let showCards = 0;
 
@@ -35,6 +36,8 @@ const cardTextMapping = {
     "image 9": "Hei Matau",
     "image 10": "Pikorua"
 };
+
+// 
 
 window.addEventListener('resize', function() 
 {	
@@ -157,6 +160,7 @@ function shuffleArray(array) {
 
 // Handle card click
 function handleCardClick(event) {
+    if (lockBoard) return;
     if (gameStart !== 1) {
         gameStart = 1;
         telemetry.log('start', { level: 3 });
@@ -190,6 +194,7 @@ function handleCardClick(event) {
             flippedCards.push(card);
 
             if (flippedCards.length === 2) {
+                lockBoard = true;
                 const [card1, card2] = flippedCards;
 
                 // Ensure that both cards have the 'data-match' attribute before proceeding
@@ -262,7 +267,8 @@ function handleCardClick(event) {
                         }
                     });
                     flippedCards = [];
-                }, 400);
+                    lockBoard = false;
+                }, HIDE_DELAY_MS);
             }
         }
     }
@@ -442,3 +448,4 @@ window.onload = () => {
 };
 
 // No code below this
+const HIDE_DELAY_MS = 400;

@@ -1,7 +1,6 @@
 //
 
-// Level 1: 2 minutes (120 seconds)
-const INITIAL_TIME = 120;
+const INITIAL_TIME = 180;
 let time = INITIAL_TIME;
 let gameStart = 0;
 let gameStop = 0;
@@ -10,7 +9,8 @@ const totalPairs = 10;
 let cards = [];
 let flippedCards = [];
 let matchedPairs = 0;
-let streak = 0; // Track consecutive successful matches
+let streak = 0;
+let lockBoard = false;
 
 let showCards = 0;
 
@@ -22,85 +22,23 @@ let telemetry;
 
 //
 
-const GRID_COLS = 5;
-const GRID_ROWS = 4;
-const ADJACENT_TARGET = Math.ceil(totalPairs * 0.6);
-let ADJACENT_ACTUAL = 0;
-function generateAdjacentLayout(totalPairs, cols, rows, target) {
-  const n = cols * rows;
-  const layout = new Array(n).fill(null);
-  const used = new Set();
-  const edges = [];
-  for (let i = 0; i < n; i++) {
-    const r = Math.floor(i / cols);
-    const c = i % cols;
-    const neighbors = [];
-    if (c > 0) neighbors.push(i - 1);
-    if (c < cols - 1) neighbors.push(i + 1);
-    if (r > 0) neighbors.push(i - cols);
-    if (r < rows - 1) neighbors.push(i + cols);
-    if (r > 0 && c > 0) neighbors.push(i - cols - 1);
-    if (r > 0 && c < cols - 1) neighbors.push(i - cols + 1);
-    if (r < rows - 1 && c > 0) neighbors.push(i + cols - 1);
-    if (r < rows - 1 && c < cols - 1) neighbors.push(i + cols + 1);
-    neighbors.forEach(j => { if (i < j) edges.push([i, j]); });
-  }
-  for (let i = edges.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [edges[i], edges[j]] = [edges[j], edges[i]]; }
-  const pairIds = Array.from({ length: totalPairs }, (_, k) => k + 1);
-  for (let i = pairIds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pairIds[i], pairIds[j]] = [pairIds[j], pairIds[i]]; }
-  let placedAdj = 0;
-  while (placedAdj < target && pairIds.length && edges.length) {
-    const [a, b] = edges.pop();
-    if (used.has(a) || used.has(b)) continue;
-    const id = pairIds.pop();
-    layout[a] = id;
-    layout[b] = id;
-    used.add(a);
-    used.add(b);
-    placedAdj++;
-  }
-  const remainingIds = [];
-  for (let id = 1; id <= totalPairs; id++) {
-    if (!layout.includes(id)) { remainingIds.push(id, id); }
-  }
-  const freePositions = [];
-  for (let i = 0; i < n; i++) if (!used.has(i)) freePositions.push(i);
-  for (let i = freePositions.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [freePositions[i], freePositions[j]] = [freePositions[j], freePositions[i]]; }
-  for (let k = 0; k < remainingIds.length; k++) {
-    layout[freePositions[k]] = remainingIds[k];
-  }
-  const mode = Math.floor(Math.random() * 4);
-  if (mode !== 0) {
-    const res = new Array(n);
-    for (let i = 0; i < n; i++) {
-      const r = Math.floor(i / cols), c = i % cols;
-      let nr = r, nc = c;
-      if (mode === 1) { nc = cols - 1 - c; }
-      else if (mode === 2) { nr = rows - 1 - r; }
-      else if (mode === 3) { nr = rows - 1 - r; nc = cols - 1 - c; }
-      const j = nr * cols + nc;
-      res[j] = layout[i];
-    }
-    for (let i = 0; i < n; i++) layout[i] = res[i];
-  }
-  const positionsById = {};
-  for (let i = 0; i < n; i++) { const id = layout[i]; if (!positionsById[id]) positionsById[id] = []; positionsById[id].push(i); }
-  function isNeighbor(p, q) {
-    const pr = Math.floor(p / cols), pc = p % cols;
-    const qr = Math.floor(q / cols), qc = q % cols;
-    return (p !== q) && Math.abs(pr - qr) <= 1 && Math.abs(pc - qc) <= 1;
-  }
-  let adj = 0;
-  for (let id = 1; id <= totalPairs; id++) {
-    const pos = positionsById[id];
-    if (pos && pos.length === 2 && isNeighbor(pos[0], pos[1])) adj++;
-  }
-  ADJACENT_ACTUAL = adj;
-  return layout;
+const FIXED_COLS = 5;
+const FIXED_ROWS = 4;
+const FIXED_CARD_ORDER = [1,1,2,3,4, 2,5,6,3,7, 8,9,5,6,10, 8,9,7,4,10];
+const HIDE_DELAY_MS = 400;
+const SHOW_CARDS_SCALE = 1.4;
+
+function resolveImageSrc(num)
+{
+  const mapping = {
+    1: 'images/images-new/imagenew1.webp',
+    2: 'images/images-new/imagenew2.webp',
+    3: 'images/images-new/imagenew3.webp',
+    4: 'images/images-new/imagenew4.webp',
+    5: 'images/images-new/imagenew5.png'
+  };
+  return mapping[num] || `images/image${num}.png`;
 }
-const cardOrder = generateAdjacentLayout(totalPairs, GRID_COLS, GRID_ROWS, ADJACENT_TARGET);
-const HIDE_DELAY_MS = 300 + Math.floor(Math.random() * 201);
-const SHOW_CARDS_SCALE = 1.3 + Math.random() * 0.2;
 
 window.addEventListener('resize', function() 
 {	
@@ -132,50 +70,44 @@ function updateTimer()
 
 // Timer counts down by 1 every second 
 setInterval(() => {
-	if (gameStart == 1)
-	{
-		if (gameStop == 0)
-		{
-    		if (time > 0) {
-				time--;
-				// Score = time remaining + streak bonus (higher is better)
-				score = time + (streak * 10);
-				document.getElementById('current-score').innerHTML = `${Math.floor(time / 60)}:${(time % 60).toString().padStart(2, '0')}`;
-				updateTimer();
-			} else {
-				// Time's up - game over
-				gameStop = 1;
-				endGame();
-			}
-		}
-	}
+    if (gameStart == 1)
+    {
+        if (gameStop == 0)
+        {
+            if (time > 0) {
+                time--;
+                score = time + (streak * 10);
+                document.getElementById('current-score').innerHTML = `${Math.floor(time / 60)}:${(time % 60).toString().padStart(2, '0')}`;
+                updateTimer();
+            } else {
+                gameStop = 1;
+                endGame();
+            }
+        }
+    }
 }, 1000);
 
 // Initialize the game
 function initializeGame() 
 {
-	const gameBoard = document.getElementById("game-board");
+    const gameBoard = document.getElementById("game-board");
 
-	// Use the predefined card order to populate the game grid
-	const imagePairs = generateImagePairs(totalPairs);
-
-	// Flatten the predefined order to match the card images
-	const cardImages = cardOrder.map(num => `image${num}.png`);
+    const cardImages = FIXED_CARD_ORDER.map(num => ({ id: num, match: `image${num}.png`, src: resolveImageSrc(num) }));
 
 	// Create and render cards with images
-	for (let i = 0; i < cardImages.length; i++) 
-	{
-		const card = document.createElement("div");
-		card.classList.add("card");
-		card.dataset.image = cardImages[i];
-		card.addEventListener("click", handleCardClick);
-		cards.push(card);
-		gameBoard.appendChild(card);
+    for (let i = 0; i < cardImages.length; i++) 
+    {
+        const card = document.createElement("div");
+        card.classList.add("card");
+        card.dataset.image = cardImages[i].match;
+        card.addEventListener("click", handleCardClick);
+        cards.push(card);
+        gameBoard.appendChild(card);
 
-		const image = document.createElement("img");
-		image.src = `images/${cardImages[i]}`;
-		card.appendChild(image);
-	}
+        const image = document.createElement("img");
+        image.src = cardImages[i].src;
+        card.appendChild(image);
+    }
 }
 
 // Generate image pairs dynamically
@@ -192,10 +124,11 @@ function generateImagePairs(totalPairs)
 // Handle card click
 function handleCardClick(event) 
 {
+    if (lockBoard) return;
     if (gameStart != 1)
     {
         gameStart = 1;
-        telemetry.log('start', { level: 1, variant: { cols: GRID_COLS, rows: GRID_ROWS, neighborMode: '8', adjacentTarget: ADJACENT_TARGET, adjacentActual: ADJACENT_ACTUAL, hideDelay: HIDE_DELAY_MS, showScale: SHOW_CARDS_SCALE } });
+        telemetry.log('start', { level: 1, variant: { layout: 'fixed_template', cols: FIXED_COLS, rows: FIXED_ROWS, hideDelay: HIDE_DELAY_MS, showScale: SHOW_CARDS_SCALE, timerMode: 'countdown', initialTime: INITIAL_TIME, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
     }
 	
 	if (showCards !== 1)
@@ -213,35 +146,34 @@ function handleCardClick(event)
 			cardReader(card);
 			telemetry.log('flip', { image: card.dataset.image });
 
-			if (flippedCards.length === 2) 
-			{
-				const [card1, card2] = flippedCards;
-				if (card1.dataset.image === card2.dataset.image) {
-					card1.classList.add("matched");
-					card2.classList.add("matched");
-					matchedPairs++;
-					streak++; // Increment streak on successful match
-					// Add 3 seconds when a pair is matched
-					time += 3;
-					// Update score with new streak value
-					score = time + (streak * 10);
-					card1.style.background = '#3d92d04d';
-					card2.style.background = '#3d92d04d';
-					telemetry.log('match', { result: 'success', image: card1.dataset.image, pairs: matchedPairs, streak: streak });
-					if (matchedPairs === totalPairs) 
-					{
-						winFunction();
-					}
-				}
+            if (flippedCards.length === 2) 
+            {
+                lockBoard = true;
+                const [card1, card2] = flippedCards;
+                if (card1.dataset.image === card2.dataset.image) {
+                    card1.classList.add("matched");
+                    card2.classList.add("matched");
+                    matchedPairs++;
+                    streak++;
+                    time += 3;
+                    score = time + (streak * 10);
+                    card1.style.background = '#3d92d04d';
+                    card2.style.background = '#3d92d04d';
+                    telemetry.log('match', { result: 'success', image: card1.dataset.image, pairs: matchedPairs });
+                    if (matchedPairs === totalPairs) 
+                    {
+                        winFunction();
+                    }
+                }
 
-				setTimeout(() => {
-					flippedCards.forEach(card => {
-					if (card1.dataset.image != card2.dataset.image)
-					{
-						streak = 0; // Reset streak on failed match
-						score = time + (streak * 10); // Update score after streak reset
-						card1.style.background = "url('images/small-pattern.png')";
-						card2.style.background = "url('images/small-pattern.png')";
+                setTimeout(() => {
+                    flippedCards.forEach(card => {
+                    if (card1.dataset.image != card2.dataset.image)
+                    {
+                        streak = 0;
+                        score = time + (streak * 10);
+                        card1.style.background = "url('images/small-pattern.png')";
+                        card2.style.background = "url('images/small-pattern.png')";
 
 						if (window.innerWidth <= 1280 && window.innerHeight <= 850) 
 						{
@@ -260,12 +192,13 @@ function handleCardClick(event)
                     if (imageElement) {
                         imageElement.style.visibility = "hidden";
                     }
-					});
-					flippedCards = [];
+                    });
+                    flippedCards = [];
+                    lockBoard = false;
                 }, HIDE_DELAY_MS);
-			}
-		}
-	}
+            }
+        }
+    }
 }
 
 function winFunction()
@@ -409,10 +342,9 @@ function showAllCards() {
  
 
 function endGame() {
-		// Calculate final score: time remaining + streak bonus
-		score = time + (streak * 10);
-		document.body.style.backgroundColor = "#00f";
-		document.getElementById('background').style.opacity = '0.7';
+        score = time + (streak * 10);
+        document.body.style.backgroundColor = "#00f";
+        document.getElementById('background').style.opacity = '0.7';
     document.getElementById('game-board').style.display = 'none';
     document.getElementById('game-over').style.display = 'block';
     document.getElementById('menu-icon').innerHTML = "<a href='play.html' class='menu-txt'>Menu</a><br><br><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>";
@@ -447,7 +379,6 @@ window.onload = () => {
     leaderboard.openDatabase();
     telemetry.openDatabase();
     initializeGame();
-    updateTimer(); // Initialize timer display
 };
 
 // No code below this

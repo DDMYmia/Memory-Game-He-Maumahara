@@ -11,6 +11,7 @@ let cards = [];
 let flippedCards = [];
 let matchedPairs = 0;
 let streak = 0; // Track consecutive successful matches
+let lockBoard = false;
 
 let showCards = 0;
 
@@ -21,6 +22,98 @@ let leaderboard;
 let telemetry;
 
 //
+
+const GRID_COLS = 5;
+const GRID_ROWS = 4;
+const ADJACENT_TARGET = Math.ceil(totalPairs * 0.6);
+let ADJACENT_ACTUAL = 0;
+function generateAdjacentLayout(totalPairs, cols, rows, target) {
+  const n = cols * rows;
+  const layout = new Array(n).fill(null);
+  const used = new Set();
+  const edges = [];
+  for (let i = 0; i < n; i++) {
+    const r = Math.floor(i / cols);
+    const c = i % cols;
+    const neighbors = [];
+    if (c > 0) neighbors.push(i - 1);
+    if (c < cols - 1) neighbors.push(i + 1);
+    if (r > 0) neighbors.push(i - cols);
+    if (r < rows - 1) neighbors.push(i + cols);
+    if (r > 0 && c > 0) neighbors.push(i - cols - 1);
+    if (r > 0 && c < cols - 1) neighbors.push(i - cols + 1);
+    if (r < rows - 1 && c > 0) neighbors.push(i + cols - 1);
+    if (r < rows - 1 && c < cols - 1) neighbors.push(i + cols + 1);
+    neighbors.forEach(j => { if (i < j) edges.push([i, j]); });
+  }
+  for (let i = edges.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [edges[i], edges[j]] = [edges[j], edges[i]]; }
+  const pairIds = Array.from({ length: totalPairs }, (_, k) => k + 1);
+  for (let i = pairIds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pairIds[i], pairIds[j]] = [pairIds[j], pairIds[i]]; }
+  let placedAdj = 0;
+  while (placedAdj < target && pairIds.length && edges.length) {
+    const [a, b] = edges.pop();
+    if (used.has(a) || used.has(b)) continue;
+    const id = pairIds.pop();
+    layout[a] = id;
+    layout[b] = id;
+    used.add(a);
+    used.add(b);
+    placedAdj++;
+  }
+  const remainingIds = [];
+  for (let id = 1; id <= totalPairs; id++) {
+    if (!layout.includes(id)) { remainingIds.push(id, id); }
+  }
+  const freePositions = [];
+  for (let i = 0; i < n; i++) if (!used.has(i)) freePositions.push(i);
+  for (let i = freePositions.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [freePositions[i], freePositions[j]] = [freePositions[j], freePositions[i]]; }
+  for (let k = 0; k < remainingIds.length; k++) {
+    layout[freePositions[k]] = remainingIds[k];
+  }
+  const mode = Math.floor(Math.random() * 4);
+  if (mode !== 0) {
+    const res = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const r = Math.floor(i / cols), c = i % cols;
+      let nr = r, nc = c;
+      if (mode === 1) { nc = cols - 1 - c; }
+      else if (mode === 2) { nr = rows - 1 - r; }
+      else if (mode === 3) { nr = rows - 1 - r; nc = cols - 1 - c; }
+      const j = nr * cols + nc;
+      res[j] = layout[i];
+    }
+    for (let i = 0; i < n; i++) layout[i] = res[i];
+  }
+  const positionsById = {};
+  for (let i = 0; i < n; i++) { const id = layout[i]; if (!positionsById[id]) positionsById[id] = []; positionsById[id].push(i); }
+  function isNeighbor(p, q) {
+    const pr = Math.floor(p / cols), pc = p % cols;
+    const qr = Math.floor(q / cols), qc = q % cols;
+    return (p !== q) && Math.abs(pr - qr) <= 1 && Math.abs(pc - qc) <= 1;
+  }
+  let adj = 0;
+  for (let id = 1; id <= totalPairs; id++) {
+    const pos = positionsById[id];
+    if (pos && pos.length === 2 && isNeighbor(pos[0], pos[1])) adj++;
+  }
+  ADJACENT_ACTUAL = adj;
+  return layout;
+}
+const cardOrder = generateAdjacentLayout(totalPairs, GRID_COLS, GRID_ROWS, ADJACENT_TARGET);
+const HIDE_DELAY_MS = 400;
+const SHOW_CARDS_SCALE = 1.4;
+
+function resolveImageSrc(num)
+{
+  const mapping = {
+    1: 'images/images-new/imagenew1.webp',
+    2: 'images/images-new/imagenew2.webp',
+    3: 'images/images-new/imagenew3.webp',
+    4: 'images/images-new/imagenew4.webp',
+    5: 'images/images-new/imagenew5.png'
+  };
+  return mapping[num] || `images/image${num}.png`;
+}
 
 window.addEventListener('resize', function() 
 {	
@@ -73,30 +166,25 @@ setInterval(() => {
 // Initialize the game
 function initializeGame() 
 {
-	const gameBoard = document.getElementById("game-board");
+    const gameBoard = document.getElementById("game-board");
 
-	// Generate image pairs dynamically
-	const imagePairs = generateImagePairs(totalPairs);
-
-	// Duplicate the image pairs
-	const cardImages = [...imagePairs, ...imagePairs];
-	shuffleArray(cardImages);
+    const cardImages = cardOrder.map(num => ({ id: num, match: `image${num}.png`, src: resolveImageSrc(num) }));
 
 	// Create and render cards with images
-	for (let i = 0; i < cardImages.length; i++) 
-	{
-		const card = document.createElement("div");
-		card.classList.add("card");
-		card.dataset.image = cardImages[i];
-		card.addEventListener("click", handleCardClick);
-		cards.push(card);
-		gameBoard.appendChild(card);
+    for (let i = 0; i < cardImages.length; i++) 
+    {
+        const card = document.createElement("div");
+        card.classList.add("card");
+        card.dataset.image = cardImages[i].match;
+        card.addEventListener("click", handleCardClick);
+        cards.push(card);
+        gameBoard.appendChild(card);
 
-		// Create and add image elements to the cards
-		const image = document.createElement("img");
-		image.src = `images/${cardImages[i]}`; // Make sure to place your images in the "images" folder
-		card.appendChild(image);
-	}
+        // Create and add image elements to the cards
+        const image = document.createElement("img");
+        image.src = cardImages[i].src; // image source may come from images-new
+        card.appendChild(image);
+    }
 }
 
 // Generate image pairs dynamically from "image1.jpg" to "image10.jpg"
@@ -121,10 +209,11 @@ function shuffleArray(array) {
 // Handle card click
 function handleCardClick(event) 
 {
+    if (lockBoard) return;
     if (gameStart != 1)
     {
         gameStart = 1;
-        telemetry.log('start', { level: 2 });
+        telemetry.log('start', { level: 2, variant: { cols: GRID_COLS, rows: GRID_ROWS, neighborMode: '8', adjacentTarget: ADJACENT_TARGET, adjacentActual: ADJACENT_ACTUAL, hideDelay: HIDE_DELAY_MS, timerMode: 'countdown', initialTime: INITIAL_TIME, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
     }
 	
 	if (showCards !== 1)
@@ -140,9 +229,10 @@ function handleCardClick(event)
             cardReader(card);
             telemetry.log('flip', { image: card.dataset.image });
 
-			if (flippedCards.length === 2) 
-			{
-				const [card1, card2] = flippedCards;
+            if (flippedCards.length === 2) 
+            {
+                lockBoard = true;
+                const [card1, card2] = flippedCards;
                 if (card1.dataset.image === card2.dataset.image) {
                     card1.classList.add("matched");
                     card2.classList.add("matched");
@@ -164,8 +254,8 @@ function handleCardClick(event)
                     }
                 }
 
-				setTimeout(() => {
-					flippedCards.forEach(card => {
+                setTimeout(() => {
+                    flippedCards.forEach(card => {
                     if (card1.dataset.image != card2.dataset.image)
                     {
 						streak = 0; // Reset streak on failed match
@@ -190,7 +280,8 @@ function handleCardClick(event)
                     imageElement.style.visibility = "hidden";
                 });
                 flippedCards = [];
-            }, 400);
+                lockBoard = false;
+            }, HIDE_DELAY_MS);
         }
     }
 }
@@ -287,7 +378,7 @@ function showAllCards() {
                 const imageElement = card.querySelector("img");
                 imageElement.style.visibility = "visible";
                 imageElement.style.animation = "none";
-                imageElement.style.transform = "scale(1.4)";
+                imageElement.style.transform = "scale(" + SHOW_CARDS_SCALE + ")";
                 card.style.background = "#fff5";
             });
         } 
