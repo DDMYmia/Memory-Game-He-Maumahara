@@ -102,17 +102,20 @@ function generateAdjacentLayout(totalPairs, cols, rows, target) {
 const cardOrder = generateAdjacentLayout(totalPairs, GRID_COLS, GRID_ROWS, ADJACENT_TARGET);
 const HIDE_DELAY_MS = 400;
 const SHOW_CARDS_SCALE = 1.4;
+const IMAGE_POOL_MAX = 24;
+const IMAGE_SELECTION = (() => {
+  const arr = Array.from({ length: IMAGE_POOL_MAX }, (_, i) => i + 1);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, totalPairs);
+})();
 
 function resolveImageSrc(num)
 {
-  const mapping = {
-    1: 'images/images-new/imagenew1.webp',
-    2: 'images/images-new/imagenew2.webp',
-    3: 'images/images-new/imagenew3.webp',
-    4: 'images/images-new/imagenew4.webp',
-    5: 'images/images-new/imagenew5.png'
-  };
-  return mapping[num] || `images/image${num}.png`;
+  const mapped = IMAGE_SELECTION[num - 1];
+  return `images/image${mapped}.png`;
 }
 
 window.addEventListener('resize', function() 
@@ -284,7 +287,6 @@ function handleCardClick(event)
             }, HIDE_DELAY_MS);
         }
     }
-}
 }
 
 // Start the game
