@@ -448,4 +448,5 @@ window.onload = () => {
     updateTimer(); // Initialize timer display
 };
 
+}
 // No code below this
