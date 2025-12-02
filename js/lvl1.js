@@ -161,6 +161,7 @@ function handleCardClick(event) {
           if (matchedPairs === totalPairs) {
             winFunction();
           }
+          playComboSound(streak);
         }
 
         setTimeout(() => {
@@ -405,3 +406,17 @@ window.onload = () => {
 };
 
 // No code below this
+
+function playComboSound(streak) {
+  let soundFile = '';
+  if (streak === 2) soundFile = 'Sound/nice.mp3';
+  else if (streak === 3) soundFile = 'Sound/great.mp3';
+  else if (streak === 4) soundFile = 'Sound/Amazing.mp3';
+  else if (streak === 5) soundFile = 'Sound/excellent.mp3';
+  else if (streak >= 6) soundFile = 'Sound/Unbelievable.mp3';
+
+  if (soundFile) {
+    const audio = new Audio(soundFile);
+    audio.play().catch(e => console.log("Audio play failed", e));
+  }
+}
