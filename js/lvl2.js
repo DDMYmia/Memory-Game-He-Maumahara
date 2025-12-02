@@ -102,22 +102,17 @@ function generateAdjacentLayout(totalPairs, cols, rows, target) {
 const cardOrder = generateAdjacentLayout(totalPairs, GRID_COLS, GRID_ROWS, ADJACENT_TARGET);
 const HIDE_DELAY_MS = 400;
 const SHOW_CARDS_SCALE = 1.4;
+const IMAGE_POOL_MAX = 24;
+const IMAGE_SELECTION = (() => {
+  const arr = Array.from({ length: IMAGE_POOL_MAX }, (_, i) => i + 1);
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr.slice(0, totalPairs);
+})();
 
 function resolveImageSrc(num)
 {
-  const mapping = {
-    1: 'images/image11.png',
-    2: 'images/image12.png',
-    3: 'images/image13.png',
-    4: 'images/image14.png',
-    5: 'images/image15.png',
-    6: 'images/image16.png',
-    7: 'images/image17.png',
-    8: 'images/image18.png',
-    9: 'images/image19.png',
-    10: 'images/image20.png'
-  };
-  return mapping[num];
+  const mapped = IMAGE_SELECTION[num - 1];
+  return `images/image${mapped}.png`;
 }
 
 window.addEventListener('resize', function() 
@@ -440,7 +435,6 @@ async function displayLeaderboard() {
     try {
         await leaderboard.displayLeaderboard(leaderboardList);
     } catch (error) {}
-}
 
 window.onload = () => {
     leaderboard = new Leaderboard('leaderboardDB_lvl2');
