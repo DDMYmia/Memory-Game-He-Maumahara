@@ -31,13 +31,18 @@ const SHOW_CARDS_SCALE = 1.4;
 function resolveImageSrc(num)
 {
   const mapping = {
-    1: 'images/images-new/imagenew1.webp',
-    2: 'images/images-new/imagenew2.webp',
-    3: 'images/images-new/imagenew3.webp',
-    4: 'images/images-new/imagenew4.webp',
-    5: 'images/images-new/imagenew5.png'
+    1: 'images/image1.png',
+    2: 'images/image2.png',
+    3: 'images/image3.png',
+    4: 'images/image4.png',
+    5: 'images/image5.png',
+    6: 'images/image6.png',
+    7: 'images/image7.png',
+    8: 'images/image8.png',
+    9: 'images/image9.png',
+    10: 'images/image10.png'
   };
-  return mapping[num] || `images/image${num}.png`;
+  return mapping[num];
 }
 
 window.addEventListener('resize', function() 
