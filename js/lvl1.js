@@ -15,6 +15,7 @@ let lockBoard = false;
 let showCards = 0;
 let lastInteractionTime = Date.now();
 let isRippleActive = false;
+let failedAttempts = 0;
 
 //
 
@@ -79,11 +80,6 @@ setInterval(() => {
         score = time + (streak * 10);
         document.getElementById('current-score').innerHTML = `${Math.floor(time / 60)}:${(time % 60).toString().padStart(2, '0')}`;
         updateTimer();
-
-        // Check for idle
-        if (!isRippleActive && !lockBoard && showCards === 0 && flippedCards.length === 0 && (Date.now() - lastInteractionTime > 5000)) {
-          triggerRippleEffect();
-        }
       } else {
         gameStop = 1;
         endGame();
@@ -165,8 +161,9 @@ function handleCardClick(event) {
         }
 
         setTimeout(() => {
+          const isMismatch = card1.dataset.image != card2.dataset.image;
           flippedCards.forEach(card => {
-            if (card1.dataset.image != card2.dataset.image) {
+            if (isMismatch) {
               streak = 0;
               score = time + (streak * 10);
               card1.style.background = "url('images/small-pattern.png')";
@@ -190,6 +187,14 @@ function handleCardClick(event) {
           });
           flippedCards = [];
           lockBoard = false;
+
+          if (isMismatch) {
+            failedAttempts++;
+            if (failedAttempts >= 2) {
+              triggerRippleEffect();
+              failedAttempts = 0;
+            }
+          }
         }, HIDE_DELAY_MS);
       }
     }
@@ -316,7 +321,6 @@ function showAllCards() {
 }
 
 // * * * * * Leaderboard Code * * * * * 
-
 // Initialize IndexedDB
 
 
