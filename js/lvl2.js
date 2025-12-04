@@ -223,7 +223,7 @@ function handleCardClick(event) {
         lockBoard = true;
         const [card1, card2] = flippedCards;
         if (card1.dataset.image === card2.dataset.image) {
-          // SUCCESSFUL MATCH
+          // SUCCESSFUL MATCH - Follow Level 1 design
           card1.classList.add("matched");
           card2.classList.add("matched");
           matchedPairs++;
@@ -233,10 +233,6 @@ function handleCardClick(event) {
           card1.style.background = '#3d92d04d';
           card2.style.background = '#3d92d04d';
           telemetry.log('match', { result: 'success', image: card1.dataset.image, pairs: matchedPairs, streak: streak });
-
-          flippedCards = []; // Reset for next turn
-          lockBoard = false; // Unlock board
-
           if (matchedPairs === totalPairs) {
             setTimeout(() => {
               document.getElementById("game-board").style.display = "none";
@@ -244,36 +240,34 @@ function handleCardClick(event) {
               endGame();
             }, 400);
           }
-        } else {
-          // FAILED MATCH
-          setTimeout(() => {
-            streak = 0; // Reset streak on failed match
-            score = time + (streak * 10); // Update score after streak reset
-            card1.style.background = "url('images/small-pattern.png')";
-            card2.style.background = "url('images/small-pattern.png')";
-
-            if (window.innerWidth <= 1280 && window.innerHeight <= 850) {
-              card1.style.backgroundSize = '240px';
-              card2.style.backgroundSize = '240px';
-            } else {
-              card1.style.backgroundSize = '370px';
-              card2.style.backgroundSize = '370px';
-            }
-            telemetry.log('match', { result: 'fail', images: [card1.dataset.image, card2.dataset.image] });
-
-            const imageElement1 = card1.querySelector("img");
-            if (imageElement1) {
-              imageElement1.style.visibility = "hidden";
-            }
-            const imageElement2 = card2.querySelector("img");
-            if (imageElement2) {
-              imageElement2.style.visibility = "hidden";
-            }
-
-            flippedCards = [];
-            lockBoard = false;
-          }, HIDE_DELAY_MS);
         }
+
+        setTimeout(() => {
+          const isMismatch = card1.dataset.image != card2.dataset.image;
+          flippedCards.forEach(card => {
+            if (isMismatch) {
+              streak = 0; // Reset streak on failed match
+              score = time + (streak * 10); // Update score after streak reset
+              card1.style.background = "url('images/small-pattern.png')";
+              card2.style.background = "url('images/small-pattern.png')";
+
+              if (window.innerWidth <= 1280 && window.innerHeight <= 850) {
+                card1.style.backgroundSize = '240px';
+                card2.style.backgroundSize = '240px';
+              } else {
+                card1.style.backgroundSize = '370px';
+                card2.style.backgroundSize = '370px';
+              }
+              telemetry.log('match', { result: 'fail', images: [card1.dataset.image, card2.dataset.image] });
+            }
+            const imageElement = card.querySelector("img");
+            if (imageElement) {
+              imageElement.style.visibility = "hidden";
+            }
+          });
+          flippedCards = [];
+          lockBoard = false;
+        }, HIDE_DELAY_MS);
       }
     }
   }
@@ -284,6 +278,23 @@ function handleCardClick(event) {
 // Restart the game
 function restartFunction() {
   location.reload();
+}
+
+async function exportTelemetry() {
+  try {
+    const events = await telemetry.exportAll();
+    const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'telemetry_lvl2.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error('Export failed:', e);
+  }
 }
 
 function cardReader(card) {
