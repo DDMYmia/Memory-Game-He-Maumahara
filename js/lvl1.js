@@ -22,6 +22,7 @@ let failedAttempts = 0;
 let score = time;
 let leaderboard;
 let telemetry;
+let aiEngine = null;
 
 //
 
@@ -237,43 +238,53 @@ function cardReader(card) {
   console.log(card.dataset.image);
 
   if (card.dataset.image == "image1.png") {
-    card.style.background = '#4a61aa73';
+    // blue-dark
+    card.style.background = 'rgba(30, 37, 59, 0.4)';
     cookieCutterTxt.innerHTML = "Matariki";
   }
   if (card.dataset.image == "image2.png") {
-    card.style.background = 'rgba(166, 93, 70, 0.6)';
+    // orange-brown-dark
+    card.style.background = 'rgba(156, 68, 26, 0.4)';
     cookieCutterTxt.innerHTML = "Pīwakawaka";
   }
   if (card.dataset.image == "image3.png") {
-    card.style.background = '#656f76';
+    // gray-dark
+    card.style.background = 'rgba(23, 25, 31, 0.4)';
     cookieCutterTxt.innerHTML = "Tūī";
   }
   if (card.dataset.image == "image4.png") {
-    card.style.background = '#747853c4';
+    // green-olive-dark
+    card.style.background = 'rgba(78, 83, 55, 0.4)';
     cookieCutterTxt.innerHTML = "Kea";
   }
   if (card.dataset.image == "image5.png") {
-    card.style.background = '#063c1294';
+    // green-dark
+    card.style.background = 'rgba(0, 89, 28, 0.4)';
     cookieCutterTxt.innerHTML = "Kawakawa";
   }
   if (card.dataset.image == "image6.png") {
-    card.style.background = 'rgba(255, 0, 0, 0.3)';
+    // red
+    card.style.background = 'rgba(255, 0, 0, 0.4)';
     cookieCutterTxt.innerHTML = "Pōhutukawa";
   }
   if (card.dataset.image == "image7.png") {
-    card.style.background = '#f4b520a3';
+    // yellow-bright
+    card.style.background = 'rgba(241, 179, 0, 0.4)';
     cookieCutterTxt.innerHTML = "Kōwhai";
   }
   if (card.dataset.image == "image8.png") {
-    card.style.background = 'rgba(140, 236, 15, 0.3)';
+    // green-light
+    card.style.background = 'rgba(140, 236, 15, 0.4)';
     cookieCutterTxt.innerHTML = "Koru";
   }
   if (card.dataset.image == "image9.png") {
-    card.style.background = '#0065c669';
+    // blue-dark
+    card.style.background = 'rgba(0, 69, 115, 0.4)';
     cookieCutterTxt.innerHTML = "Hei Matau";
   }
   if (card.dataset.image == "image10.png") {
-    card.style.background = '#008fb3b2';
+    // blue-light
+    card.style.background = 'rgba(47, 174, 196, 0.4)';
     cookieCutterTxt.innerHTML = "Pikorua";
   }
 }
@@ -324,14 +335,23 @@ function showAllCards() {
 // Initialize IndexedDB
 
 
-function endGame() {
+async function endGame() {
   score = time + (streak * 10);
   document.body.style.backgroundColor = "#00f";
   document.getElementById('background').style.opacity = '0.7';
   document.getElementById('game-board').style.display = 'none';
   document.getElementById('game-over').style.display = 'block';
   document.getElementById('menu-icon').innerHTML = "<a href='play.html' class='menu-txt'>Menu</a><br><br><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>";
-  telemetry.log('end', { score, pairs: matchedPairs, streak: streak });
+  await telemetry.log('end', { score, pairs: matchedPairs, streak: streak });
+  
+  // Process with AI if available
+  if (aiEngine && typeof processGameEndWithAI === 'function') {
+    const aiResult = await processGameEndWithAI(telemetry, 1, aiEngine);
+    if (aiResult) {
+      console.log('Flow Index:', aiResult.flowIndex.toFixed(3));
+      console.log('Next Config Suggestion:', aiResult.nextConfig);
+    }
+  }
 }
 
 async function submitScore() {
@@ -406,6 +426,12 @@ window.onload = () => {
   telemetry = new Telemetry('telemetry_lvl1');
   leaderboard.openDatabase();
   telemetry.openDatabase();
+  
+  // Initialize AI Engine if available
+  if (typeof AIEngine !== 'undefined') {
+    aiEngine = new AIEngine();
+  }
+  
   initializeGame();
 };
 

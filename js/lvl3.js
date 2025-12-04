@@ -286,6 +286,23 @@ function restartFunction() {
     location.reload();
 }
 
+async function exportTelemetry() {
+  try {
+    const events = await telemetry.exportAll();
+    const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'telemetry_lvl3.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error('Export failed:', e);
+  }
+}
+
 // Card reader function (updates text and background)
 // Card reader function (updates text and background)
 function cardReader(card) {
