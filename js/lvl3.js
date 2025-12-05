@@ -6,7 +6,7 @@ let time = INITIAL_TIME;
 let gameStart = 0;
 let gameStop = 0;
 
-const totalPairs = 10;
+let totalPairs = 10;
 let cards = [];
 let flippedCards = [];
 let matchedPairs = 0;
@@ -34,7 +34,9 @@ const cardTextMapping = {
     "image 7": "Kōwhai",
     "image 8": "Koru",
     "image 9": "Hei Matau",
-    "image 10": "Pikorua"
+    "image 10": "Pikorua",
+    "image 11": "Image 11",
+    "image 12": "Image 12"
 };
 
 // 
@@ -347,6 +349,12 @@ function cardReader(card) {
         case "image10":
             card.style.background = '#008fb3b2';
             break;
+        case "image11":
+            card.style.background = '#7a3f9f';
+            break;
+        case "image12":
+            card.style.background = '#2b8cbe';
+            break;
         default:
             console.log("Card match not recognized:", matchKey);
     }
@@ -456,12 +464,39 @@ async function displayLeaderboard() {
 }
 
 window.onload = () => {
-    leaderboard = new Leaderboard('leaderboardDB_lvl3');
-    telemetry = new Telemetry('telemetry_lvl3');
-    leaderboard.openDatabase();
-    telemetry.openDatabase();
-    initializeGame();
-    updateTimer(); // Initialize timer display
+  leaderboard = new Leaderboard('leaderboardDB_lvl3');
+  telemetry = new Telemetry('telemetry_lvl3');
+  leaderboard.openDatabase();
+  telemetry.openDatabase();
+  try {
+    const params = new URLSearchParams(location.search);
+    const v = params.get('v');
+    if (v === '1') {
+      const gameBoard = document.getElementById('game-board');
+      if (gameBoard) {
+        gameBoard.style.gridTemplateColumns = 'repeat(4, 1fr)';
+        gameBoard.style.gridTemplateRows = 'repeat(6, 1fr)';
+      }
+      totalPairs = 12;
+    }
+  } catch (e) {}
+  try {
+    const cfgStr = localStorage.getItem('ai_level3_config');
+    const banner = document.getElementById('ai-banner');
+    if (banner) {
+      if (cfgStr) {
+        const cfg = JSON.parse(cfgStr);
+        const t = typeof cfg.initialTime === 'number' ? cfg.initialTime : INITIAL_TIME;
+        const h = typeof cfg.hideDelay === 'number' ? cfg.hideDelay : 400;
+        const s = typeof cfg.showScale === 'number' ? cfg.showScale : 1.4;
+        banner.textContent = `Adaptive difficulty enabled · Initial time ${t}s | Hide delay ${h}ms | Show scale ${s}`;
+      } else {
+        banner.textContent = 'Adaptive difficulty not enabled';
+      }
+    }
+  } catch (e) {}
+  initializeGame();
+  updateTimer(); // Initialize timer display
 };
 
 // No code below this
