@@ -107,7 +107,7 @@ const HIDE_DELAY_MS = 400;
 const SHOW_CARDS_SCALE = 1.4;
 let HIDE_DELAY_RUNTIME = HIDE_DELAY_MS;
 let SHOW_CARDS_SCALE_RUNTIME = SHOW_CARDS_SCALE;
-const IMAGE_POOL_MAX = 24;
+let IMAGE_POOL_MAX = 24;
 let IMAGE_SELECTION = (() => {
   const arr = Array.from({ length: IMAGE_POOL_MAX }, (_, i) => i + 1);
   for (let i = arr.length - 1; i > 0; i--) {
@@ -334,6 +334,13 @@ function endGame() {
   })();
 }
 
+async function resetData() {
+  try {
+    await telemetry.clearAll();
+    await leaderboard.clearAll();
+  } catch (e) {}
+}
+
 async function submitScore() {
   const name = document.getElementById('name').value;
   if (!name) return;
@@ -346,6 +353,17 @@ async function submitScore() {
     document.getElementById('game-over').style.display = 'none';
     document.getElementById('leaderboard-container').style.display = "block";
   } catch (error) {}
+}
+
+function isAdaptiveEnabled() {
+  const raw = localStorage.getItem('ai_adaptive_enabled');
+  return raw === null ? true : raw === 'true';
+}
+
+function toggleAdaptive() {
+  const enabled = isAdaptiveEnabled();
+  localStorage.setItem('ai_adaptive_enabled', enabled ? 'false' : 'true');
+  location.reload();
 }
 
 async function displayLeaderboard() {
@@ -372,22 +390,41 @@ window.onload = () => {
     }
   } catch (e) {}
   try {
+    const menuIcon = document.getElementById('menu-icon');
+    let banner = document.getElementById('ai-banner');
+    if (!banner && menuIcon) {
+      banner = document.createElement('div');
+      banner.id = 'ai-banner';
+      banner.className = 'menu-txt';
+      menuIcon.appendChild(banner);
+    }
+    const enabledRaw = localStorage.getItem('ai_adaptive_enabled');
+    const enabled = enabledRaw === null ? true : enabledRaw === 'true';
     const cfgStr = localStorage.getItem('ai_level2_config');
-    if (cfgStr) {
+    if (enabled && cfgStr) {
       const cfg = JSON.parse(cfgStr);
       if (typeof cfg.initialTime === 'number') { time = cfg.initialTime; }
       if (typeof cfg.hideDelay === 'number') { HIDE_DELAY_RUNTIME = cfg.hideDelay; }
       if (typeof cfg.showScale === 'number') { SHOW_CARDS_SCALE_RUNTIME = cfg.showScale; }
       if (typeof cfg.adjacentRate === 'number') { ADJACENT_RATE_RUNTIME = Math.max(0.2, Math.min(0.5, cfg.adjacentRate)); }
-      const banner = document.getElementById('ai-banner');
+      if (typeof cfg.gridCols === 'number' && typeof cfg.gridRows === 'number') {
+        GRID_COLS_RUNTIME = cfg.gridCols;
+        GRID_ROWS_RUNTIME = cfg.gridRows;
+        IMAGE_POOL_MAX = GRID_COLS_RUNTIME * GRID_ROWS_RUNTIME;
+        if (typeof cfg.totalPairs === 'number') { totalPairs = cfg.totalPairs; } else { totalPairs = Math.floor((GRID_COLS_RUNTIME * GRID_ROWS_RUNTIME) / 2); }
+      }
       if (banner) {
         const t = typeof cfg.initialTime === 'number' ? cfg.initialTime : INITIAL_TIME;
         const h = typeof cfg.hideDelay === 'number' ? cfg.hideDelay : HIDE_DELAY_MS;
         const s = typeof cfg.showScale === 'number' ? cfg.showScale : SHOW_CARDS_SCALE;
-        banner.textContent = `Adaptive difficulty enabled · Initial time ${t}s | Hide delay ${h}ms | Show scale ${s}`;
+        const gc = typeof cfg.gridCols === 'number' ? cfg.gridCols : GRID_COLS_RUNTIME;
+        const gr = typeof cfg.gridRows === 'number' ? cfg.gridRows : GRID_ROWS_RUNTIME;
+        const ar = typeof cfg.adjacentRate === 'number' ? Math.max(0.2, Math.min(0.5, cfg.adjacentRate)) : ADJACENT_RATE_RUNTIME;
+        banner.textContent = `Adaptive difficulty enabled · Grid ${gc}×${gr} | Pairs ${totalPairs} | Adjacent ${(ar*100).toFixed(0)}% | Initial time ${t}s | Hide delay ${h}ms | Show scale ${s}`;
       }
+    } else if (!enabled) {
+      if (banner) { banner.textContent = 'Adaptive difficulty disabled'; }
     } else {
-      const banner = document.getElementById('ai-banner');
       if (banner) { banner.textContent = 'Adaptive difficulty not enabled'; }
     }
   } catch (e) {}

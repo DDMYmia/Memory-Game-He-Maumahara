@@ -90,6 +90,17 @@ class Leaderboard {
       };
     });
   }
+
+  clearAll() {
+    if (!this.db) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('scores', 'readwrite');
+      const store = tx.objectStore('scores');
+      const req = store.clear();
+      req.onsuccess = () => { resolve(); };
+      req.onerror = e => { reject(e.target.error); };
+    });
+  }
 }
 
 class Telemetry {
@@ -136,6 +147,17 @@ class Telemetry {
       const store = tx.objectStore('events');
       const req = store.getAll();
       req.onsuccess = () => { resolve(req.result || []); };
+      req.onerror = e => { reject(e.target.error); };
+    });
+  }
+
+  clearAll() {
+    if (!this.db) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('events', 'readwrite');
+      const store = tx.objectStore('events');
+      const req = store.clear();
+      req.onsuccess = () => { resolve(); };
       req.onerror = e => { reject(e.target.error); };
     });
   }
