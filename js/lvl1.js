@@ -231,6 +231,13 @@ async function exportTelemetry() {
   } catch (e) { }
 }
 
+async function resetData() {
+  try {
+    await telemetry.clearAll();
+    await leaderboard.clearAll();
+  } catch (e) { }
+}
+
 function cardReader(card) {
   const cookieCutterTxt = document.getElementById("cookie-txt");
   const imageElement = card.querySelector("img");
@@ -350,6 +357,21 @@ async function endGame() {
     if (aiResult) {
       console.log('Flow Index:', aiResult.flowIndex.toFixed(3));
       console.log('Next Config Suggestion:', aiResult.nextConfig);
+      if (typeof aiEngine.updateBandit === 'function') {
+        aiEngine.updateBandit(aiResult.flowIndex);
+      }
+      try {
+        const key = 'ai_lvl1_completed_count';
+        const raw = localStorage.getItem(key);
+        let count = raw ? parseInt(raw, 10) : 0;
+        count += 1;
+        localStorage.setItem(key, String(count));
+        if (count >= 2) {
+          const lvl2Cfg = aiEngine.decideNextConfig(2);
+          localStorage.setItem('ai_level2_config', JSON.stringify(lvl2Cfg));
+          await telemetry.log('ai_level2_suggestion', { level: 2, nextConfig: lvl2Cfg, basedOn: 'lvl1_baseline', completedRounds: count });
+        }
+      } catch (e) {}
     }
   }
 }
@@ -426,6 +448,16 @@ window.onload = () => {
   telemetry = new Telemetry('telemetry_lvl1');
   leaderboard.openDatabase();
   telemetry.openDatabase();
+  const menuIcon = document.getElementById('menu-icon');
+  let banner = document.getElementById('ai-banner');
+  if (!banner && menuIcon) {
+    banner = document.createElement('div');
+    banner.id = 'ai-banner';
+    banner.className = 'menu-txt';
+    menuIcon.appendChild(banner);
+  }
+  const enabled = (function(){ const raw = localStorage.getItem('ai_adaptive_enabled'); return raw === null ? true : raw === 'true'; })();
+  if (banner) { banner.textContent = enabled ? 'Adaptive difficulty enabled' : 'Adaptive difficulty disabled'; }
   
   // Initialize AI Engine if available
   if (typeof AIEngine !== 'undefined') {
@@ -434,6 +466,18 @@ window.onload = () => {
   
   initializeGame();
 };
+
+function isAdaptiveEnabled() {
+  const raw = localStorage.getItem('ai_adaptive_enabled');
+  return raw === null ? true : raw === 'true';
+}
+
+function toggleAdaptive() {
+  const enabled = isAdaptiveEnabled();
+  localStorage.setItem('ai_adaptive_enabled', enabled ? 'false' : 'true');
+  const banner = document.getElementById('ai-banner');
+  if (banner) { banner.textContent = enabled ? 'Adaptive difficulty disabled' : 'Adaptive difficulty enabled'; }
+}
 
 // No code below this
 

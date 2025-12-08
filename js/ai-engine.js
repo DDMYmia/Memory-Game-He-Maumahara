@@ -673,12 +673,31 @@ class ContextualBandit {
     const base = baseConfig[level] || baseConfig[1];
     const difficultyMultiplier = 0.2 * arm; // 0 to 0.8
 
+    let gridCols = 5;
+    let gridRows = 4;
+    if (level === 2) {
+      const gridMap = [ [5,4], [5,4], [4,6], [5,6], [5,6] ];
+      const sel = gridMap[Math.min(gridMap.length - 1, Math.max(0, arm))];
+      gridCols = sel[0];
+      gridRows = sel[1];
+    } else if (level === 3) {
+      const gridMap = [ [4,6], [4,6], [5,6], [6,6], [6,6] ];
+      const sel = gridMap[Math.min(gridMap.length - 1, Math.max(0, arm))];
+      gridCols = sel[0];
+      gridRows = sel[1];
+    }
+    const totalPairs = Math.floor((gridCols * gridRows) / 2);
+
     return {
       initialTime: Math.round(base.initialTime * (1 + difficultyMultiplier)),
       matchReward: Math.max(1, Math.round(base.matchReward * (1 - 0.2 * difficultyMultiplier))),
       hideDelay: Math.max(200, Math.round(base.hideDelay * (1 - 0.3 * difficultyMultiplier))),
       showScale: Math.max(1.1, base.showScale * (1 - 0.2 * difficultyMultiplier)),
-      hintPolicy: arm < 2 ? 'generous' : arm > 3 ? 'limited' : 'standard'
+      hintPolicy: arm < 2 ? 'generous' : arm > 3 ? 'limited' : 'standard',
+      adjacentRate: Math.max(0.2, 0.5 - 0.1 * arm),
+      gridCols,
+      gridRows,
+      totalPairs
     };
   }
 }

@@ -1,5 +1,3 @@
-//
-
 // Level 3: 5 minutes (300 seconds)
 const INITIAL_TIME = 300;
 let time = INITIAL_TIME;
@@ -270,7 +268,7 @@ function handleCardClick(event) {
                     });
                     flippedCards = [];
                     lockBoard = false;
-                }, HIDE_DELAY_MS);
+                }, HIDE_DELAY_RUNTIME);
             }
         }
     }
@@ -285,7 +283,7 @@ function normalizeMatch(match) {
 
 // Restart the game
 function restartFunction() {
-    location.reload();
+  location.reload();
 }
 
 async function exportTelemetry() {
@@ -303,6 +301,24 @@ async function exportTelemetry() {
   } catch (e) {
     console.error('Export failed:', e);
   }
+}
+
+async function resetData() {
+  try {
+    await telemetry.clearAll();
+    await leaderboard.clearAll();
+  } catch (e) {}
+}
+
+function isAdaptiveEnabled() {
+  const raw = localStorage.getItem('ai_adaptive_enabled');
+  return raw === null ? true : raw === 'true';
+}
+
+function toggleAdaptive() {
+  const enabled = isAdaptiveEnabled();
+  localStorage.setItem('ai_adaptive_enabled', enabled ? 'false' : 'true');
+  location.reload();
 }
 
 // Card reader function (updates text and background)
@@ -388,7 +404,7 @@ function showAllCards() {
                 if (imageElement) {
                     imageElement.style.visibility = "visible"; // Show the image
                     imageElement.style.animation = "none"; // Remove any animations if needed
-                    imageElement.style.transform = "scale(1.4)";
+                    imageElement.style.transform = "scale(" + SHOW_CARDS_SCALE_RUNTIME + ")";
                 }
                 
                 if (textElement) {
@@ -481,15 +497,38 @@ window.onload = () => {
     }
   } catch (e) {}
   try {
+    const menuIcon = document.getElementById('menu-icon');
+    let banner = document.getElementById('ai-banner');
+    if (!banner && menuIcon) {
+      banner = document.createElement('div');
+      banner.id = 'ai-banner';
+      banner.className = 'menu-txt';
+      menuIcon.appendChild(banner);
+    }
+    const enabledRaw = localStorage.getItem('ai_adaptive_enabled');
+    const enabled = enabledRaw === null ? true : enabledRaw === 'true';
     const cfgStr = localStorage.getItem('ai_level3_config');
-    const banner = document.getElementById('ai-banner');
     if (banner) {
-      if (cfgStr) {
+      if (enabled && cfgStr) {
         const cfg = JSON.parse(cfgStr);
+        if (typeof cfg.initialTime === 'number') { time = cfg.initialTime; }
+        if (typeof cfg.hideDelay === 'number') { HIDE_DELAY_RUNTIME = cfg.hideDelay; }
+        if (typeof cfg.showScale === 'number') { SHOW_CARDS_SCALE_RUNTIME = cfg.showScale; }
+        const gameBoard = document.getElementById('game-board');
+        if (typeof cfg.gridCols === 'number' && typeof cfg.gridRows === 'number' && gameBoard) {
+          gameBoard.style.gridTemplateColumns = `repeat(${cfg.gridCols}, 1fr)`;
+          gameBoard.style.gridTemplateRows = `repeat(${cfg.gridRows}, 1fr)`;
+          if (typeof cfg.totalPairs === 'number') { totalPairs = cfg.totalPairs; } else { totalPairs = Math.floor((cfg.gridCols * cfg.gridRows) / 2); }
+        }
         const t = typeof cfg.initialTime === 'number' ? cfg.initialTime : INITIAL_TIME;
-        const h = typeof cfg.hideDelay === 'number' ? cfg.hideDelay : 400;
-        const s = typeof cfg.showScale === 'number' ? cfg.showScale : 1.4;
-        banner.textContent = `Adaptive difficulty enabled · Initial time ${t}s | Hide delay ${h}ms | Show scale ${s}`;
+        const h = typeof cfg.hideDelay === 'number' ? cfg.hideDelay : HIDE_DELAY_RUNTIME;
+        const s = typeof cfg.showScale === 'number' ? cfg.showScale : SHOW_CARDS_SCALE_RUNTIME;
+        const gc = typeof cfg.gridCols === 'number' ? cfg.gridCols : 4;
+        const gr = typeof cfg.gridRows === 'number' ? cfg.gridRows : 6;
+        const pairs = typeof cfg.totalPairs === 'number' ? cfg.totalPairs : Math.floor((gc * gr) / 2);
+        banner.textContent = `Adaptive difficulty enabled · Grid ${gc}×${gr} | Pairs ${pairs} | Initial time ${t}s | Hide delay ${h}ms | Show scale ${s}`;
+      } else if (!enabled) {
+        banner.textContent = 'Adaptive difficulty disabled';
       } else {
         banner.textContent = 'Adaptive difficulty not enabled';
       }
@@ -501,3 +540,6 @@ window.onload = () => {
 
 // No code below this
 const HIDE_DELAY_MS = 400;
+let HIDE_DELAY_RUNTIME = HIDE_DELAY_MS;
+const SHOW_CARDS_SCALE = 1.4;
+let SHOW_CARDS_SCALE_RUNTIME = SHOW_CARDS_SCALE;
