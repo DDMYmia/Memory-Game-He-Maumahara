@@ -18,6 +18,7 @@ let showCards = 0;
 let score = time;
 let leaderboard;
 let telemetry;
+let aiEngine;
 
 //
 
@@ -160,11 +161,11 @@ function shuffleArray(array) {
 
 // Handle card click
 function handleCardClick(event) {
-    if (lockBoard) return;
-    if (gameStart !== 1) {
-        gameStart = 1;
-        telemetry.log('start', { level: 3 });
-    }
+  if (lockBoard) return;
+  if (gameStart !== 1) {
+    gameStart = 1;
+    telemetry.log('start', { level: 3, variant: { pairsType: 'image-text', hideDelay: HIDE_DELAY_RUNTIME, showScale: SHOW_CARDS_SCALE_RUNTIME, timerMode: 'countdown', initialTime: time, totalPairs } });
+  }
 
 	if (showCards !== 1)
 	{
@@ -194,13 +195,17 @@ function handleCardClick(event) {
             flippedCards.push(card);
 
             if (flippedCards.length === 2) {
-                lockBoard = true;
-                const [card1, card2] = flippedCards;
-
-                // Ensure that both cards have the 'data-match' attribute before proceeding
-                
+              lockBoard = true;
+              const [card1, card2] = flippedCards;
                 if (!card1.dataset.match || !card2.dataset.match) {
-                    console.error("Missing data-match attribute on cards");
+                    flippedCards.forEach(card => {
+                        const imageElementX = card.querySelector("img");
+                        const textElementX = card.querySelector("span");
+                        if (imageElementX) imageElementX.style.visibility = "hidden";
+                        if (textElementX) textElementX.style.visibility = "hidden";
+                    });
+                    flippedCards = [];
+                    lockBoard = false;
                     return;
                 }
 
@@ -208,12 +213,8 @@ function handleCardClick(event) {
                 const match1 = normalizeMatch(card1.dataset.match);  // Normalize the match for card1
                 const match2 = normalizeMatch(card2.dataset.match);  // Normalize the match for card2
 
-                console.log("Normalized Card 1:", match1);  // For debugging
-                console.log("Card 2 (Text):", match2);  // For debugging
-
                 // Compare the normalized match values (ensuring both cards match, no matter the order)
                 if (match1 === match2) {
-                    console.log("Match Found!");
                     card1.classList.add("matched");
                     card2.classList.add("matched");
                     
@@ -327,7 +328,7 @@ function cardReader(card) {
     const cookieCutterTxt = document.getElementById("cookie-txt");
 
     // Normalize the match key (remove ".png" and replace spaces)
-    let matchKey = card.dataset.match.replace('.png', '').replace(' ', '');
+    let matchKey = card.dataset.match.replace('.png', '').replace(/\s+/g, '');
 
     // Update the text display with the normalized match value
     const displayText = cardTextMapping[`image ${matchKey.replace('image', '')}`]; // Convert 'image1' to 'image 1'
@@ -455,6 +456,24 @@ function endGame() {
     document.getElementById('game-over').style.display = 'block';
     document.getElementById('menu-icon').innerHTML = "<a href='play.html' class='menu-txt'>Menu</a><br><br><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>";
     telemetry.log('end', { score, pairs: matchedPairs, streak: streak });
+    (async () => {
+      try {
+        if (aiEngine && typeof processGameEndWithAI === 'function') {
+          const aiResult = await processGameEndWithAI(telemetry, 3, aiEngine);
+          if (aiResult && typeof aiEngine.updateBandit === 'function') { aiEngine.updateBandit(aiResult.flowIndex); }
+          const l1raw = localStorage.getItem('ai_lvl1_completed_count');
+          const l1count = l1raw ? parseInt(l1raw, 10) : 0;
+          if (l1count >= 2) {
+            const lvl2Cfg = aiEngine.decideNextConfig(2);
+            localStorage.setItem('ai_level2_config', JSON.stringify(lvl2Cfg));
+            await telemetry.log('ai_level2_suggestion', { level: 2, nextConfig: lvl2Cfg, basedOn: 'lvl3_update' });
+            const lvl3Cfg = aiEngine.decideNextConfig(3);
+            localStorage.setItem('ai_level3_config', JSON.stringify(lvl3Cfg));
+            await telemetry.log('ai_level3_suggestion', { level: 3, nextConfig: lvl3Cfg, basedOn: 'lvl3_update' });
+          }
+        }
+      } catch (e) {}
+    })();
 }
 
 async function submitScore() {
@@ -484,6 +503,7 @@ window.onload = () => {
   telemetry = new Telemetry('telemetry_lvl3');
   leaderboard.openDatabase();
   telemetry.openDatabase();
+  if (typeof AIEngine !== 'undefined') { aiEngine = new AIEngine(); }
   try {
     const params = new URLSearchParams(location.search);
     const v = params.get('v');
