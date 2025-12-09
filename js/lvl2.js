@@ -137,7 +137,7 @@ function updateTimer() {
 }
 
 setInterval(() => {
-  if (gameStart == 1) {
+  if (gameStart === 1) {
     if (gameStop == 0) {
       if (time > 0) {
         time--;
@@ -318,16 +318,6 @@ function endGame() {
         const aiResult = await processGameEndWithAI(telemetry, 2, aiEngine);
         if (aiResult) {
           if (typeof aiEngine.updateBandit === 'function') { aiEngine.updateBandit(aiResult.flowIndex); }
-          const key = 'ai_lvl2_completed_count';
-          const raw = localStorage.getItem(key);
-          let count = raw ? parseInt(raw, 10) : 0;
-          count += 1;
-          localStorage.setItem(key, String(count));
-          if (count >= 2) {
-            const lvl3Cfg = aiEngine.decideNextConfig(3);
-            localStorage.setItem('ai_level3_config', JSON.stringify(lvl3Cfg));
-            await telemetry.log('ai_level3_suggestion', { level: 3, nextConfig: lvl3Cfg, basedOn: 'lvl2_baseline', completedRounds: count });
-          }
         }
       } catch (e) {}
     }

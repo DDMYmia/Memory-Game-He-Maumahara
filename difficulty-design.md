@@ -1,4 +1,4 @@
-# Difficulty Design
+# Difficulty Design (Version v1.4.2)
 
 ## Legacy (Old) Design
 

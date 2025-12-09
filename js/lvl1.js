@@ -74,7 +74,7 @@ function updateTimer() {
 
 // Timer counts down by 1 every second 
 setInterval(() => {
-  if (gameStart == 1) {
+  if (gameStart === 1) {
     if (gameStop == 0) {
       if (time > 0) {
         time--;
@@ -124,7 +124,7 @@ function handleCardClick(event) {
   if (lockBoard || isRippleActive) return;
   lastInteractionTime = Date.now();
 
-  if (gameStart != 1) {
+  if (gameStart !== 1) {
     gameStart = 1;
     telemetry.log('start', { level: 1, variant: { layout: 'fixed_template', cols: FIXED_COLS, rows: FIXED_ROWS, hideDelay: HIDE_DELAY_MS, showScale: SHOW_CARDS_SCALE, timerMode: 'countdown', initialTime: INITIAL_TIME, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
   }
@@ -242,7 +242,6 @@ function cardReader(card) {
   const cookieCutterTxt = document.getElementById("cookie-txt");
   const imageElement = card.querySelector("img");
 
-  console.log(card.dataset.image);
 
   if (card.dataset.image == "image1.png") {
     // blue-dark
@@ -370,6 +369,9 @@ async function endGame() {
           const lvl2Cfg = aiEngine.decideNextConfig(2);
           localStorage.setItem('ai_level2_config', JSON.stringify(lvl2Cfg));
           await telemetry.log('ai_level2_suggestion', { level: 2, nextConfig: lvl2Cfg, basedOn: 'lvl1_baseline', completedRounds: count });
+          const lvl3Cfg = aiEngine.decideNextConfig(3);
+          localStorage.setItem('ai_level3_config', JSON.stringify(lvl3Cfg));
+          await telemetry.log('ai_level3_suggestion', { level: 3, nextConfig: lvl3Cfg, basedOn: 'lvl1_baseline', completedRounds: count });
         }
       } catch (e) {}
     }
