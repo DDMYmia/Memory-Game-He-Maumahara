@@ -70,6 +70,16 @@ class FuzzyLogicSystem {
         color: 'blue-light',        // Main: blue, tone: light
         baseColor: 'blue', 
         name: 'Pikorua' 
+      },
+      'image11.png': {
+        color: 'purple-dark',
+        baseColor: 'blue',
+        name: 'Image 11'
+      },
+      'image12.png': {
+        color: 'blue-medium',
+        baseColor: 'blue',
+        name: 'Image 12'
       }
     };
 
@@ -497,8 +507,8 @@ class ContextualBandit {
     // Arm 4: Hard (fewer hints, shorter time, complex layout)
     
     // LinUCB parameters
-    this.alpha = 1.0; // Exploration parameter
-    this.d = 6; // Context dimension: [level, avgFlow, errorRate, cadence, streak, fatigue]
+    this.alpha = 1.0;
+    this.d = 6;
     
     // Initialize per-arm parameters
     this.arms = [];
@@ -590,9 +600,8 @@ class ContextualBandit {
       errorRate = 0.2,
       cadence = 0.5,
       streak = 0,
-      fatigue = 0 // Proxy: session duration or consecutive rounds
+      fatigue = 0
     } = playerState;
-
     return [level / 3, avgFlow, errorRate, cadence, Math.min(streak / 10, 1), fatigue];
   }
 
@@ -643,15 +652,11 @@ class ContextualBandit {
   update(arm, playerState, reward) {
     const context = this.extractContext(playerState);
     const armData = this.arms[arm];
-    
-    // Update A: A = A + context * context^T
     for (let i = 0; i < this.d; i++) {
       for (let j = 0; j < this.d; j++) {
         armData.A[i][j] += context[i] * context[j];
       }
     }
-    
-    // Update b: b = b + reward * context
     for (let i = 0; i < this.d; i++) {
       armData.b[i] += reward * context[i];
     }
@@ -671,12 +676,12 @@ class ContextualBandit {
     };
 
     const base = baseConfig[level] || baseConfig[1];
-    const difficultyMultiplier = 0.2 * arm; // 0 to 0.8
+    const difficultyMultiplier = 0.2 * arm;
 
     let gridCols = 5;
     let gridRows = 4;
     if (level === 2) {
-      const gridMap = [ [5,4], [5,4], [4,6], [5,6], [5,6] ];
+      const gridMap = [ [5,4], [5,4], [4,6], [4,6], [4,6] ];
       const sel = gridMap[Math.min(gridMap.length - 1, Math.max(0, arm))];
       gridCols = sel[0];
       gridRows = sel[1];
@@ -739,12 +744,16 @@ class AIEngine {
       level: 1,
       rounds: [],
       currentRound: null,
+      lastHiddenLevel: null,
+      lastArm: null,
+      lastAdjacentRate: null,
       playerProfile: {
         avgFlow: 0.5,
         errorRate: 0.2,
         cadence: 0.5,
         streak: 0,
-        fatigue: 0
+        fatigue: 0,
+        hiddenDifficulty: 0.5
       }
     };
   }
@@ -782,8 +791,16 @@ class AIEngine {
 
     // Update player profile
     const allFlows = this.sessionState.rounds.map(r => r.flowIndex);
-    this.sessionState.playerProfile.avgFlow = 
-      allFlows.reduce((a, b) => a + b, 0) / allFlows.length;
+    this.sessionState.playerProfile.avgFlow = allFlows.reduce((a, b) => a + b, 0) / allFlows.length;
+
+    const err = this.fuzzyLogic.calculateErrorRate(failedMatches || 0, totalMatches || 0);
+    const successful = (totalMatches || 0) - (failedMatches || 0);
+    const acc = this.fuzzyLogic.calculateClickAccuracy(successful, (gameData.totalClicks || 0));
+    const cadence = this.fuzzyLogic.calculateCadenceStability(flipIntervals || []);
+    this.sessionState.playerProfile.errorRate = err;
+    this.sessionState.playerProfile.cadence = cadence;
+
+    this.updateHiddenDifficulty(flowIndex, gameData);
 
     return flowIndex;
   }
@@ -798,9 +815,43 @@ class AIEngine {
     this.sessionState.playerProfile.fatigue = 
       Math.min(1, this.sessionState.rounds.length / 10);
 
-    const selectedArm = this.bandit.selectArm(this.sessionState.playerProfile);
-    const config = this.bandit.getConfigForArm(selectedArm, level);
+    const armRaw = this.bandit.selectArm(this.sessionState.playerProfile);
+    let selectedArm = armRaw;
+    if (typeof this.sessionState.lastArm === 'number') {
+      const last = this.sessionState.lastArm;
+      if (armRaw > last) selectedArm = Math.min(last + 1, armRaw);
+      if (armRaw < last) selectedArm = Math.max(last - 1, armRaw);
+    }
+    selectedArm = Math.max(0, Math.min(4, selectedArm));
+    const configBase = this.bandit.getConfigForArm(selectedArm, level);
 
+    let targetAdj = configBase.adjacentRate;
+    let newAdj = targetAdj;
+    if (typeof this.sessionState.lastAdjacentRate === 'number') {
+      const prev = this.sessionState.lastAdjacentRate;
+      const step = 0.05;
+      if (targetAdj > prev) newAdj = Math.min(prev + step, targetAdj);
+      if (targetAdj < prev) newAdj = Math.max(prev - step, targetAdj);
+    }
+    newAdj = Math.max(0.2, Math.min(0.5, newAdj));
+    const config = { ...configBase, adjacentRate: newAdj };
+
+    const hiddenLevelRaw = this.getHiddenLevel();
+    const prev = this.sessionState.lastHiddenLevel;
+    let hiddenLevel = hiddenLevelRaw;
+    if (typeof prev === 'number') {
+      if (hiddenLevelRaw > prev) hiddenLevel = Math.min(prev + 1, hiddenLevelRaw);
+      if (hiddenLevelRaw < prev) hiddenLevel = Math.max(prev - 1, hiddenLevelRaw);
+    }
+    const hideMap = [600, 500, 400, 300, 240];
+    const scaleMap = [1.5, 1.4, 1.3, 1.2, 1.1];
+    config.hideDelay = hideMap[hiddenLevel];
+    config.showScale = scaleMap[hiddenLevel];
+    config.hiddenLevel = hiddenLevel;
+    this.sessionState.lastHiddenLevel = hiddenLevel;
+
+    this.sessionState.lastArm = selectedArm;
+    this.sessionState.lastAdjacentRate = newAdj;
     this.sessionState.currentRound = {
       arm: selectedArm,
       config,
@@ -831,6 +882,30 @@ class AIEngine {
    */
   getInitialDifficulty(signals) {
     return this.decisionTree.assessInitialDifficulty(signals);
+  }
+
+  updateHiddenDifficulty(flowIndex, metrics) {
+    const fm = metrics.failedMatches || 0;
+    const tm = metrics.totalMatches || 0;
+    const tc = metrics.totalClicks || 0;
+    const cheats = metrics.cheatCount || 0;
+    const pairs = metrics.totalPairs || 10;
+    const cheatRatio = pairs > 0 ? Math.min(1, cheats / pairs) : 0;
+    const err = this.fuzzyLogic.calculateErrorRate(fm, tm);
+    const successful = tm - fm;
+    const acc = this.fuzzyLogic.calculateClickAccuracy(successful, tc);
+    let target = 0.5 * flowIndex + 0.3 * (1 - cheatRatio) + 0.2 * acc - 0.2 * err;
+    target = Math.max(0, Math.min(1, target));
+    const prev = this.sessionState.playerProfile.hiddenDifficulty || 0.5;
+    const alpha = 0.3;
+    const next = alpha * target + (1 - alpha) * prev;
+    this.sessionState.playerProfile.hiddenDifficulty = Math.max(0, Math.min(1, next));
+  }
+
+  getHiddenLevel() {
+    const d = this.sessionState.playerProfile.hiddenDifficulty || 0.5;
+    const lvl = Math.round(d * 4);
+    return Math.max(0, Math.min(4, lvl));
   }
 }
 
