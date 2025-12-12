@@ -30,6 +30,7 @@ async function extractPerformanceMetrics(telemetry, level) {
     const failedMatches = matchEvents.filter(e => e.data.result === 'fail').length;
     const totalMatches = matchEvents.length;
     
+    
     // Extract flip intervals and count total clicks
     const flipEvents = events.filter(e => e.type === 'flip');
     const flipIntervals = [];
@@ -38,6 +39,7 @@ async function extractPerformanceMetrics(telemetry, level) {
       flipIntervals.push(interval);
     }
     const totalClicks = flipEvents.length;
+    
     
     // Get total pairs from start event or default
     const totalPairs = startEvent.data.variant?.totalPairs || 10;
@@ -69,8 +71,14 @@ async function extractPerformanceMetrics(telemetry, level) {
         // For failed matches, use first image
         imageName = data.images[0];
       } else if (data.pair) {
-        // For Level 3, use pair information
         imageName = data.pair;
+      }
+
+      if (typeof imageName === 'string') {
+        const m = imageName.match(/^image\s*(\d+)$/i);
+        if (m) {
+          imageName = `image${m[1]}.png`;
+        }
       }
       
       if (imageName && fuzzyLogic) {
@@ -97,6 +105,8 @@ async function extractPerformanceMetrics(telemetry, level) {
         }
       }
     });
+
+    
     
     // Also process flip events to get more complete statistics
     // Track which images were attempted (even if not matched)
@@ -106,6 +116,8 @@ async function extractPerformanceMetrics(telemetry, level) {
         attemptedImages.add(event.data.image);
       }
     });
+
+    
     
     return {
       level,
