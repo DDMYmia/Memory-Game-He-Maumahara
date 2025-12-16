@@ -162,3 +162,94 @@ class Telemetry {
     });
   }
 }
+
+/**
+ * PlayerProfile - Stores AI player profile data in IndexedDB
+ * 
+ * Persists player profile, bandit state, and session state across sessions
+ */
+class PlayerProfile {
+  constructor(dbName = 'ai_player_profile') {
+    this.db = null;
+    this.dbName = dbName;
+  }
+
+  openDatabase() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, 1);
+      request.onupgradeneeded = event => {
+        this.db = event.target.result;
+        if (!this.db.objectStoreNames.contains('profile')) {
+          this.db.createObjectStore('profile', { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = event => {
+        this.db = event.target.result;
+        resolve();
+      };
+      request.onerror = event => {
+        reject(event.target.error);
+      };
+    });
+  }
+
+  /**
+   * Save player profile data
+   * @param {Object} profileData - Profile data to save
+   * @returns {Promise}
+   */
+  saveProfile(profileData) {
+    if (!this.db) return Promise.reject('Database not open');
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('profile', 'readwrite');
+      const store = tx.objectStore('profile');
+      const data = {
+        id: 'current',
+        ...profileData,
+        lastUpdated: Date.now()
+      };
+      const req = store.put(data);
+      req.onsuccess = () => { resolve(); };
+      req.onerror = e => { reject(e.target.error); };
+    });
+  }
+
+  /**
+   * Load player profile data
+   * @returns {Promise<Object|null>} Profile data or null if not found
+   */
+  loadProfile() {
+    if (!this.db) return Promise.reject('Database not open');
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('profile', 'readonly');
+      const store = tx.objectStore('profile');
+      const req = store.get('current');
+      req.onsuccess = () => {
+        const result = req.result;
+        if (result) {
+          // Remove metadata fields
+          const { id, lastUpdated, ...profileData } = result;
+          resolve(profileData);
+        } else {
+          resolve(null);
+        }
+      };
+      req.onerror = e => { reject(e.target.error); };
+    });
+  }
+
+  /**
+   * Clear all profile data
+   * @returns {Promise}
+   */
+  clearAll() {
+    if (!this.db) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction('profile', 'readwrite');
+      const store = tx.objectStore('profile');
+      const req = store.clear();
+      req.onsuccess = () => { resolve(); };
+      req.onerror = e => { reject(e.target.error); };
+    });
+  }
+}
