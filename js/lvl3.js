@@ -12,6 +12,14 @@ let streak = 0; // Track consecutive successful matches
 let lockBoard = false;
 
 let showCards = 0;
+let consecutiveErrors = 0;
+let maxConsecutiveErrors = 0;
+
+// Grid configuration (can be adjusted by AI)
+const GRID_COLS = 5;
+const GRID_ROWS = 4;
+let GRID_COLS_RUNTIME = GRID_COLS;
+let GRID_ROWS_RUNTIME = GRID_ROWS;
 
 //
 
@@ -164,7 +172,7 @@ function handleCardClick(event) {
   if (lockBoard) return;
   if (gameStart !== 1) {
     gameStart = 1;
-    telemetry.log('start', { level: 3, variant: { pairsType: 'image-text', hideDelay: HIDE_DELAY_RUNTIME, showScale: SHOW_CARDS_SCALE_RUNTIME, timerMode: 'countdown', initialTime: time, totalPairs } });
+    telemetry.log('start', { level: 3, variant: { pairsType: 'image-text', cols: GRID_COLS_RUNTIME, rows: GRID_ROWS_RUNTIME, totalPairs, hideDelay: HIDE_DELAY_RUNTIME, showScale: SHOW_CARDS_SCALE_RUNTIME, timerMode: 'countdown', initialTime: time, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
   }
 
 	if (showCards !== 1)
@@ -227,7 +235,15 @@ function handleCardClick(event) {
                     time += 3;
                     // Update score with new streak value
                     score = time + (streak * 10);
-                    telemetry.log('match', { result: 'success', pair: match1, pairs: matchedPairs, streak: streak });
+                    consecutiveErrors = 0; // Reset on success
+                    telemetry.log('match', { 
+                      result: 'success', 
+                      pair: match1, 
+                      pairs: matchedPairs, 
+                      streak: streak,
+                      consecutiveErrors: 0,
+                      maxConsecutiveErrors: maxConsecutiveErrors
+                    });
 
                     if (matchedPairs === totalPairs) {
                         setTimeout(() => {
@@ -264,7 +280,14 @@ function handleCardClick(event) {
                                 card1.style.backgroundSize = '370px';
                                 card2.style.backgroundSize = '370px';
                             }
-                            telemetry.log('match', { result: 'fail', pair: [match1, match2] });
+                            consecutiveErrors++;
+                            maxConsecutiveErrors = Math.max(maxConsecutiveErrors, consecutiveErrors);
+                            telemetry.log('match', { 
+                              result: 'fail', 
+                              pair: [match1, match2],
+                              consecutiveErrors: consecutiveErrors,
+                              maxConsecutiveErrors: maxConsecutiveErrors
+                            });
                         }
                     });
                     flippedCards = [];
@@ -447,33 +470,89 @@ function showAllCards() {
 // Initialize IndexedDB
  
 
-function endGame() {
+async function endGame() {
 		// Calculate final score: time remaining + streak bonus
 		score = time + (streak * 10);
 		document.body.style.backgroundColor = "#00f";
 		document.getElementById('background').style.opacity = '0.7';
     document.getElementById('game-board').style.display = 'none';
-    document.getElementById('game-over').style.display = 'block';
+    // Hide game timer when game ends
+    const gameTimer = document.getElementById('game-timer');
+    if (gameTimer) {
+      gameTimer.style.display = 'none';
+    }
+    // Hide glass effect when game ends
+    const glassFx = document.getElementById('glass-fx');
+    if (glassFx) {
+      glassFx.style.display = 'none';
+    }
+    
+    const gameOver = document.getElementById('game-over');
+    gameOver.classList.add('show');
     document.getElementById('menu-icon').innerHTML = "<a href='play.html' class='menu-txt'>Menu</a><br><br><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>";
-    telemetry.log('end', { score, pairs: matchedPairs, streak: streak });
-    (async () => {
-      try {
-        if (aiEngine && typeof processGameEndWithAI === 'function') {
-          const aiResult = await processGameEndWithAI(telemetry, 3, aiEngine);
-          if (aiResult && typeof aiEngine.updateBandit === 'function') { aiEngine.updateBandit(aiResult.flowIndex); }
-          const l1raw = localStorage.getItem('ai_lvl1_completed_count');
-          const l1count = l1raw ? parseInt(l1raw, 10) : 0;
-          if (l1count >= 2) {
-            const lvl2Cfg = aiEngine.decideNextConfig(2);
-            localStorage.setItem('ai_level2_config', JSON.stringify(lvl2Cfg));
-            await telemetry.log('ai_level2_suggestion', { level: 2, nextConfig: lvl2Cfg, basedOn: 'lvl3_update' });
-            const lvl3Cfg = aiEngine.decideNextConfig(3);
-            localStorage.setItem('ai_level3_config', JSON.stringify(lvl3Cfg));
-            await telemetry.log('ai_level3_suggestion', { level: 3, nextConfig: lvl3Cfg, basedOn: 'lvl3_update' });
-          }
+    await telemetry.log('end', { score, pairs: matchedPairs, streak: streak });
+    
+    let aiResult = null;
+    try {
+      if (aiEngine && typeof processGameEndWithAI === 'function') {
+        aiResult = await processGameEndWithAI(telemetry, 3, aiEngine);
+        if (aiResult && typeof aiEngine.updateBandit === 'function') { aiEngine.updateBandit(aiResult.flowIndex); }
+        const l1raw = localStorage.getItem('ai_lvl1_completed_count');
+        const l1count = l1raw ? parseInt(l1raw, 10) : 0;
+        if (l1count >= 2) {
+          const lvl2Cfg = aiEngine.decideNextConfig(2);
+          localStorage.setItem('ai_level2_config', JSON.stringify(lvl2Cfg));
+          await telemetry.log('ai_level2_suggestion', { level: 2, nextConfig: lvl2Cfg, basedOn: 'lvl3_update' });
+          const lvl3Cfg = aiEngine.decideNextConfig(3);
+          localStorage.setItem('ai_level3_config', JSON.stringify(lvl3Cfg));
+          await telemetry.log('ai_level3_suggestion', { level: 3, nextConfig: lvl3Cfg, basedOn: 'lvl3_update' });
         }
-      } catch (e) {}
-    })();
+      }
+    } catch (e) {}
+    
+    // Display analytics summary
+    const analyticsContainer = document.querySelector('#game-over .game-over-right') || document.getElementById('analytics-summary');
+    if (typeof displayAnalyticsSummary === 'function' && analyticsContainer) {
+      await displayAnalyticsSummary(telemetry, 3, aiResult, { score, streak, remainingTime: time });
+      
+      // Save game session to history
+      if (typeof GameHistory !== 'undefined') {
+        try {
+          const history = new GameHistory();
+          await history.openDatabase();
+          
+          const events = await telemetry.exportAll();
+          const sortedEvents = events.sort((a, b) => a.ts - b.ts);
+          let startEvent = null;
+          for (let i = sortedEvents.length - 1; i >= 0; i--) {
+            if (sortedEvents[i].type === 'start' && sortedEvents[i].data.level === 3) {
+              startEvent = sortedEvents[i];
+              break;
+            }
+          }
+          const config = startEvent?.data?.variant || {};
+          
+          let metrics = null;
+          if (typeof extractPerformanceMetrics === 'function') {
+            metrics = await extractPerformanceMetrics(telemetry, 3);
+          }
+          
+          const gameId = await history.saveGameSession({
+            gameId: `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: startEvent?.ts || Date.now(),
+            level: 3,
+            metrics: metrics || {},
+            aiResult: aiResult,
+            gameStats: { score, streak, remainingTime: time },
+            config: config
+          });
+          
+          console.log('Game session saved to history:', gameId);
+        } catch (e) {
+          console.error('Error saving game session to history:', e);
+        }
+      }
+    }
 }
 
 async function submitScore() {

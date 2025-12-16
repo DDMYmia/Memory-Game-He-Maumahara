@@ -108,6 +108,15 @@ img {
   width: 20%;
   bottom: 0;
   background: #fff3;
+  z-index: 50;
+  transition: opacity 0.3s;
+}
+
+/* Hide glass effect when game-over is shown */
+#game-over.show ~ #glass-fx,
+body:has(#game-over.show) #glass-fx {
+  opacity: 0;
+  pointer-events: none;
 }
 
 #combo-text {
@@ -341,6 +350,10 @@ img {
 
 #menu-btn4 {
   top: 450px;
+}
+
+#menu-btn5 {
+  top: 550px;
 }
 
 .txt {
@@ -802,7 +815,61 @@ img {
 
 #game-over {
   display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  gap: 0;
+  z-index: 100;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#game-over.show {
+  display: flex;
+}
+
+/* Hide glass effect when game-over is shown */
+#game-over.show ~ #glass-fx {
+  display: none;
+}
+
+body:has(#game-over.show) #glass-fx {
+  display: none;
+}
+
+.game-over-left {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  padding: 40px 40px 20px 40px;
+  box-sizing: border-box;
+}
+
+.game-over-right {
+  width: 100%;
+  max-width: 1200px;
+  max-height: none;
+  overflow-y: visible;
+  padding: 20px 40px 40px 40px;
+  box-sizing: border-box;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  margin: 0;
+  box-shadow: none;
 }
 
 #leaderboard-container {
@@ -886,40 +953,37 @@ img {
 }
 
 #well-done-etc {
-  position: absolute;
-  top: calc(50% - 136px);
-  left: 0;
-  right: 0;
+  position: relative;
+  width: 100%;
   height: auto;
   color: #fff;
-  font-size: 96px;
+  font-size: 64px;
   font-weight: 100;
   text-align: center;
+  margin-bottom: 20px;
+  line-height: 1.2;
 }
 
 #name {
-  position: absolute;
-  top: calc(50% + 10px);
-  left: calc(50% - 400px);
-  width: 800px;
+  position: relative;
+  width: 100%;
+  max-width: 450px;
   height: auto;
   background: #fff1;
   color: #fff;
   font-family: 'Roboto', sans-serif;
-  font-size: 48px;
+  font-size: 36px;
   font-weight: 300;
   text-align: center;
   border: 2px #fff5 solid;
   border-radius: 300px;
-  padding: 20px;
-  padding-left: 0;
-  padding-right: 0;
+  padding: 18px 30px;
+  margin-bottom: 20px;
+  box-sizing: border-box;
 }
 
 #submit-score {
-  position: absolute;
-  top: calc(50% + 162px);
-  left: calc(50% - 100px);
+  position: relative;
   width: 200px;
   height: auto;
   background-color: #fff3;
@@ -929,7 +993,7 @@ img {
   font-family: 'Roboto', sans-serif;
   font-size: 24px;
   text-align: center;
-  padding: 10px;
+  padding: 12px 30px;
   transition: 0.25s;
   cursor: pointer;
 }
@@ -1065,6 +1129,14 @@ screen and (max-height: 670px) {
     top: 336px;
   }
 
+  #menu-btn4 {
+    top: 395px;
+  }
+
+  #menu-btn5 {
+    top: 454px;
+  }
+
   #rkct-menu {
     position: absolute;
     top: 20px;
@@ -1195,4 +1267,282 @@ screen and (max-height: 670px) {
     top: calc(50% + 117px);
   }
 
+}
+
+/* Analytics Summary Component - Now integrated into game-over */
+#analytics-summary,
+.game-over-right,
+#analytics-display {
+  width: 100%;
+  height: auto;
+  color: #fff;
+  font-family: 'Roboto', sans-serif;
+  box-sizing: border-box;
+  display: block;
+}
+
+/* Game over right panel specific styling */
+.game-over-right {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 40px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Standalone analytics page styling */
+#analytics-display {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 30px;
+  max-height: none;
+}
+
+.analytics-header {
+  font-size: 28px;
+  font-weight: 300;
+  text-align: left;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.close-btn {
+  display: none; /* Hide close button as it's now integrated */
+}
+
+.analytics-section {
+  margin-bottom: 25px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 25px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.game-over-right .analytics-section {
+  margin-bottom: 25px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 25px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.analytics-title {
+  font-size: 24px;
+  font-weight: 400;
+  margin-bottom: 18px;
+  color: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 8px;
+}
+
+.game-over-right .analytics-title {
+  font-size: 24px;
+  font-weight: 400;
+  margin-bottom: 18px;
+  color: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 8px;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.game-over-right .analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.analytics-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  font-size: 16px;
+  transition: all 0.3s;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.game-over-right .analytics-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  font-size: 16px;
+  transition: all 0.3s;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.analytics-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.game-over-right .analytics-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.analytics-item .label {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 300;
+  font-size: 16px;
+}
+
+.game-over-right .analytics-item .label {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 300;
+  font-size: 16px;
+}
+
+.analytics-item .value {
+  color: #fff;
+  font-weight: 500;
+  text-align: right;
+  font-size: 16px;
+}
+
+.game-over-right .analytics-item .value {
+  color: #fff;
+  font-weight: 500;
+  text-align: right;
+  font-size: 16px;
+}
+
+.analytics-item.flow-index {
+  grid-column: 1 / -1;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 20px 25px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 25px;
+}
+
+.game-over-right .analytics-item.flow-index {
+  grid-column: 1 / -1;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 20px 25px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 25px;
+}
+
+.analytics-item.flow-index .value {
+  font-size: 36px;
+  font-weight: 600;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.game-over-right .analytics-item.flow-index .value {
+  font-size: 36px;
+  font-weight: 600;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+/* Session Results - Highlighted styling */
+.analytics-section.session-results {
+  background: rgba(255, 255, 255, 0.12);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.game-over-right .analytics-section.session-results {
+  background: rgba(255, 255, 255, 0.12);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.analytics-section.session-results .analytics-title {
+  font-size: 24px;
+  font-weight: 400;
+  color: #fff;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+  padding-bottom: 10px;
+}
+
+.game-over-right .analytics-section.session-results .analytics-title {
+  font-size: 24px;
+  font-weight: 400;
+  color: #fff;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+  padding-bottom: 10px;
+}
+
+.analytics-item.score-item {
+  grid-column: 1 / -1;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 15px 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+}
+
+.analytics-item.score-item .value.score-value {
+  font-size: 32px;
+  font-weight: 600;
+  color: #4CAF50;
+  text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+.analytics-item.streak-item .value.streak-value {
+  font-size: 20px;
+  font-weight: 500;
+  color: #FFC107;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1280px) {
+  #game-over {
+    flex-direction: column;
+    width: 95%;
+    max-height: 95vh;
+    padding: 20px;
+    gap: 30px;
+  }
+  
+  .game-over-left {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+  
+  .game-over-right {
+    flex: 1;
+    width: 100%;
+    min-width: auto;
+    max-width: 100%;
+    max-height: 50vh;
+  }
+  
+  #well-done-etc {
+    font-size: 56px;
+  }
+  
+  #name {
+    font-size: 28px;
+    max-width: 100%;
+  }
+  
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .analytics-header {
+    font-size: 24px;
+  }
+  
+  .analytics-section {
+    padding: 15px;
+  }
 }

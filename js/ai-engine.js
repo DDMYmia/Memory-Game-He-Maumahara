@@ -146,17 +146,44 @@ class FuzzyLogicSystem {
    * @returns {number} Normalized time [0, 1]
    */
   normalizeTime(completionTime, level, totalPairs) {
-    // Expected time per pair varies by level
+    // Expected time per pair - all levels now use 300s total time
     const expectedTimePerPair = {
-      1: 18,  // Level 1: 180s / 10 pairs = 18s per pair
-      2: 18,  // Level 2: 180s / 10 pairs = 18s per pair
+      1: 30,  // Level 1: 300s / 10 pairs = 30s per pair
+      2: 30,  // Level 2: 300s / 10 pairs = 30s per pair
       3: 30   // Level 3: 300s / 10 pairs = 30s per pair
     };
     
     const expectedTotal = expectedTimePerPair[level] * totalPairs;
-    const normalized = Math.min(1, Math.max(0, completionTime / expectedTotal));
     
-    // Invert: faster = lower value (better)
+    // Handle edge cases
+    if (expectedTotal <= 0) {
+      console.warn('normalizeTime: expectedTotal <= 0', { level, totalPairs, expectedTotal });
+      return 0.5; // Default moderate value
+    }
+    
+    if (completionTime < 0) {
+      console.warn('normalizeTime: completionTime < 0', { completionTime });
+      return 0.5; // Default moderate value
+    }
+    
+    // If completionTime is 0 or very small, it means game ended immediately (unlikely but possible)
+    // Use a small default value instead of 0
+    const actualTime = completionTime || 1; // At least 1 second
+    
+    const normalized = Math.min(1, Math.max(0, actualTime / expectedTotal));
+    
+    // Debug log
+    console.log('normalizeTime:', {
+      completionTime,
+      actualTime,
+      expectedTotal,
+      normalized,
+      inverted: 1 - normalized
+    });
+    
+    // Invert: faster = lower value (better), slower = higher value (worse)
+    // normalized = 0 means very fast (good), normalized = 1 means very slow (bad)
+    // Return inverted: 1 - normalized means fast = high value (good)
     return 1 - normalized;
   }
 
@@ -358,13 +385,38 @@ class FuzzyLogicSystem {
     } = context;
 
     // Normalize inputs
-    const normalizedTime = this.normalizeTime(completionTime, level, totalPairs);
-    const errorRate = this.calculateErrorRate(failedMatches, totalMatches);
-    const cadenceVariance = this.calculateCadenceStability(flipIntervals);
-    const successfulMatches = totalMatches - failedMatches;
-    const clickAccuracy = this.calculateClickAccuracy(successfulMatches, totalClicks);
-    const colorAccuracy = this.calculateColorAccuracy(colorStats);
-    const shapeAccuracy = this.calculateShapeAccuracy(shapeStats);
+    const normalizedTime = this.normalizeTime(completionTime || 0, level || 1, totalPairs || 10);
+    const errorRate = this.calculateErrorRate(failedMatches || 0, totalMatches || 0);
+    const cadenceVariance = this.calculateCadenceStability(flipIntervals || []);
+    const successfulMatches = (totalMatches || 0) - (failedMatches || 0);
+    const clickAccuracy = this.calculateClickAccuracy(successfulMatches, totalClicks || 0);
+    const colorAccuracy = this.calculateColorAccuracy(colorStats || {});
+    const shapeAccuracy = this.calculateShapeAccuracy(shapeStats || {});
+    
+    // Debug: Log normalized values with raw inputs
+    console.log('Flow Index - Raw inputs:', {
+      completionTime,
+      level,
+      totalPairs,
+      failedMatches,
+      totalMatches,
+      totalClicks,
+      flipIntervalsLength: flipIntervals.length,
+      colorStatsKeys: Object.keys(colorStats).length,
+      shapeStatsKeys: Object.keys(shapeStats).length,
+      cheatCount
+    });
+    
+    console.log('Flow Index - Normalized inputs:', {
+      normalizedTime,
+      errorRate,
+      cadenceVariance,
+      successfulMatches,
+      clickAccuracy,
+      colorAccuracy,
+      shapeAccuracy,
+      cheatCount
+    });
     
     // Calculate color sensitivity by base color family
     const colorSensitivity = this.calculateColorSensitivity(colorStats);
@@ -478,6 +530,19 @@ class FuzzyLogicSystem {
 
     let flowIndex = denominator > 0 ? numerator / denominator : 0.5;
     
+    // Debug: Log intermediate values
+    if (denominator === 0) {
+      console.warn('Flow Index: denominator is 0, using default 0.5');
+    } else {
+      console.log('Flow Index calculation:', {
+        numerator,
+        denominator,
+        rawFlowIndex: flowIndex,
+        cheatPenalty,
+        activeRules: rules.filter(r => r > 0).length
+      });
+    }
+    
     // Apply cheat penalty multiplicatively (more severe than additive)
     flowIndex = flowIndex * cheatPenalty;
     
@@ -487,7 +552,9 @@ class FuzzyLogicSystem {
     context.cheatPenalty = cheatPenalty;
     
     // Clamp to [0, 1]
-    return Math.max(0, Math.min(1, flowIndex));
+    const finalFlowIndex = Math.max(0, Math.min(1, flowIndex));
+    console.log('Final Flow Index:', finalFlowIndex);
+    return finalFlowIndex;
   }
 }
 
@@ -497,14 +564,13 @@ class FuzzyLogicSystem {
  * Selects optimal game configuration based on player context and Flow Index reward
  */
 class ContextualBandit {
-  constructor(numArms = 5) {
+  constructor(numArms = 4) {
     this.numArms = numArms;
     // Each arm represents a game configuration
-    // Arm 0: Easy (more hints, longer time, simpler layout)
-    // Arm 1: Medium-Easy
-    // Arm 2: Medium (baseline)
-    // Arm 3: Medium-Hard
-    // Arm 4: Hard (fewer hints, shorter time, complex layout)
+    // Arm 0: Easiest (more hints, longer time, simpler layout) - DEFAULT
+    // Arm 1: Standard (baseline)
+    // Arm 2: Hard (fewer hints, shorter time, complex layout)
+    // Arm 3: Hardest (minimal hints, shortest time, most complex layout)
     
     // LinUCB parameters
     this.alpha = 1.0;
@@ -670,39 +736,49 @@ class ContextualBandit {
    */
   getConfigForArm(arm, level) {
     const baseConfig = {
-      1: { initialTime: 180, matchReward: 3, hideDelay: 400, showScale: 1.4 },
-      2: { initialTime: 180, matchReward: 3, hideDelay: 400, showScale: 1.4 },
+      1: { initialTime: 300, matchReward: 3, hideDelay: 400, showScale: 1.4 },
+      2: { initialTime: 300, matchReward: 3, hideDelay: 400, showScale: 1.4 },
       3: { initialTime: 300, matchReward: 3, hideDelay: 400, showScale: 1.4 }
     };
 
     const base = baseConfig[level] || baseConfig[1];
-    const difficultyMultiplier = 0.2 * arm;
+    // Difficulty multiplier: 0 (Arm 0) to 1.0 (Arm 3)
+    const difficultyMultiplier = arm / 3;
 
     let gridCols = 5;
     let gridRows = 4;
-    if (level === 2) {
-      const gridMap = [ [5,4], [5,4], [4,6], [4,6], [4,6] ];
-      const sel = gridMap[Math.min(gridMap.length - 1, Math.max(0, arm))];
-      gridCols = sel[0];
-      gridRows = sel[1];
-    } else if (level === 3) {
-      const gridMap = [ [4,6], [4,6], [5,6], [6,6], [6,6] ];
+    if (level === 2 || level === 3) {
+      // Level 2 & 3: 5×4 (easiest) to 4×6 (hardest)
+      const gridMap = [ [5,4], [5,4], [4,6], [4,6] ];
       const sel = gridMap[Math.min(gridMap.length - 1, Math.max(0, arm))];
       gridCols = sel[0];
       gridRows = sel[1];
     }
     const totalPairs = Math.floor((gridCols * gridRows) / 2);
 
+    // Calculate adjacent rate for Level 2
+    const adjacentRate = level === 2 ? Math.max(0.2, 0.5 - 0.15 * arm) : undefined;
+    const adjacentTarget = level === 2 && adjacentRate ? Math.floor(totalPairs * adjacentRate) : undefined;
+
     return {
-      initialTime: Math.round(base.initialTime * (1 + difficultyMultiplier)),
-      matchReward: Math.max(1, Math.round(base.matchReward * (1 - 0.2 * difficultyMultiplier))),
-      hideDelay: Math.max(200, Math.round(base.hideDelay * (1 - 0.3 * difficultyMultiplier))),
-      showScale: Math.max(1.1, base.showScale * (1 - 0.2 * difficultyMultiplier)),
-      hintPolicy: arm < 2 ? 'generous' : arm > 3 ? 'limited' : 'standard',
-      adjacentRate: Math.max(0.2, 0.5 - 0.1 * arm),
+      initialTime: 300, // Fixed 300 seconds for all levels and difficulties
+      matchReward: Math.max(1, Math.round(base.matchReward * (1 - 0.3 * difficultyMultiplier))),
+      hideDelay: Math.max(200, Math.round(base.hideDelay * (1 - 0.4 * difficultyMultiplier))),
+      showScale: Math.max(1.1, base.showScale * (1 - 0.25 * difficultyMultiplier)),
+      hintPolicy: arm === 0 ? 'generous' : arm >= 2 ? 'limited' : 'standard',
       gridCols,
       gridRows,
-      totalPairs
+      totalPairs,
+      // Level 2 specific fields
+      ...(level === 2 && {
+        neighborMode: '8',
+        adjacentRate: adjacentRate,
+        adjacentTarget: adjacentTarget
+      }),
+      // Level 3 specific fields
+      ...(level === 3 && {
+        pairsType: 'image-text'
+      })
     };
   }
 }
@@ -736,7 +812,7 @@ class DecisionTree {
 class AIEngine {
   constructor() {
     this.fuzzyLogic = new FuzzyLogicSystem();
-    this.bandit = new ContextualBandit(5);
+    this.bandit = new ContextualBandit(4);
     this.decisionTree = new DecisionTree();
     
     // Session state
@@ -770,17 +846,41 @@ class AIEngine {
       completionTime,
       failedMatches,
       totalMatches,
-      flipIntervals
+      flipIntervals,
+      totalClicks,
+      colorStats,
+      shapeStats,
+      cheatCount
     } = gameData;
 
-    const flowIndex = this.fuzzyLogic.computeFlowIndex({
+    // Debug: Log input data
+    console.log('AI Engine processGameEnd - Input data:', {
       completionTime,
       level,
       totalPairs,
       failedMatches,
       totalMatches,
-      flipIntervals
+      flipIntervals: flipIntervals?.length || 0,
+      totalClicks: totalClicks || 0,
+      colorStatsCount: Object.keys(colorStats || {}).length,
+      shapeStatsCount: Object.keys(shapeStats || {}).length,
+      cheatCount: cheatCount || 0
     });
+    
+    const flowIndex = this.fuzzyLogic.computeFlowIndex({
+      completionTime: completionTime || 0,
+      level: level || 1,
+      totalPairs: totalPairs || 10,
+      failedMatches: failedMatches || 0,
+      totalMatches: totalMatches || 0,
+      flipIntervals: flipIntervals || [],
+      totalClicks: totalClicks || 0,
+      colorStats: colorStats || {},
+      shapeStats: shapeStats || {},
+      cheatCount: cheatCount || 0
+    });
+    
+    console.log('AI Engine computed Flow Index:', flowIndex);
 
     // Update session state
     this.sessionState.rounds.push({
@@ -822,7 +922,7 @@ class AIEngine {
       if (armRaw > last) selectedArm = Math.min(last + 1, armRaw);
       if (armRaw < last) selectedArm = Math.max(last - 1, armRaw);
     }
-    selectedArm = Math.max(0, Math.min(4, selectedArm));
+    selectedArm = Math.max(0, Math.min(3, selectedArm));
     const configBase = this.bandit.getConfigForArm(selectedArm, level);
 
     let targetAdj = configBase.adjacentRate;
@@ -843,10 +943,10 @@ class AIEngine {
       if (hiddenLevelRaw > prev) hiddenLevel = Math.min(prev + 1, hiddenLevelRaw);
       if (hiddenLevelRaw < prev) hiddenLevel = Math.max(prev - 1, hiddenLevelRaw);
     }
-    const hideMap = [600, 500, 400, 300, 240];
-    const scaleMap = [1.5, 1.4, 1.3, 1.2, 1.1];
-    config.hideDelay = hideMap[hiddenLevel];
-    config.showScale = scaleMap[hiddenLevel];
+    const hideMap = [600, 400, 300, 240];
+    const scaleMap = [1.5, 1.3, 1.2, 1.1];
+    config.hideDelay = hideMap[Math.min(hiddenLevel, hideMap.length - 1)];
+    config.showScale = scaleMap[Math.min(hiddenLevel, scaleMap.length - 1)];
     config.hiddenLevel = hiddenLevel;
     this.sessionState.lastHiddenLevel = hiddenLevel;
 

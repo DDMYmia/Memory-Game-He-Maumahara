@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>He Maumahara</title>
+<link rel="shortcut icon" type="image/x-icon" href="images/icon.ico">
+<link rel="stylesheet" href="css/analytics.css">
+<link rel="stylesheet" href="css/roboto.css">
+<script>
+(function(){
+  var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (!isLocal) {
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);} 
+    var s = document.createElement('script');
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=G-5M5BTEYB52';
+    s.async = true;
+    s.onload = function(){
+      gtag('js', new Date());
+      gtag('config', 'G-5M5BTEYB52');
+    };
+    document.head.appendChild(s);
+  } else {
+    window.gtag = function(){};
+  }
+})();
+</script>
+</head>
+<body>
+
+<div id="analytics-blue"></div>
+<div id="background"></div>
+<a href="https://rauawaawatpm.co.nz"><div id="rkct-menu"></div></a>
+
+<div id="menu-icon">
+<a href="index.html" class="menu-txt">Menu</a>
+</div>
+
+<div id="menu-container">
+<div id="title" class="unselect">Analytics</div>
+<div id="analytics-content">
+  <div class="mode-selector">
+    <button class="mode-btn active" onclick="window.showHistoryList()">History</button>
+    <button class="mode-btn" onclick="window.showDemoMode()">Demo</button>
+  </div>
+  
+  <div class="level-selector" id="level-selector" style="display: none;">
+    <button class="level-btn active" onclick="window.loadMockData(1)">Level 1</button>
+    <button class="level-btn" onclick="window.loadMockData(2)">Level 2</button>
+    <button class="level-btn" onclick="window.loadMockData(3)">Level 3</button>
+  </div>
+  
+  <div id="history-list" style="display: none;"></div>
+  <div id="analytics-display"></div>
+</div>
+</div>
+
+<script src="js/game-core.js"></script>
+<script src="js/ai-engine.js"></script>
+<script src="js/ai-helper.js"></script>
+<script src="js/game-history.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/analytics-summary.js"></script>
+<script>
+  let currentLevel = 1;
+  let currentMode = 'history'; // 'history' or 'demo'
+  
+  // Show history list
+  async function showHistoryList() {
+    currentMode = 'history';
+    document.getElementById('level-selector').style.display = 'none';
+    document.getElementById('analytics-display').style.display = 'none';
+    document.getElementById('history-list').style.display = 'block';
+    
+    // Update active button
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      if (btn.textContent === 'History') {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    
+    try {
+      const history = new GameHistory();
+      await history.openDatabase();
+      const sessions = await history.getAllSessions(100);
+      
+      const listContainer = document.getElementById('history-list');
+      if (sessions.length === 0) {
+        listContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.7);">No game history yet. Play a game to see your analytics here!</div>';
+        return;
+      }
+      
+      // Group by level
+      const byLevel = { 1: [], 2: [], 3: [] };
+      sessions.forEach(s => {
+        if (byLevel[s.level]) {
+          byLevel[s.level].push(s);
+        }
+      });
+      
+      let html = '<div style="max-width: 1200px; margin: 0 auto;">';
+      
+      // Display sessions grouped by level
+      for (let level = 1; level <= 3; level++) {
+        if (byLevel[level].length === 0) continue;
+        
+        html += `<h3 style="color: rgba(255,255,255,0.9); margin-top: 30px; margin-bottom: 15px;">Level ${level}</h3>`;
+        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; margin-bottom: 30px;">';
+        
+        byLevel[level].forEach(session => {
+          const date = new Date(session.timestamp);
+          const flowIndex = session.summary.flowIndex !== null ? session.summary.flowIndex.toFixed(3) : 'N/A';
+          const accuracy = (session.summary.accuracy * 100).toFixed(1);
+          const timeRemaining = formatTime(session.summary.timeRemaining);
+          
+          html += `
+            <div class="history-item" onclick="window.loadHistorySession('${session.gameId}')" style="
+              background: rgba(255,255,255,0.1);
+              border-radius: 8px;
+              padding: 15px;
+              cursor: pointer;
+              transition: all 0.3s;
+              border: 1px solid rgba(255,255,255,0.2);
+            " onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+              <div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 8px;">
+                ${date.toLocaleDateString()} ${date.toLocaleTimeString()}
+              </div>
+              <div style="font-size: 16px; color: rgba(255,255,255,0.7); margin-bottom: 4px;">
+                Flow: <strong style="color: rgba(255,255,255,0.9);">${flowIndex}</strong>
+              </div>
+              <div style="font-size: 14px; color: rgba(255,255,255,0.6);">
+                Accuracy: ${accuracy}% | Time: ${timeRemaining} | Pairs: ${session.summary.totalPairs}
+              </div>
+            </div>
+          `;
+        });
+        
+        html += '</div>';
+      }
+      
+      html += '</div>';
+      listContainer.innerHTML = html;
+    } catch (e) {
+      console.error('Error loading history:', e);
+      document.getElementById('history-list').innerHTML = '<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.7);">Error loading history. Please try again.</div>';
+    }
+  }
+  
+  // Load a specific history session
+  async function loadHistorySession(gameId) {
+    try {
+      const history = new GameHistory();
+      await history.openDatabase();
+      const session = await history.getSession(gameId);
+      
+      if (!session) {
+        alert('Session not found');
+        return;
+      }
+      
+      // Hide history list, show analytics display
+      document.getElementById('history-list').style.display = 'none';
+      document.getElementById('analytics-display').style.display = 'block';
+      
+      // Create a mock telemetry object from session data
+      const mockTelemetry = {
+        exportAll: async function() {
+          // Return minimal events for display
+          return [
+            { 
+              type: 'start', 
+              ts: session.timestamp, 
+              data: { level: session.level, variant: session.config } 
+            },
+            { 
+              type: 'end', 
+              ts: session.timestamp + (session.metrics.completionTime || 0) * 1000, 
+              data: { 
+                score: session.gameStats.score, 
+                pairs: session.metrics.totalPairs, 
+                streak: session.gameStats.streak 
+              } 
+            }
+          ];
+        },
+        log: async function() { return Promise.resolve(); }
+      };
+      
+      // Display analytics from session data
+      await displayAnalyticsSummary(
+        mockTelemetry,
+        session.level,
+        session.aiResult,
+        session.gameStats
+      );
+      
+      // Add back button
+      const container = document.getElementById('analytics-display');
+      const backBtn = document.createElement('button');
+      backBtn.textContent = '← Back to History';
+      backBtn.style.cssText = 'margin-bottom: 20px; padding: 10px 20px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 5px; cursor: pointer;';
+      backBtn.onclick = () => {
+        showHistoryList();
+      };
+      container.insertBefore(backBtn, container.firstChild);
+    } catch (e) {
+      console.error('Error loading session:', e);
+      alert('Error loading session');
+    }
+  }
+  
+  // Show demo mode
+  function showDemoMode() {
+    currentMode = 'demo';
+    document.getElementById('history-list').style.display = 'none';
+    document.getElementById('analytics-display').style.display = 'block';
+    document.getElementById('level-selector').style.display = 'flex';
+    
+    // Update active button
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      if (btn.textContent === 'Demo') {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    
+    loadMockData(1);
+  }
+  
+  // Helper function to format time
+  function formatTime(seconds) {
+    if (!seconds && seconds !== 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+  
+  window.showHistoryList = showHistoryList;
+  window.showDemoMode = showDemoMode;
+  window.loadHistorySession = loadHistorySession;
+  
+  // Create a mock telemetry object for display
+  function createMockTelemetry() {
+    return {
+      exportAll: async function() {
+        return [
+          { type: 'start', ts: Date.now() - 125000, data: { level: currentLevel, variant: { totalPairs: 10 } } },
+          { type: 'end', ts: Date.now(), data: { score: 105, pairs: 10, streak: 5 } },
+          { type: 'flip', ts: Date.now() - 120000, data: { image: 'image1.png' } },
+          { type: 'match', ts: Date.now() - 100000, data: { result: 'success', image: 'image1.png' } },
+          { type: 'match', ts: Date.now() - 80000, data: { result: 'fail', images: ['image2.png', 'image3.png'] } }
+        ];
+      },
+      log: async function() { return Promise.resolve(); }
+    };
+  }
+  
+  async function loadMockData(level) {
+    currentLevel = level;
+    
+    // Update active button
+    document.querySelectorAll('.level-btn').forEach((btn, index) => {
+      if (index === level - 1) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    
+    // Get mock data
+    const mockData = getMockAnalyticsData(level);
+    
+    // Create mock telemetry
+    const mockTelemetry = createMockTelemetry();
+    
+    // Display analytics
+    const container = document.getElementById('analytics-display');
+    if (container) {
+      container.innerHTML = '';
+      // Temporarily set id for compatibility
+      const originalId = container.id;
+      container.id = 'analytics-summary';
+      
+      // Add config to mock telemetry start event
+      if (mockTelemetry.exportAll) {
+        const originalExportAll = mockTelemetry.exportAll;
+        mockTelemetry.exportAll = async function() {
+          const events = await originalExportAll();
+          const startEvent = events.find(e => e.type === 'start');
+          if (startEvent && mockData.config) {
+            startEvent.data = startEvent.data || {};
+            startEvent.data.variant = mockData.config;
+          }
+          return events;
+        };
+      }
+      
+      await displayAnalyticsSummary(
+        mockTelemetry,
+        level,
+        mockData.aiResult,
+        mockData.gameStats
+      );
+      
+      // Restore original id
+      container.id = originalId;
+    }
+  }
+  
+  // Make loadMockData available globally
+  window.loadMockData = loadMockData;
+  
+  // Load history list on page load
+  window.onload = () => {
+    showHistoryList();
+  };
+</script>
+
+</body>
+</html>

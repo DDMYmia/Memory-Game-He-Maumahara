@@ -1,6 +1,6 @@
 //
 
-const INITIAL_TIME = 180;
+const INITIAL_TIME = 300;
 let time = INITIAL_TIME;
 let gameStart = 0;
 let gameStop = 0;
@@ -16,6 +16,8 @@ let showCards = 0;
 let lastInteractionTime = Date.now();
 let isRippleActive = false;
 let failedAttempts = 0;
+let consecutiveErrors = 0;
+let maxConsecutiveErrors = 0;
 
 //
 
@@ -154,7 +156,14 @@ function handleCardClick(event) {
           score = time + (streak * 10);
           card1.style.background = '#3d92d04d';
           card2.style.background = '#3d92d04d';
-          telemetry.log('match', { result: 'success', image: card1.dataset.image, pairs: matchedPairs });
+          consecutiveErrors = 0; // Reset on success
+          telemetry.log('match', { 
+            result: 'success', 
+            image: card1.dataset.image, 
+            pairs: matchedPairs,
+            consecutiveErrors: 0,
+            maxConsecutiveErrors: maxConsecutiveErrors
+          });
           if (matchedPairs === totalPairs) {
             winFunction();
           }
@@ -179,7 +188,14 @@ function handleCardClick(event) {
                 card1.style.backgroundSize = '370px';
                 card2.style.backgroundSize = '370px';
               }
-              telemetry.log('match', { result: 'fail', images: [card1.dataset.image, card2.dataset.image] });
+              consecutiveErrors++;
+              maxConsecutiveErrors = Math.max(maxConsecutiveErrors, consecutiveErrors);
+              telemetry.log('match', { 
+                result: 'fail', 
+                images: [card1.dataset.image, card2.dataset.image],
+                consecutiveErrors: consecutiveErrors,
+                maxConsecutiveErrors: maxConsecutiveErrors
+              });
             }
             const imageElement = card.querySelector("img");
             if (imageElement) {
@@ -346,13 +362,40 @@ async function endGame() {
   document.body.style.backgroundColor = "#00f";
   document.getElementById('background').style.opacity = '0.7';
   document.getElementById('game-board').style.display = 'none';
-  document.getElementById('game-over').style.display = 'block';
+  // Hide game timer when game ends
+  const gameTimer = document.getElementById('game-timer');
+  if (gameTimer) {
+    gameTimer.style.display = 'none';
+  }
+  // Hide glass effect when game ends
+  const glassFx = document.getElementById('glass-fx');
+  if (glassFx) {
+    glassFx.style.display = 'none';
+  }
+  
+  // Setup game-over layout
+  const gameOver = document.getElementById('game-over');
+  if (!gameOver.querySelector('.game-over-left')) {
+    const leftDiv = document.createElement('div');
+    leftDiv.className = 'game-over-left';
+    leftDiv.innerHTML = gameOver.innerHTML;
+    gameOver.innerHTML = '';
+    gameOver.appendChild(leftDiv);
+    
+    const rightDiv = document.createElement('div');
+    rightDiv.className = 'game-over-right';
+    rightDiv.id = 'analytics-summary';
+    gameOver.appendChild(rightDiv);
+  }
+  
+  gameOver.classList.add('show');
   document.getElementById('menu-icon').innerHTML = "<a href='play.html' class='menu-txt'>Menu</a><br><br><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>";
   await telemetry.log('end', { score, pairs: matchedPairs, streak: streak });
   
+  let aiResult = null;
   // Process with AI if available
   if (aiEngine && typeof processGameEndWithAI === 'function') {
-    const aiResult = await processGameEndWithAI(telemetry, 1, aiEngine);
+    aiResult = await processGameEndWithAI(telemetry, 1, aiEngine);
     if (aiResult) {
       console.log('Flow Index:', aiResult.flowIndex.toFixed(3));
       console.log('Next Config Suggestion:', aiResult.nextConfig);
@@ -374,6 +417,53 @@ async function endGame() {
           await telemetry.log('ai_level3_suggestion', { level: 3, nextConfig: lvl3Cfg, basedOn: 'lvl1_baseline', completedRounds: count });
         }
       } catch (e) {}
+    }
+  }
+  
+  // Display analytics summary in the right panel
+  const analyticsContainer = document.querySelector('#game-over .game-over-right') || document.getElementById('analytics-summary');
+  if (typeof displayAnalyticsSummary === 'function' && analyticsContainer) {
+    await displayAnalyticsSummary(telemetry, 1, aiResult, { score, streak, remainingTime: time });
+    
+    // Save game session to history
+    if (typeof GameHistory !== 'undefined') {
+      try {
+        const history = new GameHistory();
+        await history.openDatabase();
+        
+        // Get current game configuration from start event
+        const events = await telemetry.exportAll();
+        const sortedEvents = events.sort((a, b) => a.ts - b.ts);
+        let startEvent = null;
+        for (let i = sortedEvents.length - 1; i >= 0; i--) {
+          if (sortedEvents[i].type === 'start' && sortedEvents[i].data.level === 1) {
+            startEvent = sortedEvents[i];
+            break;
+          }
+        }
+        const config = startEvent?.data?.variant || {};
+        
+        // Get metrics
+        let metrics = null;
+        if (typeof extractPerformanceMetrics === 'function') {
+          metrics = await extractPerformanceMetrics(telemetry, 1);
+        }
+        
+        // Save session
+        const gameId = await history.saveGameSession({
+          gameId: `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: startEvent?.ts || Date.now(),
+          level: 1,
+          metrics: metrics || {},
+          aiResult: aiResult,
+          gameStats: { score, streak, remainingTime: time },
+          config: config
+        });
+        
+        console.log('Game session saved to history:', gameId);
+      } catch (e) {
+        console.error('Error saving game session to history:', e);
+      }
     }
   }
 }

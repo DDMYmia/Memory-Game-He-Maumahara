@@ -57,9 +57,12 @@
   <div id="game-board"></div>
 
   <div id="game-over">
-    <div id="well-done-etc"><span id="current-score">0:00</span>! Well Done!</div>
-    <input type="text" id="name" placeholder="Type your name here..">
-    <button id="submit-score" onclick="submitScore()">Submit Score</button>
+    <div class="game-over-left">
+      <div id="well-done-etc"><span id="current-score">0:00</span>! Well Done!</div>
+      <input type="text" id="name" placeholder="Type your name here..">
+      <button id="submit-score" onclick="submitScore()">Submit Score</button>
+    </div>
+    <div class="game-over-right" id="analytics-summary"></div>
   </div>
 
   <div id="leaderboard-container">
@@ -70,6 +73,8 @@
   <script src="js/game-core.js"></script>
   <script src="js/ai-engine.js"></script>
   <script src="js/ai-helper.js"></script>
+  <script src="js/game-history.js"></script>
+  <script src="js/analytics-summary.js"></script>
   <script src="js/lvl1.js"></script>
 
 </body>
