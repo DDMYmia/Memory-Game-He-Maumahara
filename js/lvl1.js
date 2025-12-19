@@ -18,6 +18,8 @@ let isRippleActive = false;
 let failedAttempts = 0;
 let consecutiveErrors = 0;
 let maxConsecutiveErrors = 0;
+let showCardsCooldown = 0; // Cooldown timer for show cards (5 seconds for level 1)
+let showCardsCooldownInterval = null;
 
 //
 
@@ -312,17 +314,60 @@ function cardReader(card) {
 }
 
 function showAllCards() {
+  // If cooldown is active and trying to show cards (not hide), don't allow action
+  if (showCardsCooldown > 0 && showCards === 0) {
+    return;
+  }
+
   if (gameStart !== 1) {
     gameStart = 1;
   }
 
   if (flippedCards.length === 0) {
     const allCards = document.querySelectorAll('.card');
+    const showCardsBtn = document.getElementById("show-cards");
 
     // Toggle the state of showCards before running the loop
     if (showCards === 0) {
+      // Start cooldown: 5 seconds for level 1
+      showCardsCooldown = 5;
+      showCardsBtn.style.pointerEvents = 'none'; // Disable button during cooldown
+      
+      // Start countdown
+      showCardsCooldownInterval = setInterval(() => {
+        showCardsCooldown--;
+        if (showCardsCooldown > 0) {
+          showCardsBtn.innerHTML = showCards === 1 ? `Hide Cards (${showCardsCooldown}s)` : `Show Cards (${showCardsCooldown}s)`;
+        } else {
+          clearInterval(showCardsCooldownInterval);
+          showCardsCooldownInterval = null;
+          
+          // Auto-hide cards if still showing when cooldown ends
+          if (showCards === 1 && flippedCards.length === 0) {
+            const allCards = document.querySelectorAll('.card');
+            showCards = 0;
+            showCardsBtn.innerHTML = "Show Cards";
+            telemetry.log('show_cards', { state: 'hide', auto: true });
+            
+            allCards.forEach(card => {
+              const imageElement = card.querySelector("img");
+              if (imageElement) {
+                imageElement.style.visibility = "hidden";
+                imageElement.style.animation = "";
+                imageElement.style.transform = "";
+              }
+              card.style.background = "";
+            });
+          } else {
+            showCardsBtn.innerHTML = showCards === 1 ? "Hide Cards" : "Show Cards";
+          }
+          
+          showCardsBtn.style.pointerEvents = 'auto'; // Re-enable button
+        }
+      }, 1000);
+      
       showCards = 1;
-      document.getElementById("show-cards").innerHTML = "Hide Cards";
+      showCardsBtn.innerHTML = `Hide Cards (${showCardsCooldown}s)`;
       telemetry.log('show_cards', { state: 'show' });
 
       allCards.forEach(card => {
@@ -337,7 +382,12 @@ function showAllCards() {
     }
     else if (showCards === 1) {
       showCards = 0;
-      document.getElementById("show-cards").innerHTML = "Show Cards";
+      // Update button text based on cooldown status
+      if (showCardsCooldown > 0) {
+        showCardsBtn.innerHTML = `Show Cards (${showCardsCooldown}s)`;
+      } else {
+        showCardsBtn.innerHTML = "Show Cards";
+      }
       telemetry.log('show_cards', { state: 'hide' });
 
       allCards.forEach(card => {

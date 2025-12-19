@@ -1278,14 +1278,21 @@ screen and (max-height: 670px) {
   /* * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
   #well-done-etc {
-    top: calc(50% - 78px);
-    font-size: 72px;
+    position: relative;
+    top: auto;
+    font-size: 56px;
+    margin-bottom: 20px;
+    width: 100%;
+    text-align: center;
   }
 
   #name {
-    left: calc(50% - 300px);
-    width: 600px;
-    font-size: 36px;
+    position: relative;
+    left: auto;
+    width: 100%;
+    max-width: 100%;
+    font-size: 28px;
+    margin: 0 auto 20px auto;
   }
 
   #submit-score {
@@ -1540,6 +1547,7 @@ screen and (max-height: 670px) {
   .game-over-left {
     flex: 0 0 auto;
     width: 100%;
+    padding: 20px;
   }
   
   .game-over-right {
@@ -1548,15 +1556,27 @@ screen and (max-height: 670px) {
     min-width: auto;
     max-width: 100%;
     max-height: 50vh;
+    padding: 20px;
   }
   
   #well-done-etc {
-    font-size: 56px;
+    position: relative;
+    top: auto;
+    font-size: 48px;
+    margin-bottom: 15px;
+    width: 100%;
+    text-align: center;
+    line-height: 1.2;
   }
   
   #name {
-    font-size: 28px;
+    position: relative;
+    left: auto;
+    width: 100%;
     max-width: 100%;
+    font-size: 24px;
+    margin: 0 auto 15px auto;
+    padding: 12px 20px;
   }
   
   .analytics-grid {
