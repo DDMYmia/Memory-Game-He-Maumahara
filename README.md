@@ -155,7 +155,7 @@ The analytics summary is displayed in the game-over screen alongside the score s
 
 ## Version History
 
-Current version: **v2.1.0** (2025-12-16)
+Current version: **v2.1.1** (2025-12-19)
 
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for detailed changes.
 

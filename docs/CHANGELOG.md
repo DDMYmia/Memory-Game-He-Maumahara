@@ -1,5 +1,13 @@
 # Changelog
 
+Version: v2.1.1 (2025-12-19)
+
+## Major Updates
+- **Documentation Upload**: Added all documentation files to repository (removed docs from .gitignore)
+- **Version Update**: Updated to v2.1.1
+
+---
+
 Version: v2.1.0 (2025-12-16)
 
 ## Major Updates
