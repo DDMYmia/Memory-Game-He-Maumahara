@@ -14,6 +14,11 @@ let lockBoard = false;
 let showCards = 0;
 let consecutiveErrors = 0;
 let maxConsecutiveErrors = 0;
+let lastInteractionTime = Date.now();
+let isRippleActive = false;
+let failedAttempts = 0;
+let showCardsCooldown = 0; // Cooldown timer for show cards (3 seconds for level 3)
+let showCardsCooldownInterval = null;
 
 // Grid configuration (can be adjusted by AI)
 const GRID_COLS = 5;
@@ -169,7 +174,8 @@ function shuffleArray(array) {
 
 // Handle card click
 function handleCardClick(event) {
-  if (lockBoard) return;
+  if (lockBoard || isRippleActive) return;
+  lastInteractionTime = Date.now();
   if (gameStart !== 1) {
     gameStart = 1;
     telemetry.log('start', { level: 3, variant: { pairsType: 'image-text', cols: GRID_COLS_RUNTIME, rows: GRID_ROWS_RUNTIME, totalPairs, hideDelay: HIDE_DELAY_RUNTIME, showScale: SHOW_CARDS_SCALE_RUNTIME, timerMode: 'countdown', initialTime: time, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
@@ -252,6 +258,7 @@ function handleCardClick(event) {
                             endGame();
                         }, 400);
                     }
+                    playComboSound(streak);
                 }
 
                 setTimeout(() => {
@@ -288,6 +295,11 @@ function handleCardClick(event) {
                               consecutiveErrors: consecutiveErrors,
                               maxConsecutiveErrors: maxConsecutiveErrors
                             });
+                            failedAttempts++;
+                            if (failedAttempts >= 2) {
+                              triggerRippleEffect();
+                              failedAttempts = 0;
+                            }
                         }
                     });
                     flippedCards = [];
@@ -404,6 +416,10 @@ function cardReader(card) {
 
 // Function to show all cards when 'show-cards' div is clicked
 function showAllCards() {
+	// If cooldown is active and trying to show cards (not hide), don't allow action
+	if (showCardsCooldown > 0 && showCards === 0) {
+		return;
+	}
 
 	if (gameStart != 1)
 	{
@@ -413,11 +429,56 @@ function showAllCards() {
 	if (flippedCards.length === 0) 
 	{
         const allCards = document.querySelectorAll('.card');
+        const showCardsBtn = document.getElementById("show-cards");
         
         if (showCards === 0) 
 		{
+			// Start cooldown: 3 seconds for level 3
+			showCardsCooldown = 3;
+			showCardsBtn.style.pointerEvents = 'none'; // Disable button during cooldown
+			
+			// Start countdown
+			showCardsCooldownInterval = setInterval(() => {
+				showCardsCooldown--;
+				if (showCardsCooldown > 0) {
+					showCardsBtn.innerHTML = showCards === 1 ? `Hide Cards (${showCardsCooldown}s)` : `Show Cards (${showCardsCooldown}s)`;
+				} else {
+					clearInterval(showCardsCooldownInterval);
+					showCardsCooldownInterval = null;
+					
+					// Auto-hide cards if still showing when cooldown ends
+					if (showCards === 1 && flippedCards.length === 0) {
+						const allCards = document.querySelectorAll('.card');
+						showCards = 0;
+						showCardsBtn.innerHTML = "Show Cards";
+						telemetry.log('show_cards', { state: 'hide', auto: true });
+						
+						allCards.forEach(card => {
+							const imageElement = card.querySelector("img");
+							const textElement = card.querySelector("span");
+							
+							if (imageElement) {
+								imageElement.style.visibility = "hidden";
+								imageElement.style.animation = "";
+								imageElement.style.transform = "";
+							}
+							
+							if (textElement) {
+								textElement.style.visibility = "hidden";
+							}
+							
+							card.style.background = "";
+						});
+					} else {
+						showCardsBtn.innerHTML = showCards === 1 ? "Hide Cards" : "Show Cards";
+					}
+					
+					showCardsBtn.style.pointerEvents = 'auto'; // Re-enable button
+				}
+			}, 1000);
+			
             showCards = 1;
-            document.getElementById("show-cards").innerHTML = "Hide Cards";
+            showCardsBtn.innerHTML = `Hide Cards (${showCardsCooldown}s)`;
             telemetry.log('show_cards', { state: 'show' });
 
             // Show all cards
@@ -441,7 +502,12 @@ function showAllCards() {
         else if (showCards === 1) 
 		{
             showCards = 0;
-            document.getElementById("show-cards").innerHTML = "Show Cards";
+            // Update button text based on cooldown status
+            if (showCardsCooldown > 0) {
+                showCardsBtn.innerHTML = `Show Cards (${showCardsCooldown}s)`;
+            } else {
+                showCardsBtn.innerHTML = "Show Cards";
+            }
             telemetry.log('show_cards', { state: 'hide' });
         
             allCards.forEach(card => {
@@ -575,6 +641,104 @@ async function displayLeaderboard() {
     try {
         await leaderboard.displayLeaderboard(leaderboardList);
     } catch (error) {}
+}
+
+function showComboText(text) {
+  const comboElement = document.getElementById('combo-text');
+  if (comboElement) {
+    comboElement.textContent = text;
+    comboElement.classList.add('show');
+
+    setTimeout(() => {
+      comboElement.classList.remove('show');
+    }, 1500);
+  }
+}
+
+function playComboSound(streak) {
+  let soundFile = '';
+  let comboText = '';
+
+  if (streak === 2) {
+    soundFile = 'Sound/nice.mp3';
+    comboText = 'NICE!';
+  } else if (streak === 3) {
+    soundFile = 'Sound/great.mp3';
+    comboText = 'GREAT!';
+  } else if (streak === 4) {
+    soundFile = 'Sound/Amazing.mp3';
+    comboText = 'AMAZING!';
+  } else if (streak === 5) {
+    soundFile = 'Sound/excellent.mp3';
+    comboText = 'EXCELLENT!';
+  } else if (streak >= 6) {
+    soundFile = 'Sound/Unbelievable.mp3';
+    comboText = 'UNBELIEVABLE!';
+  }
+
+  if (soundFile) {
+    const audio = new Audio(soundFile);
+    audio.play().catch(e => console.log("Audio play failed", e));
+  }
+
+  if (comboText) {
+    showComboText(comboText);
+  }
+}
+
+function triggerRippleEffect() {
+  isRippleActive = true;
+  telemetry.log('ripple_effect', { timestamp: Date.now() });
+
+  // Pick random start
+  const startIndex = Math.floor(Math.random() * cards.length);
+  const startRow = Math.floor(startIndex / GRID_COLS_RUNTIME);
+  const startCol = startIndex % GRID_COLS_RUNTIME;
+
+  let maxDelay = 0;
+
+  cards.forEach((card, index) => {
+    if (card.classList.contains('matched') || flippedCards.includes(card)) return;
+
+    const row = Math.floor(index / GRID_COLS_RUNTIME);
+    const col = index % GRID_COLS_RUNTIME;
+    // Euclidean distance for circular ripple
+    const distance = Math.sqrt(Math.pow(row - startRow, 2) + Math.pow(col - startCol, 2));
+    const delay = distance * 100; // 100ms per unit distance
+
+    maxDelay = Math.max(maxDelay, delay + 600);
+
+    setTimeout(() => {
+      const img = card.querySelector('img');
+      const text = card.querySelector('span');
+      if (img) {
+        img.style.visibility = 'visible';
+        card.style.background = '#fff5'; // Light highlight
+      }
+      if (text) {
+        text.style.visibility = 'visible';
+        card.style.background = '#fff5'; // Light highlight
+      }
+    }, delay);
+
+    setTimeout(() => {
+      const img = card.querySelector('img');
+      const text = card.querySelector('span');
+      if (img) {
+        img.style.visibility = 'hidden';
+        card.style.background = ''; // Reset
+      }
+      if (text) {
+        text.style.visibility = 'hidden';
+        card.style.background = ''; // Reset
+      }
+    }, delay + 600); // Show for 600ms
+  });
+
+  setTimeout(() => {
+    isRippleActive = false;
+    lastInteractionTime = Date.now(); // Reset timer
+  }, maxDelay);
 }
 
 window.onload = () => {

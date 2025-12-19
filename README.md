@@ -155,20 +155,23 @@ The analytics summary is displayed in the game-over screen alongside the score s
 
 ## Version History
 
-Current version: **v1.5.0** (2025-12-10)
+Current version: **v2.1.0** (2025-12-16)
 
-See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for detailed changes.
 
 ## Documentation
 
 All documentation is available in the `docs/` folder:
 
+- [AI Algorithms](docs/AI_ALGORITHMS.md) - **Comprehensive explanation of all AI algorithms used in the project**
+- [Flow Index Guide](docs/FLOW_INDEX_GUIDE.md) - Complete Flow Index guide (evaluation, interpretation, debugging)
 - [Architecture & Design](docs/ARCHITECTURE.md) - Complete architecture and design specifications
-- [Data Collection](docs/DATA_COLLECTION.md) - Telemetry and data collection details
 - [Difficulty System](docs/DIFFICULTY_SYSTEM.md) - Adaptive difficulty system documentation
-- [Analytics](docs/ANALYTICS.md) - Analytics and game history features
-- [Development Guide](docs/DEVELOPMENT.md) - Development setup and guidelines
+- [Analytics, Data Collection & Player Profile](docs/ANALYTICS_AND_DATA.md) - Analytics, data collection, and profile viewing guide
+- [Release Notes v2.0.0](docs/RELEASE_NOTES_v2.0.0.md) - Version 2.0.0 release notes
 - [Changelog](docs/CHANGELOG.md) - Version history
+
+See [docs/README.md](docs/README.md) for the complete documentation index.
 
 ## Development
 

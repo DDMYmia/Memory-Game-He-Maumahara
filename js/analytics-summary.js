@@ -40,9 +40,9 @@ function getFlowInterpretation(flowIndex) {
   } else if (flowIndex >= 0.4) {
     return { label: 'Moderate Challenge', color: '#FFC107' };
   } else if (flowIndex >= 0.2) {
-    return { label: 'Too Easy', color: '#FF9800' };
-  } else {
     return { label: 'Too Hard', color: '#F44336' };
+  } else {
+    return { label: 'Very Hard', color: '#D32F2F' };
   }
 }
 
@@ -82,10 +82,32 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     let metrics = null;
     if (typeof extractPerformanceMetrics === 'function' && telemetry) {
       try {
+        console.log('Attempting to extract performance metrics for level', level);
         metrics = await extractPerformanceMetrics(telemetry, level);
+        if (!metrics) {
+          console.warn('extractPerformanceMetrics returned null for level', level);
+          // Try to get events to debug
+          try {
+            const allEvents = await telemetry.exportAll();
+            console.log('Total telemetry events:', allEvents.length);
+            const startEvents = allEvents.filter(e => e.type === 'start' && e.data.level === level);
+            console.log('Start events for level', level, ':', startEvents.length);
+            if (startEvents.length > 0) {
+              console.log('Latest start event:', startEvents[startEvents.length - 1]);
+            }
+          } catch (debugError) {
+            console.error('Error debugging telemetry:', debugError);
+          }
+        }
       } catch (e) {
-        console.warn('Error extracting metrics:', e);
+        console.error('Error extracting metrics:', e);
+        console.error('Error stack:', e.stack);
       }
+    } else {
+      console.warn('extractPerformanceMetrics function not available or telemetry is null', {
+        hasFunction: typeof extractPerformanceMetrics === 'function',
+        hasTelemetry: !!telemetry
+      });
     }
 
     // If no metrics and we have mock data available, use it
@@ -103,13 +125,43 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
 
     if (!metrics) {
       console.warn('Could not extract performance metrics and no mock data available, showing basic stats');
-      // Show basic stats even if metrics extraction fails
-      summaryContainer.innerHTML = '<div class="analytics-header">Game Analytics</div>' +
-        '<div class="analytics-section"><div class="analytics-title">Session Statistics</div>' +
-        `<div class="analytics-grid"><div class="analytics-item"><span class="label">Level:</span><span class="value">${level}</span></div>` +
-        (gameStats.score !== undefined ? `<div class="analytics-item"><span class="label">Final Score:</span><span class="value">${gameStats.score}</span></div>` : '') +
-        (gameStats.streak !== undefined ? `<div class="analytics-item"><span class="label">Best Streak:</span><span class="value">${gameStats.streak}</span></div>` : '') +
-        '</div></div>';
+      // Show basic stats even if metrics extraction fails, but with more information
+      let html = '<div class="analytics-header">Game Analytics</div>';
+      
+      // Session Results Section
+      html += '<div class="analytics-section session-results">';
+      html += '<div class="analytics-title">🏆 Session Results</div>';
+      html += '<div class="analytics-grid">';
+      html += `<div class="analytics-item"><span class="label">Level:</span><span class="value">${level}</span></div>`;
+      if (gameStats.score !== undefined) {
+        html += `<div class="analytics-item score-item"><span class="label">Final Score:</span><span class="value score-value">${gameStats.score}</span></div>`;
+      }
+      if (gameStats.streak !== undefined) {
+        html += `<div class="analytics-item streak-item"><span class="label">Best Streak:</span><span class="value streak-value">${gameStats.streak}</span></div>`;
+      }
+      if (gameStats.remainingTime !== undefined) {
+        html += `<div class="analytics-item"><span class="label">Time Remaining:</span><span class="value">${formatTime(gameStats.remainingTime)}</span></div>`;
+      }
+      html += '</div></div>';
+      
+      // Performance Overview Section (with limited data)
+      html += '<div class="analytics-section">';
+      html += '<div class="analytics-title">📊 Performance Overview</div>';
+      html += '<div class="analytics-grid">';
+      if (gameStats.remainingTime !== undefined) {
+        html += `<div class="analytics-item"><span class="label">Time Remaining:</span><span class="value">${formatTime(gameStats.remainingTime)}</span></div>`;
+      }
+      html += '<div class="analytics-item"><span class="label">Status:</span><span class="value">Limited data available</span></div>';
+      html += '</div></div>';
+      
+      // Note about data availability
+      html += '<div class="analytics-section">';
+      html += '<div class="analytics-title">ℹ️ Note</div>';
+      html += '<div class="analytics-grid">';
+      html += '<div class="analytics-item"><span class="label">Data Status:</span><span class="value">Telemetry data extraction failed. Please check browser console for details.</span></div>';
+      html += '</div></div>';
+      
+      summaryContainer.innerHTML = html;
       summaryContainer.style.display = 'block';
       return;
     }
@@ -290,7 +342,9 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     html += '</div></div>';
 
     // Add data validation warning if data seems unrealistic
-    if (rawSuccessfulMatches > maxPossibleMatches || metrics.totalMatches > maxPossibleMatches * 3) {
+    // Note: rawSuccessfulMatches can exceed maxPossibleMatches if player attempted more matches than pairs
+    // This is normal behavior, so we only warn if the difference is very large
+    if (rawSuccessfulMatches > maxPossibleMatches * 1.5 || metrics.totalMatches > maxPossibleMatches * 5) {
       console.warn('Data validation: Detected unrealistic match counts', {
         totalPairs: metrics.totalPairs,
         totalMatches: metrics.totalMatches,

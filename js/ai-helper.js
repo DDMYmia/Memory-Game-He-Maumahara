@@ -18,12 +18,27 @@ async function extractPerformanceMetrics(telemetry, level) {
     // Sort events by timestamp to find the latest game session
     const sortedEvents = allEvents.sort((a, b) => a.ts - b.ts);
     
+    // Debug: Log all event types to help diagnose
+    const eventTypes = {};
+    sortedEvents.forEach(e => {
+      eventTypes[e.type] = (eventTypes[e.type] || 0) + 1;
+    });
+    console.log('Event types in telemetry:', eventTypes);
+    
     // Find the most recent start event for this level
     let startEvent = null;
+    const allStartEvents = sortedEvents.filter(e => e.type === 'start');
+    console.log('All start events found:', allStartEvents.length, allStartEvents.map(e => ({ level: e.data?.level, ts: new Date(e.ts).toLocaleTimeString() })));
+    
     for (let i = sortedEvents.length - 1; i >= 0; i--) {
-      if (sortedEvents[i].type === 'start' && sortedEvents[i].data.level === level) {
-        startEvent = sortedEvents[i];
-        break;
+      const event = sortedEvents[i];
+      if (event.type === 'start') {
+        console.log('Checking start event:', { level: event.data?.level, expectedLevel: level, match: event.data?.level === level, data: event.data });
+        if (event.data && event.data.level === level) {
+          startEvent = event;
+          console.log('Found matching start event for level', level);
+          break;
+        }
       }
     }
     
@@ -45,6 +60,7 @@ async function extractPerformanceMetrics(telemetry, level) {
     
     if (!startEvent) {
       console.warn('No start event found for level', level);
+      console.warn('Available start events:', allStartEvents.map(e => ({ level: e.data?.level, data: e.data })));
       return null;
     }
     
