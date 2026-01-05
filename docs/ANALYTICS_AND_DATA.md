@@ -312,6 +312,6 @@ Recent Rounds (Flow Index):
 
 ## Related Documents
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Complete architecture document
-- [DIFFICULTY_SYSTEM.md](DIFFICULTY_SYSTEM.md) - Difficulty system documentation
-- [AI_ALGORITHMS.md](AI_ALGORITHMS.md) - AI algorithms documentation
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Architecture overview
+- [AI_AND_SCORING.md](AI_AND_SCORING.md) - Flow Index, scoring, and adaptive difficulty
+- [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) - UI layout and styling conventions

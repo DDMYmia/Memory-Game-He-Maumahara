@@ -1,7 +1,9 @@
 //
+//
 
 const INITIAL_TIME = 300;
 let time = INITIAL_TIME;
+let actualStartTime = null;
 let gameStart = 0;
 let gameStop = 0;
 
@@ -23,7 +25,7 @@ let showCardsCooldownInterval = null;
 
 //
 
-let score = time;
+let score = 0;
 let leaderboard;
 let telemetry;
 let aiEngine = null;
@@ -36,39 +38,22 @@ const FIXED_CARD_ORDER = [1, 1, 2, 3, 4, 2, 5, 6, 3, 7, 8, 9, 5, 6, 10, 8, 9, 7,
 const HIDE_DELAY_MS = 400;
 const SHOW_CARDS_SCALE = 1.4;
 
+const cardTextMapping = {
+  "image1": "Matariki",
+  "image2": "Pīwakawaka",
+  "image3": "Tūī",
+  "image4": "Kea",
+  "image5": "Kawakawa",
+  "image6": "Pōhutukawa",
+  "image7": "Kōwhai",
+  "image8": "Koru",
+  "image9": "Hei Matau",
+  "image10": "Pikorua"
+};
+
 function resolveImageSrc(num) {
-  const mapping = {
-    1: 'images/image1.png',
-    2: 'images/image2.png',
-    3: 'images/image3.png',
-    4: 'images/image4.png',
-    5: 'images/image5.png',
-    6: 'images/image6.png',
-    7: 'images/image7.png',
-    8: 'images/image8.png',
-    9: 'images/image9.png',
-    10: 'images/image10.png'
-  };
-  return mapping[num];
+  return `images/image${num}.png`;
 }
-
-window.addEventListener('resize', function () {
-  const getCards = document.querySelectorAll('.card');
-
-  if (window.innerWidth <= 1280 && window.innerHeight <= 850) {
-    console.log("Small Screen");
-    getCards.forEach(card => {
-      card.style.backgroundSize = '240px';
-    });
-  }
-
-  else {
-    console.log("Large Screen");
-    getCards.forEach(card => {
-      card.style.backgroundSize = '370px';
-    });
-  }
-});
 
 // Update the timer 
 function updateTimer() {
@@ -77,18 +62,23 @@ function updateTimer() {
 }
 
 // Timer counts down by 1 every second 
-setInterval(() => {
+const timerInterval = setInterval(() => {
   if (gameStart === 1) {
     if (gameStop == 0) {
       if (time > 0) {
         time--;
-        score = time + (streak * 10);
-        document.getElementById('current-score').innerHTML = `${Math.floor(time / 60)}:${(time % 60).toString().padStart(2, '0')}`;
+        // Score is now cumulative, not time-based snapshot
+        // score = time + (streak * 10); 
+        // const elapsed = Math.floor((Date.now() - actualStartTime) / 1000);
+        // document.getElementById('current-score').innerHTML = `${Math.floor(elapsed / 60)}:${(elapsed % 60).toString().padStart(2, '0')}`;
         updateTimer();
       } else {
         gameStop = 1;
+        clearInterval(timerInterval);
         endGame();
       }
+    } else {
+      clearInterval(timerInterval);
     }
   }
 }, 1000);
@@ -123,14 +113,17 @@ function generateImagePairs(totalPairs) {
   return imagePairs;
 }
 
+
+let isPreviewing = false;
+
 // Handle card click
 function handleCardClick(event) {
-  if (lockBoard || isRippleActive) return;
-  lastInteractionTime = Date.now();
+	if (lockBoard || isRippleActive || isPreviewing || gameStop !== 0 || time <= 0) return;
+	lastInteractionTime = Date.now();
 
   if (gameStart !== 1) {
-    gameStart = 1;
-    telemetry.log('start', { level: 1, variant: { layout: 'fixed_template', cols: FIXED_COLS, rows: FIXED_ROWS, hideDelay: HIDE_DELAY_MS, showScale: SHOW_CARDS_SCALE, timerMode: 'countdown', initialTime: INITIAL_TIME, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
+    startInitialPreview();
+    return;
   }
 
   if (showCards !== 1) {
@@ -144,7 +137,7 @@ function handleCardClick(event) {
       flippedCards.push(card);
 
       cardReader(card);
-      telemetry.log('flip', { image: card.dataset.image });
+      telemetry.log('flip', { level: 1, image: card.dataset.image, match: card.dataset.image });
 
       if (flippedCards.length === 2) {
         lockBoard = true;
@@ -155,18 +148,30 @@ function handleCardClick(event) {
           matchedPairs++;
           streak++;
           time += 3;
-          score = time + (streak * 10);
-          card1.style.background = '#3d92d04d';
-          card2.style.background = '#3d92d04d';
+          if (time > 300) time = 300;
+          
+          // Cumulative Scoring removed - using Flow Index
+          // score += 50 + (streak * 30);
+          // document.getElementById('current-score').innerText = score;
+          updateTimer();
+          
+          card1.classList.add('card-matched-highlight');
+          card2.classList.add('card-matched-highlight');
+          
           consecutiveErrors = 0; // Reset on success
           telemetry.log('match', { 
+            level: 1,
             result: 'success', 
             image: card1.dataset.image, 
+            pair: card1.dataset.image,
+            images: [card1.dataset.image, card2.dataset.image],
             pairs: matchedPairs,
             consecutiveErrors: 0,
             maxConsecutiveErrors: maxConsecutiveErrors
           });
           if (matchedPairs === totalPairs) {
+            score += time; // Time Bonus at end
+            document.getElementById('current-score').innerText = score;
             winFunction();
           }
           playComboSound(streak);
@@ -177,27 +182,22 @@ function handleCardClick(event) {
           flippedCards.forEach(card => {
             if (isMismatch) {
               streak = 0;
-              score = time + (streak * 10);
-              card1.style.background = "url('images/small-pattern.png')";
-              card2.style.background = "url('images/small-pattern.png')";
-
-              if (window.innerWidth <= 1280 && window.innerHeight <= 850) {
-                card1.style.backgroundSize = '240px';
-                card2.style.backgroundSize = '240px';
-              }
-
-              else {
-                card1.style.backgroundSize = '370px';
-                card2.style.backgroundSize = '370px';
-              }
+              // score = time + (streak * 10); // No penalty on score, just streak reset
+              card1.style.backgroundImage = "url('images/small-pattern.png')";
+              card2.style.backgroundImage = "url('images/small-pattern.png')";
               consecutiveErrors++;
               maxConsecutiveErrors = Math.max(maxConsecutiveErrors, consecutiveErrors);
               telemetry.log('match', { 
+                level: 1,
                 result: 'fail', 
                 images: [card1.dataset.image, card2.dataset.image],
                 consecutiveErrors: consecutiveErrors,
                 maxConsecutiveErrors: maxConsecutiveErrors
               });
+              
+              // Remove color class on mismatch
+              const imgKey = card.dataset.image.replace('.png', '');
+              card.classList.remove('card-lvl1-' + imgKey);
             }
             const imageElement = card.querySelector("img");
             if (imageElement) {
@@ -234,6 +234,27 @@ function restartFunction() {
   location.reload();
 }
 
+// Start next game with AI-adjusted difficulty
+async function startNextGame() {
+  // Ensure AI has processed the last game and saved config
+  if (aiEngine && typeof aiEngine.decideNextConfig === 'function') {
+    try {
+      // Get the next configuration for this level
+      const nextConfig = aiEngine.decideNextConfig(1);
+      
+      // Save to localStorage (this should already be done, but ensure it)
+      localStorage.setItem('ai_level1_config', JSON.stringify(nextConfig));
+      
+      aiLog('Next game config:', nextConfig);
+    } catch (e) {
+      console.error('Error getting next config:', e);
+    }
+  }
+  
+  // Reload page to apply new configuration
+  location.reload();
+}
+
 async function exportTelemetry() {
   try {
     const events = await telemetry.exportAll();
@@ -258,149 +279,99 @@ async function resetData() {
 
 function cardReader(card) {
   const cookieCutterTxt = document.getElementById("cookie-txt");
-  const imageElement = card.querySelector("img");
-
-
-  if (card.dataset.image == "image1.png") {
-    // blue-dark
-    card.style.background = 'rgba(30, 37, 59, 0.4)';
-    cookieCutterTxt.innerHTML = "Matariki";
-  }
-  if (card.dataset.image == "image2.png") {
-    // orange-brown-dark
-    card.style.background = 'rgba(156, 68, 26, 0.4)';
-    cookieCutterTxt.innerHTML = "Pīwakawaka";
-  }
-  if (card.dataset.image == "image3.png") {
-    // gray-dark
-    card.style.background = 'rgba(23, 25, 31, 0.4)';
-    cookieCutterTxt.innerHTML = "Tūī";
-  }
-  if (card.dataset.image == "image4.png") {
-    // green-olive-dark
-    card.style.background = 'rgba(78, 83, 55, 0.4)';
-    cookieCutterTxt.innerHTML = "Kea";
-  }
-  if (card.dataset.image == "image5.png") {
-    // green-dark
-    card.style.background = 'rgba(0, 89, 28, 0.4)';
-    cookieCutterTxt.innerHTML = "Kawakawa";
-  }
-  if (card.dataset.image == "image6.png") {
-    // red
-    card.style.background = 'rgba(255, 0, 0, 0.4)';
-    cookieCutterTxt.innerHTML = "Pōhutukawa";
-  }
-  if (card.dataset.image == "image7.png") {
-    // yellow-bright
-    card.style.background = 'rgba(241, 179, 0, 0.4)';
-    cookieCutterTxt.innerHTML = "Kōwhai";
-  }
-  if (card.dataset.image == "image8.png") {
-    // green-light
-    card.style.background = 'rgba(140, 236, 15, 0.4)';
-    cookieCutterTxt.innerHTML = "Koru";
-  }
-  if (card.dataset.image == "image9.png") {
-    // blue-dark
-    card.style.background = 'rgba(0, 69, 115, 0.4)';
-    cookieCutterTxt.innerHTML = "Hei Matau";
-  }
-  if (card.dataset.image == "image10.png") {
-    // blue-light
-    card.style.background = 'rgba(47, 174, 196, 0.4)';
-    cookieCutterTxt.innerHTML = "Pikorua";
-  }
+  const imgKey = card.dataset.image.replace('.png', '');
+  
+  card.classList.add('card-lvl1-' + imgKey);
+  cookieCutterTxt.innerHTML = cardTextMapping[imgKey] || '';
 }
 
-function showAllCards() {
-  // If cooldown is active and trying to show cards (not hide), don't allow action
-  if (showCardsCooldown > 0 && showCards === 0) {
-    return;
-  }
+function startInitialPreview() {
+  if (isPreviewing || gameStart === 1) return;
+  
+  isPreviewing = true;
+  const allCards = document.querySelectorAll('.card');
+  
+  // Show all cards
+  allCards.forEach(card => {
+    const img = card.querySelector('img');
+    if (img) img.style.visibility = 'visible';
+    card.classList.add('card-peek');
+  });
 
-  if (gameStart !== 1) {
-    gameStart = 1;
-  }
-
-  if (flippedCards.length === 0) {
-    const allCards = document.querySelectorAll('.card');
-    const showCardsBtn = document.getElementById("show-cards");
-
-    // Toggle the state of showCards before running the loop
-    if (showCards === 0) {
-      // Start cooldown: 5 seconds for level 1
-      showCardsCooldown = 5;
-      showCardsBtn.style.pointerEvents = 'none'; // Disable button during cooldown
-      
-      // Start countdown
-      showCardsCooldownInterval = setInterval(() => {
-        showCardsCooldown--;
-        if (showCardsCooldown > 0) {
-          showCardsBtn.innerHTML = showCards === 1 ? `Hide Cards (${showCardsCooldown}s)` : `Show Cards (${showCardsCooldown}s)`;
-        } else {
-          clearInterval(showCardsCooldownInterval);
-          showCardsCooldownInterval = null;
-          
-          // Auto-hide cards if still showing when cooldown ends
-          if (showCards === 1 && flippedCards.length === 0) {
-            const allCards = document.querySelectorAll('.card');
-            showCards = 0;
-            showCardsBtn.innerHTML = "Show Cards";
-            telemetry.log('show_cards', { state: 'hide', auto: true });
-            
-            allCards.forEach(card => {
-              const imageElement = card.querySelector("img");
-              if (imageElement) {
-                imageElement.style.visibility = "hidden";
-                imageElement.style.animation = "";
-                imageElement.style.transform = "";
-              }
-              card.style.background = "";
-            });
-          } else {
-            showCardsBtn.innerHTML = showCards === 1 ? "Hide Cards" : "Show Cards";
-          }
-          
-          showCardsBtn.style.pointerEvents = 'auto'; // Re-enable button
-        }
-      }, 1000);
-      
-      showCards = 1;
-      showCardsBtn.innerHTML = `Hide Cards (${showCardsCooldown}s)`;
-      telemetry.log('show_cards', { state: 'show' });
-
-      allCards.forEach(card => {
-        const imageElement = card.querySelector("img");
-        if (imageElement) {
-          imageElement.style.visibility = "visible";
-          imageElement.style.animation = "none";
-          imageElement.style.transform = "scale(" + SHOW_CARDS_SCALE + ")";
-        }
-        card.style.background = "#fff5";
-      });
-    }
-    else if (showCards === 1) {
-      showCards = 0;
-      // Update button text based on cooldown status
-      if (showCardsCooldown > 0) {
-        showCardsBtn.innerHTML = `Show Cards (${showCardsCooldown}s)`;
-      } else {
-        showCardsBtn.innerHTML = "Show Cards";
+  // Wait 3 seconds
+  setTimeout(() => {
+    // Hide all cards
+    allCards.forEach(card => {
+      if (!card.classList.contains('matched')) {
+        const img = card.querySelector('img');
+        if (img) img.style.visibility = 'hidden';
+        card.classList.remove('card-peek');
       }
-      telemetry.log('show_cards', { state: 'hide' });
-
-      allCards.forEach(card => {
-        const imageElement = card.querySelector("img");
-        if (imageElement) {
-          imageElement.style.visibility = "hidden";
-          imageElement.style.animation = "";
-          imageElement.style.transform = "";
-        }
-        card.style.background = "";
-      });
+    });
+    
+    isPreviewing = false;
+    gameStart = 1;
+    if (!actualStartTime) {
+      actualStartTime = Date.now();
     }
-  }
+    telemetry.log('start', { level: 1, variant: { pairsType: 'image-image', layout: 'fixed_template', cols: FIXED_COLS, rows: FIXED_ROWS, totalPairs, hideDelay: HIDE_DELAY_MS, showScale: SHOW_CARDS_SCALE, timerMode: 'countdown', initialTime: INITIAL_TIME, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
+  }, 3000);
+}
+
+let isShowingCards = false;
+
+function showAllCards() {
+	if (gameStop !== 0 || isRippleActive || isPreviewing || isShowingCards) return;
+	
+	if (gameStart !== 1) {
+		startInitialPreview();
+		return;
+	}
+
+  isShowingCards = true;
+	telemetry.log('show_cards', { level: 1, state: 'show' });
+  
+  // Deduct 10s for Level 1
+  time -= 10;
+  if (time < 0) time = 0;
+  updateTimer();
+  
+  cards.forEach(card => {
+    if (!card.classList.contains('matched')) {
+      const img = card.querySelector('img');
+      if (img) img.style.visibility = 'visible';
+      card.classList.add('card-peek');
+    }
+  });
+
+  // 3s flip back or manual click
+  let flipTimeout = setTimeout(() => {
+    hideAllCards();
+  }, 3000);
+
+  // Allow manual flip back
+  const handleManualFlip = () => {
+    clearTimeout(flipTimeout);
+    hideAllCards();
+    document.removeEventListener('click', handleManualFlip);
+  };
+  
+  // Use a small delay to avoid triggering from the Show button click itself
+  setTimeout(() => {
+    document.addEventListener('click', handleManualFlip);
+  }, 100);
+}
+
+function hideAllCards() {
+	cards.forEach(card => {
+		if (!card.classList.contains('matched')) {
+			const img = card.querySelector('img');
+			if (img) img.style.visibility = 'hidden';
+			card.classList.remove('card-peek');
+		}
+	});
+  isShowingCards = false;
+	telemetry.log('show_cards', { level: 1, state: 'hide' });
 }
 
 // * * * * * Leaderboard Code * * * * * 
@@ -408,123 +379,53 @@ function showAllCards() {
 
 
 async function endGame() {
-  score = time + (streak * 10);
-  document.body.style.backgroundColor = "#00f";
-  document.getElementById('background').style.opacity = '0.7';
-  document.getElementById('game-board').style.display = 'none';
-  // Hide game timer when game ends
-  const gameTimer = document.getElementById('game-timer');
-  if (gameTimer) {
-    gameTimer.style.display = 'none';
-  }
-  // Hide glass effect when game ends
-  const glassFx = document.getElementById('glass-fx');
-  if (glassFx) {
-    glassFx.style.display = 'none';
-  }
+  // score = time + (streak * 10);
   
-  // Setup game-over layout
-  const gameOver = document.getElementById('game-over');
-  if (!gameOver.querySelector('.game-over-left')) {
-    const leftDiv = document.createElement('div');
-    leftDiv.className = 'game-over-left';
-    leftDiv.innerHTML = gameOver.innerHTML;
-    gameOver.innerHTML = '';
-    gameOver.appendChild(leftDiv);
-    
-    const rightDiv = document.createElement('div');
-    rightDiv.className = 'game-over-right';
-    rightDiv.id = 'analytics-summary';
-    gameOver.appendChild(rightDiv);
-  }
-  
-  gameOver.classList.add('show');
-  document.getElementById('menu-icon').innerHTML = "<a href='play.html' class='menu-txt'>Menu</a><br><br><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>";
-  await telemetry.log('end', { score, pairs: matchedPairs, streak: streak });
-  
+  // Calculate Flow Index directly (ignoring adaptive enabled/disabled for score calculation)
   let aiResult = null;
-  // Process with AI if available
-  if (aiEngine && typeof processGameEndWithAI === 'function') {
-    aiResult = await processGameEndWithAI(telemetry, 1, aiEngine);
-    if (aiResult) {
-      console.log('Flow Index:', aiResult.flowIndex.toFixed(3));
-      console.log('Next Config Suggestion:', aiResult.nextConfig);
-      if (typeof aiEngine.updateBandit === 'function') {
-        aiEngine.updateBandit(aiResult.flowIndex);
-      }
-      try {
-        const key = 'ai_lvl1_completed_count';
-        const raw = localStorage.getItem(key);
-        let count = raw ? parseInt(raw, 10) : 0;
-        count += 1;
-        localStorage.setItem(key, String(count));
-        if (count >= 2) {
-          const lvl2Cfg = aiEngine.decideNextConfig(2);
-          localStorage.setItem('ai_level2_config', JSON.stringify(lvl2Cfg));
-          await telemetry.log('ai_level2_suggestion', { level: 2, nextConfig: lvl2Cfg, basedOn: 'lvl1_baseline', completedRounds: count });
-          const lvl3Cfg = aiEngine.decideNextConfig(3);
-          localStorage.setItem('ai_level3_config', JSON.stringify(lvl3Cfg));
-          await telemetry.log('ai_level3_suggestion', { level: 3, nextConfig: lvl3Cfg, basedOn: 'lvl1_baseline', completedRounds: count });
-        }
-      } catch (e) {}
-    }
+  try {
+    aiResult = await runAdaptiveGameEnd(telemetry, 1, aiEngine, {
+      propagateSuggestions: true,
+      updateCompletionCount: true,
+      requireCompletionCount: 2,
+      completionKey: 'ai_lvl1_completed_count',
+      basedOn: 'lvl1_baseline'
+    });
+  } catch (e) {
+    console.error("AI Error:", e);
   }
+
+  // Set score based on Flow Index (0-1 -> 0-1000)
+  if (aiResult && typeof aiResult.flowIndex === 'number') {
+    score = Math.round(aiResult.flowIndex * 1000);
+  } else {
+    // Fallback logic if AI fails (e.g. not initialized)
+    score = 0; 
+  }
+
+  // Update Score UI for Game Over screen
+  const currentScoreEl = document.getElementById('current-score');
+  if (currentScoreEl) currentScoreEl.innerText = score;
+
+  showGameOverScreen(actualStartTime, "<a href='play.html' class='menu-txt'>Menu</a><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>");
   
-  // Display analytics summary in the right panel
+  // Log end event with the final Flow Index score
+  await telemetry.log('end', { level: 1, score, flowIndex: aiResult?.flowIndex, pairs: matchedPairs, streak: streak });
+
   const analyticsContainer = document.querySelector('#game-over .game-over-right') || document.getElementById('analytics-summary');
   if (typeof displayAnalyticsSummary === 'function' && analyticsContainer) {
     await displayAnalyticsSummary(telemetry, 1, aiResult, { score, streak, remainingTime: time });
-    
-    // Save game session to history
-    if (typeof GameHistory !== 'undefined') {
-      try {
-        const history = new GameHistory();
-        await history.openDatabase();
-        
-        // Get current game configuration from start event
-        const events = await telemetry.exportAll();
-        const sortedEvents = events.sort((a, b) => a.ts - b.ts);
-        let startEvent = null;
-        for (let i = sortedEvents.length - 1; i >= 0; i--) {
-          if (sortedEvents[i].type === 'start' && sortedEvents[i].data.level === 1) {
-            startEvent = sortedEvents[i];
-            break;
-          }
-        }
-        const config = startEvent?.data?.variant || {};
-        
-        // Get metrics
-        let metrics = null;
-        if (typeof extractPerformanceMetrics === 'function') {
-          metrics = await extractPerformanceMetrics(telemetry, 1);
-        }
-        
-        // Save session
-        const gameId = await history.saveGameSession({
-          gameId: `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: startEvent?.ts || Date.now(),
-          level: 1,
-          metrics: metrics || {},
-          aiResult: aiResult,
-          gameStats: { score, streak, remainingTime: time },
-          config: config
-        });
-        
-        console.log('Game session saved to history:', gameId);
-      } catch (e) {
-        console.error('Error saving game session to history:', e);
-      }
-    }
+    await saveSessionToHistoryFromTelemetry(telemetry, 1, aiResult, { score, streak, remainingTime: time });
   }
 }
 
 async function submitScore() {
   const name = document.getElementById('name').value;
   if (!name) return;
-  try {
-    telemetry.log('submit', { name, score });
-    await leaderboard.submitScore(name, score);
-    document.getElementById('submit-score').disabled = true;
+	try {
+		telemetry.log('submit', { level: 1, name, score });
+		await leaderboard.submitScore(name, score);
+		document.getElementById('submit-score').disabled = true;
     await displayLeaderboard();
     document.getElementById('game-board').style.display = "none";
     document.getElementById('game-over').style.display = 'none';
@@ -542,7 +443,7 @@ async function displayLeaderboard() {
 
 function triggerRippleEffect() {
   isRippleActive = true;
-  telemetry.log('ripple_effect', { timestamp: Date.now() });
+  telemetry.log('ripple_effect', { level: 1, timestamp: Date.now() });
 
   // Pick random start
   const startIndex = Math.floor(Math.random() * cards.length);
@@ -563,18 +464,20 @@ function triggerRippleEffect() {
     maxDelay = Math.max(maxDelay, delay + 600);
 
     setTimeout(() => {
+      if (gameStop !== 0) return;
       const img = card.querySelector('img');
       if (img) {
         img.style.visibility = 'visible';
-        card.style.background = '#fff5'; // Light highlight
+        card.classList.add('card-peek');
       }
     }, delay);
 
     setTimeout(() => {
+      if (gameStop !== 0) return;
       const img = card.querySelector('img');
       if (img) {
         img.style.visibility = 'hidden';
-        card.style.background = ''; // Reset
+        card.classList.remove('card-peek');
       }
     }, delay + 600); // Show for 600ms
   });
@@ -586,83 +489,45 @@ function triggerRippleEffect() {
 }
 
 window.onload = () => {
-  leaderboard = new Leaderboard('leaderboardDB_lvl1');
-  telemetry = new Telemetry('telemetry_lvl1');
-  leaderboard.openDatabase();
-  telemetry.openDatabase();
-  const menuIcon = document.getElementById('menu-icon');
-  let banner = document.getElementById('ai-banner');
-  if (!banner && menuIcon) {
-    banner = document.createElement('div');
-    banner.id = 'ai-banner';
-    banner.className = 'menu-txt';
-    menuIcon.appendChild(banner);
-  }
-  const enabled = (function(){ const raw = localStorage.getItem('ai_adaptive_enabled'); return raw === null ? true : raw === 'true'; })();
-  if (banner) { banner.textContent = enabled ? 'Adaptive difficulty enabled' : 'Adaptive difficulty disabled'; }
-  
-  // Initialize AI Engine if available
-  if (typeof AIEngine !== 'undefined') {
-    aiEngine = new AIEngine();
-  }
-  
-  initializeGame();
+	leaderboard = new Leaderboard('leaderboardDB_lvl1');
+	telemetry = new Telemetry('telemetry_lvl1');
+	leaderboard.openDatabase();
+	telemetry.openDatabase();
+	const enabled = isAdaptiveEnabled();
+	updateAdaptiveUI(enabled);
+	if (typeof AIEngine !== 'undefined') {
+		aiEngine = new AIEngine();
+	}
+	initializeGame();
 };
 
-function isAdaptiveEnabled() {
-  const raw = localStorage.getItem('ai_adaptive_enabled');
-  return raw === null ? true : raw === 'true';
-}
-
-function toggleAdaptive() {
-  const enabled = isAdaptiveEnabled();
-  localStorage.setItem('ai_adaptive_enabled', enabled ? 'false' : 'true');
-  const banner = document.getElementById('ai-banner');
-  if (banner) { banner.textContent = enabled ? 'Adaptive difficulty disabled' : 'Adaptive difficulty enabled'; }
-}
-
-// No code below this
-
-
-function showComboText(text) {
-  const comboElement = document.getElementById('combo-text');
-  if (comboElement) {
-    comboElement.textContent = text;
-    comboElement.classList.add('show');
-
-    setTimeout(() => {
-      comboElement.classList.remove('show');
-    }, 1500);
-  }
-}
-
-function playComboSound(streak) {
-  let soundFile = '';
-  let comboText = '';
-
-  if (streak === 2) {
-    soundFile = 'Sound/nice.mp3';
-    comboText = 'NICE!';
-  } else if (streak === 3) {
-    soundFile = 'Sound/great.mp3';
-    comboText = 'GREAT!';
-  } else if (streak === 4) {
-    soundFile = 'Sound/Amazing.mp3';
-    comboText = 'AMAZING!';
-  } else if (streak === 5) {
-    soundFile = 'Sound/excellent.mp3';
-    comboText = 'EXCELLENT!';
-  } else if (streak >= 6) {
-    soundFile = 'Sound/Unbelievable.mp3';
-    comboText = 'UNBELIEVABLE!';
-  }
-
-  if (soundFile) {
-    const audio = new Audio(soundFile);
-    audio.play().catch(e => console.log("Audio play failed", e));
-  }
-
-  if (comboText) {
-    showComboText(comboText);
-  }
+async function downloadResult() {
+  const gameOver = document.getElementById('game-over');
+  const downloadBtn = document.getElementById('download-btn');
+  const submitBtn = document.getElementById('submit-score');
+  
+	if (downloadBtn) downloadBtn.style.display = 'none';
+	if (submitBtn) submitBtn.style.display = 'none';
+  
+  try {
+    const canvas = await html2canvas(document.body, {
+      backgroundColor: '#000',
+      scale: 2, // Higher quality
+      logging: false,
+      useCORS: true
+    });
+    
+    const playerName = document.getElementById('name').value || 'Player';
+    const date = new Date().toISOString().split('T')[0];
+    const link = document.createElement('a');
+    link.download = `MemoryGame_Result_${playerName}_${date}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch (err) {
+		if (typeof aiWarn === 'function') aiWarn('Download failed:', err);
+		alert('Failed to generate image. Please try again.');
+	} finally {
+		if (downloadBtn) downloadBtn.style.display = 'block';
+		if (submitBtn) submitBtn.style.display = 'block';
+	}
 }

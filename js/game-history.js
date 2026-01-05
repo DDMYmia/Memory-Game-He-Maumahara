@@ -72,7 +72,7 @@ class GameHistory {
       
       const req = store.put(session);
       req.onsuccess = () => {
-        console.log('Game session saved:', gameId);
+        if (typeof aiLog === 'function') aiLog('Game session saved:', gameId);
         resolve(gameId);
       };
       req.onerror = e => {
@@ -251,4 +251,3 @@ class GameHistory {
     });
   }
 }
-

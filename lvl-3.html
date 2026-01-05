@@ -7,6 +7,7 @@
 <link rel="shortcut icon" type="image/x-icon" href="images/icon.ico">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/roboto.css">
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script>
 (function(){
   var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -27,23 +28,21 @@
 })();
 </script>
 </head>
-<body>
+<body class="game-page">
 
-<div id="background"></div>
-<a href="https://rauawaawatpm.co.nz"><div id="rkct"></div></a>
+  <div id="background"></div>
+  <a href="https://rauawaawatpm.co.nz" aria-label="Rauawaawa Website">
+    <div id="rkct"></div>
+  </a>
 
-<div id="menu-icon">
-<a href="play.html" class="menu-txt">Menu</a>
-<br><br>
-<a href="#" class="menu-txt" onclick="showAllCards()" id="show-cards">Show Cards</a>
-<br><br>
-<a href="#" class="menu-txt" onclick="exportTelemetry()" id="export-telemetry">Export Telemetry</a>
-<br><br>
-<div id="ai-banner" class="menu-txt"></div>
-<br><br>
-<a href="#" class="menu-txt" onclick="toggleAdaptive()" id="toggle-adaptive">Toggle Adaptive</a>
-<br><br>
-<a href="#" class="menu-txt" onclick="resetData()" id="reset-data">Reset Data</a>
+  <div id="instruction-btn" onclick="toggleInstructions()" aria-label="Show Instructions">?</div>
+
+  <div id="menu-icon">
+<a href="play.html" class="menu-txt" aria-label="Return to Menu">Menu</a>
+<a href="#" class="menu-txt" onclick="showAllCards()" id="show-cards" aria-label="Show All Cards">Show</a>
+<a href="#" class="menu-txt" onclick="exportTelemetry()" id="export-telemetry" aria-label="Export Data">Export</a>
+<a href="#" class="menu-txt" onclick="toggleAdaptive()" id="toggle-adaptive" aria-label="Toggle Adaptive Mode">Adapt</a>
+<a href="#" class="menu-txt" onclick="resetData()" id="reset-data" aria-label="Reset Data">Reset</a>
 </div>
 
   <div id="cookie-txt">Click a card</div>
@@ -54,10 +53,14 @@
 
 <div id="game-over">
 <div class="game-over-left">
-<div id="well-done-etc"><span id="current-score">0:00</span>! Well Done!</div>
-<input type="text" id="name" placeholder="Type your name here..">
-<button id="submit-score" onclick="submitScore()">Submit Score</button>
-</div>
+      <div id="well-done-etc"><span id="current-score">0:00</span>! Well Done!</div>
+      <input type="text" id="name" placeholder="Type your name here.." aria-label="Player Name">
+      <div class="button-row">
+        <button id="submit-score" onclick="submitScore()" aria-label="Submit Score">Submit Score</button>
+        <button id="download-btn" onclick="downloadResult()" aria-label="Download Result">Download</button>
+        <button id="next-game-btn" onclick="startNextGame()" aria-label="Next Game">Next Game</button>
+      </div>
+    </div>
 <div class="game-over-right" id="analytics-summary"></div>
 </div>
 
@@ -72,6 +75,7 @@
 <script src="js/game-history.js"></script>
 <script src="js/analytics-summary.js"></script>
 <script src="js/lvl3.js"></script>
+<!-- AutoPilot removed for production -->
 
 </body>
 </html>

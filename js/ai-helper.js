@@ -4,6 +4,26 @@
  * Extracts performance metrics from telemetry events for AI processing
  */
 
+function aiDebugEnabled() {
+  return typeof globalThis !== 'undefined' && globalThis.DEBUG_AI === true;
+}
+
+function aiLog(...args) {
+  if (aiDebugEnabled()) console.log(...args);
+}
+
+function aiWarn(...args) {
+  if (aiDebugEnabled()) console.warn(...args);
+}
+
+function normalizeToImagePng(value) {
+  if (typeof value !== 'string') return null;
+  const v = value.trim();
+  const m = v.match(/^image\s*(\d+)(?:\.png)?$/i);
+  if (m) return `image${m[1]}.png`;
+  return v;
+}
+
 /**
  * Extract performance metrics from telemetry events
  * @param {Object} telemetry - Telemetry instance
@@ -23,20 +43,20 @@ async function extractPerformanceMetrics(telemetry, level) {
     sortedEvents.forEach(e => {
       eventTypes[e.type] = (eventTypes[e.type] || 0) + 1;
     });
-    console.log('Event types in telemetry:', eventTypes);
+    aiLog('Event types in telemetry:', eventTypes);
     
     // Find the most recent start event for this level
     let startEvent = null;
     const allStartEvents = sortedEvents.filter(e => e.type === 'start');
-    console.log('All start events found:', allStartEvents.length, allStartEvents.map(e => ({ level: e.data?.level, ts: new Date(e.ts).toLocaleTimeString() })));
+    aiLog('All start events found:', allStartEvents.length, allStartEvents.map(e => ({ level: e.data?.level, ts: new Date(e.ts).toLocaleTimeString() })));
     
     for (let i = sortedEvents.length - 1; i >= 0; i--) {
       const event = sortedEvents[i];
       if (event.type === 'start') {
-        console.log('Checking start event:', { level: event.data?.level, expectedLevel: level, match: event.data?.level === level, data: event.data });
+        aiLog('Checking start event:', { level: event.data?.level, expectedLevel: level, match: event.data?.level === level, data: event.data });
         if (event.data && event.data.level === level) {
           startEvent = event;
-          console.log('Found matching start event for level', level);
+          aiLog('Found matching start event for level', level);
           break;
         }
       }
@@ -59,8 +79,8 @@ async function extractPerformanceMetrics(telemetry, level) {
     }
     
     if (!startEvent) {
-      console.warn('No start event found for level', level);
-      console.warn('Available start events:', allStartEvents.map(e => ({ level: e.data?.level, data: e.data })));
+      aiWarn('No start event found for level', level);
+      aiWarn('Available start events:', allStartEvents.map(e => ({ level: e.data?.level, data: e.data })));
       return null;
     }
     
@@ -81,7 +101,7 @@ async function extractPerformanceMetrics(telemetry, level) {
     }
     
     // Debug log
-    console.log('Completion time calculation:', {
+    aiLog('Completion time calculation:', {
       hasStartEvent: !!startEvent,
       hasEndEvent: !!endEvent,
       startTime: startEvent ? new Date(startEvent.ts).toLocaleTimeString() : 'N/A',
@@ -114,7 +134,7 @@ async function extractPerformanceMetrics(telemetry, level) {
     const cheatCount = showCardsEvents.length;
     
     // Debug log to verify we're getting the right events
-    console.log('Current game session events:', {
+    aiLog('Current game session events:', {
       startTime: new Date(startEvent.ts).toLocaleTimeString(),
       endTime: endEvent ? new Date(endEvent.ts).toLocaleTimeString() : 'N/A',
       totalEvents: events.length,
@@ -247,7 +267,7 @@ async function extractPerformanceMetrics(telemetry, level) {
       maxConsecutiveErrors: maxConsecutiveErrors
     };
   } catch (error) {
-    console.error('Error extracting performance metrics:', error);
+    aiWarn('Error extracting performance metrics:', error);
     return null;
   }
 }
@@ -267,12 +287,12 @@ async function processGameEndWithAI(telemetry, level, aiEngine = null) {
   try {
     const metrics = await extractPerformanceMetrics(telemetry, level);
     if (!metrics) {
-      console.warn('No metrics extracted for Flow Index calculation');
+      aiWarn('No metrics extracted for Flow Index calculation');
       return null;
     }
     
     // Debug: Log metrics before computing Flow Index
-    console.log('Metrics for Flow Index calculation:', {
+    aiLog('Metrics for Flow Index calculation:', {
       completionTime: metrics.completionTime,
       totalPairs: metrics.totalPairs,
       failedMatches: metrics.failedMatches,
@@ -288,7 +308,7 @@ async function processGameEndWithAI(telemetry, level, aiEngine = null) {
     const flowIndex = aiEngine.processGameEnd(metrics);
     
     // Debug: Log computed Flow Index
-    console.log('Computed Flow Index:', flowIndex);
+    aiLog('Computed Flow Index:', flowIndex);
     
     // Log Flow Index to telemetry with extended metrics
     await telemetry.log('flow_index', {
@@ -302,8 +322,17 @@ async function processGameEndWithAI(telemetry, level, aiEngine = null) {
       cheatPenalty: metrics.cheatPenalty || 1.0
     });
     
-    // Decide next config (optional, for display)
+    // Decide next config and save to localStorage
     const nextConfig = aiEngine.decideNextConfig(level);
+    
+    // Save config to localStorage for current level
+    try {
+      const configKey = `ai_level${level}_config`;
+      localStorage.setItem(configKey, JSON.stringify(nextConfig));
+      aiLog('Saved next config to localStorage:', { level, configKey, nextConfig });
+    } catch (e) {
+      aiWarn('Failed to save config to localStorage:', e);
+    }
     
     // Log next config suggestion
     await telemetry.log('ai_suggestion', {
@@ -316,8 +345,58 @@ async function processGameEndWithAI(telemetry, level, aiEngine = null) {
       nextConfig
     };
   } catch (error) {
-    console.error('Error processing game end with AI:', error);
+    aiWarn('Error processing game end with AI:', error);
     return null;
   }
 }
 
+async function runAdaptiveGameEnd(telemetry, level, aiEngine, options = {}) {
+  if (!aiEngine || typeof processGameEndWithAI !== 'function') return null;
+
+  let aiResult = null;
+  try {
+    aiResult = await processGameEndWithAI(telemetry, level, aiEngine);
+  } catch (e) {
+    aiResult = null;
+  }
+
+  if (aiResult && typeof aiEngine.updateBandit === 'function') {
+    try {
+      aiEngine.updateBandit(aiResult.flowIndex);
+    } catch (e) {}
+  }
+
+  const completionKey = options.completionKey || 'ai_lvl1_completed_count';
+  const updateCompletionCount = options.updateCompletionCount === true;
+  const requireCompletionCount = typeof options.requireCompletionCount === 'number' ? options.requireCompletionCount : null;
+  const basedOn = options.basedOn || `lvl${level}_update`;
+  const shouldPropagate = options.propagateSuggestions === true;
+
+  if (!shouldPropagate || typeof aiEngine.decideNextConfig !== 'function') return aiResult;
+
+  let completionCount = null;
+  try {
+    const raw = localStorage.getItem(completionKey);
+    completionCount = raw ? parseInt(raw, 10) : 0;
+    if (updateCompletionCount) {
+      completionCount += 1;
+      localStorage.setItem(completionKey, String(completionCount));
+    }
+  } catch (e) {}
+
+  if (requireCompletionCount !== null && (completionCount === null || completionCount < requireCompletionCount)) {
+    return aiResult;
+  }
+
+  try {
+    const lvl2Cfg = aiEngine.decideNextConfig(2);
+    localStorage.setItem('ai_level2_config', JSON.stringify(lvl2Cfg));
+    await telemetry.log('ai_level2_suggestion', { level: 2, nextConfig: lvl2Cfg, basedOn, completedRounds: completionCount });
+
+    const lvl3Cfg = aiEngine.decideNextConfig(3);
+    localStorage.setItem('ai_level3_config', JSON.stringify(lvl3Cfg));
+    await telemetry.log('ai_level3_suggestion', { level: 3, nextConfig: lvl3Cfg, basedOn, completedRounds: completionCount });
+  } catch (e) {}
+
+  return aiResult;
+}

@@ -4,6 +4,7 @@
 
 html {
   scrollbar-color: #333 #000;
+  min-width: 800px;
 }
 a {
   text-decoration: none;
@@ -11,13 +12,14 @@ a {
 }
 body {
   background: #000;
+  color: #fff;
   font-family: 'Roboto', sans-serif;
   font-size: 18px;
-  height: 100vh;
+  min-height: 100vh;
   margin: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-width: 800px;
 }
 #background {
   position: fixed;
@@ -32,51 +34,46 @@ body {
   transform: scale(2.2);
   z-index: -1;
 }
-#rkct { 
-  position: absolute;
-  top: calc(25% + 9px);
-  left: calc(10% - 97.5px);
-  width: 195px;
-  height: 43px;
-  background: url('../images/rkct.png');
-  background-size: cover; 
-  filter: invert(1);
-}
 #rkct-menu { 
-  position: absolute;
-  top: 50px;
-  left: 50px;
+  position: fixed;
+  top: 20px;
+  left: 20px;
   width: 195px;
   height: 43px;
   background: url('../images/rkct.png');
   background-size: cover; 
   filter: invert(1);
-  z-index: 1;
+  z-index: 20;
 }
 #menu-container {
-  position: absolute;
-  top: calc(50% - 250px);
-  left: 0;
-  right: 0;
-  height: 550px;
-  z-index: 10;
-}
-#menu-icon {
-  position: fixed;
-  top: 57px;
-  right: 57px;
-  width: auto;
-  height: auto;
-  z-index: 1000;
-}
-#title {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: auto;
-  font-size: 108px;
+  min-height: 100vh;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 30px;
+  padding-top: 93px;
+}
+#menu-container > * {
+  pointer-events: auto;
+}
+#menu-icon {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+#title {
+  position: static;
+  font-size: 96px;
   font-weight: 100;
+  line-height: 1;
   text-align: center;
   color: #fff;
 }
@@ -92,11 +89,10 @@ body {
   right: 0;
   bottom: 0;
   background: #0064bd4f;
+  z-index: -1;
 }
 #thanks {
-  position: absolute;
-  top: 180px;
-  left: calc(50% - 250px); 
+  position: static;
   width: 500px;
   height: auto;
   color: #fff;
@@ -116,16 +112,22 @@ body {
   background-color: #fff3;
   color: #fff;
   font-size: 24px;
-  padding: 4px 20px 4px 20px;
-  font-weight: 400;
-  border-radius: 20px;
+  padding: 12px 16px;
+  font-weight: 300;
+  line-height: 1.25;
+  border-radius: 26px;
   transition: 0.5s;
+  width: 100px;
+  display: inline-block;
+  text-align: center;
+  box-sizing: border-box;
+  margin-bottom: 30px;
 }
 .menu-txt:hover {
   background: rgba(0, 147, 255, 0.4);
 }
 .txt {
-  font-size: 36px;
+  font-size: 24px;
   font-weight: 300;
   text-align: center;
   background-color: #fff3;
@@ -140,55 +142,3 @@ body {
   background-color: rgba(0, 147, 255, 0.4);
 }
 
-/* ~~~~~~~~~~~~~~~~~~~ */
-/* ~ max width 850px ~ */
-/* ~~~~~~~~~~~~~~~~~~~ */
-
-@media screen and (max-width: 1280px), screen and (max-height: 850px) 
-{
-  #background {
-    transform: scale(1.8);
-  }
-  #title {
-    position: absolute;
-    top: 100px;
-    left: 0;
-    right: 0; 
-    height: auto;
-    font-size: 84px;
-    font-weight: 100;
-    text-align: center;
-    color: #fff;
-  }
-  #rkct-menu {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    width: 195px;
-    height: 43px;
-    background: url('../images/rkct.png');
-    background-size: cover;
-    filter: invert(1);
-    z-index: 1;
-  }
-  #thanks {
-    top: 260px;
-    font-size: 18px;
-  }
-  #menu-icon {
-    top: 27px;
-    right: 27px;
-  }
-  .txt {
-    font-size: 24px;
-    font-weight: 300;
-    text-align: center;
-    background-color: #fff3;
-    color: #fff;
-    padding: 10px;
-    padding-left: 80px;
-    padding-right: 80px;
-    border-radius: 50px;
-    transition: 0.5s;
-  }
-}

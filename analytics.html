@@ -31,7 +31,7 @@
 
 <div id="analytics-blue"></div>
 <div id="background"></div>
-<a href="https://rauawaawatpm.co.nz"><div id="rkct-menu"></div></a>
+<a href="https://rauawaawatpm.co.nz" id="rkct-menu"></a>
 
 <div id="menu-icon">
 <a href="index.html" class="menu-txt">Menu</a>
@@ -45,13 +45,13 @@
     <button class="mode-btn" onclick="window.showDemoMode()">Demo</button>
   </div>
   
-  <div class="level-selector" id="level-selector" style="display: none;">
+  <div class="level-selector hidden" id="level-selector">
     <button class="level-btn active" onclick="window.loadMockData(1)">Level 1</button>
     <button class="level-btn" onclick="window.loadMockData(2)">Level 2</button>
     <button class="level-btn" onclick="window.loadMockData(3)">Level 3</button>
   </div>
   
-  <div id="history-list" style="display: none;"></div>
+  <div id="history-list" class="hidden"></div>
   <div id="analytics-display"></div>
 </div>
 </div>
@@ -89,7 +89,7 @@
       
       const listContainer = document.getElementById('history-list');
       if (sessions.length === 0) {
-        listContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.7);">No game history yet. Play a game to see your analytics here!</div>';
+        listContainer.innerHTML = '<div class="analytics-empty-state">No game history yet. Play a game to see your analytics here!</div>';
         return;
       }
       
@@ -101,14 +101,14 @@
         }
       });
       
-      let html = '<div style="max-width: 1200px; margin: 0 auto;">';
+      let html = '<div class="history-wrap">';
       
       // Display sessions grouped by level
       for (let level = 1; level <= 3; level++) {
         if (byLevel[level].length === 0) continue;
         
-        html += `<h3 style="color: rgba(255,255,255,0.9); margin-top: 30px; margin-bottom: 15px;">Level ${level}</h3>`;
-        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; margin-bottom: 30px;">';
+        html += `<h3 class="history-level-title">Level ${level}</h3>`;
+        html += '<div class="history-grid">';
         
         byLevel[level].forEach(session => {
           const date = new Date(session.timestamp);
@@ -117,23 +117,10 @@
           const timeRemaining = formatTime(session.summary.timeRemaining);
           
           html += `
-            <div class="history-item" onclick="window.loadHistorySession('${session.gameId}')" style="
-              background: rgba(255,255,255,0.1);
-              border-radius: 8px;
-              padding: 15px;
-              cursor: pointer;
-              transition: all 0.3s;
-              border: 1px solid rgba(255,255,255,0.2);
-            " onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
-              <div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 8px;">
-                ${date.toLocaleDateString()} ${date.toLocaleTimeString()}
-              </div>
-              <div style="font-size: 16px; color: rgba(255,255,255,0.7); margin-bottom: 4px;">
-                Flow: <strong style="color: rgba(255,255,255,0.9);">${flowIndex}</strong>
-              </div>
-              <div style="font-size: 14px; color: rgba(255,255,255,0.6);">
-                Accuracy: ${accuracy}% | Time: ${timeRemaining} | Pairs: ${session.summary.totalPairs}
-              </div>
+            <div class="history-item" onclick="window.loadHistorySession('${session.gameId}')">
+              <div class="history-item-date">${date.toLocaleDateString()} ${date.toLocaleTimeString()}</div>
+              <div class="history-item-main">Flow: <strong>${flowIndex}</strong></div>
+              <div class="history-item-sub">Accuracy: ${accuracy}% | Time: ${timeRemaining} | Pairs: ${session.summary.totalPairs}</div>
             </div>
           `;
         });
@@ -144,8 +131,8 @@
       html += '</div>';
       listContainer.innerHTML = html;
     } catch (e) {
-      console.error('Error loading history:', e);
-      document.getElementById('history-list').innerHTML = '<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.7);">Error loading history. Please try again.</div>';
+      if (typeof aiWarn === 'function') aiWarn('Error loading history:', e);
+      document.getElementById('history-list').innerHTML = '<div class="analytics-empty-state">Error loading history. Please try again.</div>';
     }
   }
   
@@ -201,13 +188,13 @@
       const container = document.getElementById('analytics-display');
       const backBtn = document.createElement('button');
       backBtn.textContent = '← Back to History';
-      backBtn.style.cssText = 'margin-bottom: 20px; padding: 10px 20px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 5px; cursor: pointer;';
+      backBtn.className = 'history-back-btn';
       backBtn.onclick = () => {
         showHistoryList();
       };
       container.insertBefore(backBtn, container.firstChild);
     } catch (e) {
-      console.error('Error loading session:', e);
+      if (typeof aiWarn === 'function') aiWarn('Error loading session:', e);
       alert('Error loading session');
     }
   }

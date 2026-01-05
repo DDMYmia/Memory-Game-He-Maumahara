@@ -10,6 +10,18 @@
  * Data: Uses telemetry data from game-core.js
  */
 
+function aiDebugEnabled() {
+  return typeof globalThis !== 'undefined' && globalThis.DEBUG_AI === true;
+}
+
+function aiLog(...args) {
+  if (aiDebugEnabled()) console.log(...args);
+}
+
+function aiWarn(...args) {
+  if (aiDebugEnabled()) console.warn(...args);
+}
+
 /**
  * Fuzzy Logic System - Flow Index Calculator
  * 
@@ -85,34 +97,38 @@ class FuzzyLogicSystem {
 
     // Membership function parameters (configurable)
     this.config = {
-      // Time normalization: fast (0-0.4), medium (0.3-0.7), slow (0.6-1.0)
-      timeFast: { min: 0, max: 0.4, peak: 0.2 },
-      timeMedium: { min: 0.3, max: 0.7, peak: 0.5 },
-      timeSlow: { min: 0.6, max: 1.0, peak: 0.8 },
+      // Time normalization: fast (0-0.5), medium (0.3-0.8), slow (0.6-1.0)
+      // Updated to peak at 0 for maximum speed reward
+      timeFast: { min: 0, max: 0.5, peak: 0 },
+      timeMedium: { min: 0.2, max: 0.8, peak: 0.5 },
+      timeSlow: { min: 0.5, max: 1.0, peak: 1.0 },
       
-      // Error rate: low (0-0.2), medium (0.1-0.4), high (0.3-1.0)
-      errorLow: { min: 0, max: 0.2, peak: 0.1 },
-      errorMedium: { min: 0.1, max: 0.4, peak: 0.25 },
-      errorHigh: { min: 0.3, max: 1.0, peak: 0.65 },
+      // Error rate: low (0-0.7), medium (0.5-0.9), high (0.8-1.0)
+      // Updated to peak at 0 for zero errors
+      errorLow: { min: 0, max: 0.6, peak: 0 },
+      errorMedium: { min: 0.3, max: 0.9, peak: 0.6 },
+      errorHigh: { min: 0.6, max: 1.0, peak: 1.0 },
       
       // Cadence stability: variance threshold
-      cadenceStable: { maxVariance: 0.15 },
-      cadenceVariable: { minVariance: 0.15 },
+      // Relaxed from 0.15 to 0.5 to accommodate natural variation
+      cadenceStable: { maxVariance: 0.5 },
+      cadenceVariable: { minVariance: 0.5 },
       
       // Click accuracy: high (0.8-1.0), medium (0.6-0.9), low (0-0.7)
-      accuracyHigh: { min: 0.8, max: 1.0, peak: 0.9 },
-      accuracyMedium: { min: 0.6, max: 0.9, peak: 0.75 },
-      accuracyLow: { min: 0, max: 0.7, peak: 0.35 },
+      // Updated to peak at 1.0 for perfect accuracy
+      accuracyHigh: { min: 0.7, max: 1.0, peak: 1.0 },
+      accuracyMedium: { min: 0.4, max: 0.9, peak: 0.65 },
+      accuracyLow: { min: 0, max: 0.6, peak: 0.3 },
       
       // Color classification accuracy: high (0.8-1.0), medium (0.6-0.9), low (0-0.7)
-      colorHigh: { min: 0.8, max: 1.0, peak: 0.9 },
-      colorMedium: { min: 0.6, max: 0.9, peak: 0.75 },
-      colorLow: { min: 0, max: 0.7, peak: 0.35 },
+      colorHigh: { min: 0.7, max: 1.0, peak: 1.0 },
+      colorMedium: { min: 0.4, max: 0.9, peak: 0.65 },
+      colorLow: { min: 0, max: 0.6, peak: 0.3 },
       
       // Shape/image classification accuracy: high (0.8-1.0), medium (0.6-0.9), low (0-0.7)
-      shapeHigh: { min: 0.8, max: 1.0, peak: 0.9 },
-      shapeMedium: { min: 0.6, max: 0.9, peak: 0.75 },
-      shapeLow: { min: 0, max: 0.7, peak: 0.35 },
+      shapeHigh: { min: 0.7, max: 1.0, peak: 1.0 },
+      shapeMedium: { min: 0.4, max: 0.9, peak: 0.65 },
+      shapeLow: { min: 0, max: 0.6, peak: 0.3 },
       
       // Cheat usage (show_cards): none (0), low (1-2), medium (3-4), high (5+)
       cheatNone: { min: 0, max: 0, peak: 0 },
@@ -148,21 +164,21 @@ class FuzzyLogicSystem {
   normalizeTime(completionTime, level, totalPairs) {
     // Expected time per pair - all levels now use 300s total time
     const expectedTimePerPair = {
-      1: 30,  // Level 1: 300s / 10 pairs = 30s per pair
-      2: 30,  // Level 2: 300s / 10 pairs = 30s per pair
-      3: 30   // Level 3: 300s / 10 pairs = 30s per pair
+      1: 45,  // Level 1: 450s / 10 pairs (more lenient than 300s limit)
+      2: 45,  // Level 2: 450s / 10 pairs
+      3: 45   // Level 3: 450s / 10 pairs
     };
     
     const expectedTotal = expectedTimePerPair[level] * totalPairs;
     
     // Handle edge cases
     if (expectedTotal <= 0) {
-      console.warn('normalizeTime: expectedTotal <= 0', { level, totalPairs, expectedTotal });
+      aiWarn('normalizeTime: expectedTotal <= 0', { level, totalPairs, expectedTotal });
       return 0.5; // Default moderate value
     }
     
     if (completionTime < 0) {
-      console.warn('normalizeTime: completionTime < 0', { completionTime });
+      aiWarn('normalizeTime: completionTime < 0', { completionTime });
       return 0.5; // Default moderate value
     }
     
@@ -173,7 +189,7 @@ class FuzzyLogicSystem {
     const normalized = Math.min(1, Math.max(0, actualTime / expectedTotal));
     
     // Debug log
-    console.log('normalizeTime:', {
+    aiLog('normalizeTime:', {
       completionTime,
       actualTime,
       expectedTotal,
@@ -183,8 +199,9 @@ class FuzzyLogicSystem {
     
     // Invert: faster = lower value (better), slower = higher value (worse)
     // normalized = 0 means very fast (good), normalized = 1 means very slow (bad)
-    // Return inverted: 1 - normalized means fast = high value (good)
-    return 1 - normalized;
+    // Return normalized directly: 0 = fast (good), 1 = slow (bad)
+    // This aligns with config: timeFast { min: 0, max: 0.5 }
+    return normalized;
   }
 
   /**
@@ -394,7 +411,7 @@ class FuzzyLogicSystem {
     const shapeAccuracy = this.calculateShapeAccuracy(shapeStats || {});
     
     // Debug: Log normalized values with raw inputs
-    console.log('Flow Index - Raw inputs:', {
+    aiLog('Flow Index - Raw inputs:', {
       completionTime,
       level,
       totalPairs,
@@ -407,7 +424,7 @@ class FuzzyLogicSystem {
       cheatCount
     });
     
-    console.log('Flow Index - Normalized inputs:', {
+    aiLog('Flow Index - Normalized inputs:', {
       normalizedTime,
       errorRate,
       cadenceVariance,
@@ -464,14 +481,16 @@ class FuzzyLogicSystem {
     // Rule 1: If time=medium AND errors=low AND cadence=stable THEN flow=very_high
     const rule1 = Math.min(timeMedium, errorLow, cadenceStable) * 0.95;
 
-    // Rule 2: If time=fast AND errors=low AND cadence=stable THEN flow=high
-    const rule2 = Math.min(timeFast, errorLow, cadenceStable) * 0.85;
+    // Rule 2: If time=fast AND errors=low AND cadence=stable THEN flow=very_high (not perfect if errors exist)
+    // Cap at 0.95 if there are any errors, only 1.0 if zero errors
+    const rule2Base = Math.min(timeFast, errorLow, cadenceStable);
+    const rule2 = rule2Base * (failedMatches === 0 ? 1.0 : 0.95);
 
     // Rule 3: If time=medium AND errors=medium AND cadence=stable THEN flow=medium_high
     const rule3 = Math.min(timeMedium, errorMedium, cadenceStable) * 0.75;
 
-    // Rule 4: If time=slow AND errors=low THEN flow=medium
-    const rule4 = Math.min(timeSlow, errorLow) * 0.65;
+    // Rule 4: If time=slow AND errors=low THEN flow=medium_high
+    const rule4 = Math.min(timeSlow, errorLow) * 0.70;
 
     // Rule 5: If time=fast AND errors=high THEN flow=low
     const rule5 = Math.min(timeFast, errorHigh) * 0.35;
@@ -484,10 +503,12 @@ class FuzzyLogicSystem {
 
     // New rules with color and shape classification
     // Rule 8: If time=medium AND errors=low AND color=high AND shape=high THEN flow=extremely_high
-    const rule8 = Math.min(timeMedium, errorLow, colorHigh, shapeHigh) * 0.98;
+    const rule8 = Math.min(timeMedium, errorLow, colorHigh, shapeHigh) * 0.90;
 
-    // Rule 9: If time=fast AND errors=low AND color=high THEN flow=high
-    const rule9 = Math.min(timeFast, errorLow, colorHigh) * 0.88;
+    // Rule 9: If time=fast AND errors=low AND color=high THEN flow=very_high (not perfect if errors exist)
+    // Cap at 0.95 if there are any errors, only 1.0 if zero errors
+    const rule9Base = Math.min(timeFast, errorLow, colorHigh);
+    const rule9 = rule9Base * (failedMatches === 0 ? 1.0 : 0.95);
 
     // Rule 10: If time=medium AND color=low THEN flow=medium_low
     const rule10 = Math.min(timeMedium, colorLow) * 0.55;
@@ -514,9 +535,12 @@ class FuzzyLogicSystem {
     // Rule 17: If cheat=low AND other factors good THEN slight penalty
     const rule17 = Math.min(cheatLow, timeMedium, errorLow) * 0.60;
 
+    // Rule 18: If time=fast AND errors=medium THEN flow=high (Reward speed even with exploration errors)
+    const rule18 = Math.min(timeFast, errorMedium) * 0.90;
+
     // Defuzzification: Weighted average (centroid method)
-    const rules = [rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12, rule13, rule14, rule15, rule16, rule17];
-    const weights = [0.95, 0.85, 0.75, 0.65, 0.35, 0.15, 0.25, 0.98, 0.88, 0.55, 0.30, 0.82, 0.92, 0.28, 0.20, 0.40, 0.60];
+    const rules = [rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12, rule13, rule14, rule15, rule16, rule17, rule18];
+    const weights = [0.95, 1.0, 0.75, 0.70, 0.35, 0.15, 0.25, 0.90, 1.0, 0.55, 0.30, 0.82, 0.92, 0.28, 0.20, 0.40, 0.60, 0.90];
     
     let numerator = 0;
     let denominator = 0;
@@ -528,32 +552,126 @@ class FuzzyLogicSystem {
       }
     });
 
-    let flowIndex = denominator > 0 ? numerator / denominator : 0.5;
+    let baseFlowIndex = denominator > 0 ? numerator / denominator : 0.5;
     
     // Debug: Log intermediate values
     if (denominator === 0) {
-      console.warn('Flow Index: denominator is 0, using default 0.5');
+      aiWarn('Flow Index: denominator is 0, using default 0.5');
     } else {
-      console.log('Flow Index calculation:', {
+      aiLog('Flow Index calculation:', {
         numerator,
         denominator,
-        rawFlowIndex: flowIndex,
-        cheatPenalty,
+        rawFlowIndex: baseFlowIndex,
         activeRules: rules.filter(r => r > 0).length
       });
     }
     
-    // Apply cheat penalty multiplicatively (more severe than additive)
-    flowIndex = flowIndex * cheatPenalty;
+    // Step 1: Clamp base Flow Index to [0.8, 1.0] range
+    // Special case: If no errors and no cheats, allow base score to be up to 1.0
+    // Otherwise, ensure minimum is 0.8
+    const originalBaseFlowIndex = baseFlowIndex;
+    const hasNoErrors = failedMatches === 0;
+    const hasNoCheats = cheatCount === 0;
     
-    // Store color sensitivity in context for reporting
+    if (baseFlowIndex < 0.8) {
+      // If calculated value is below 0.8, raise to 0.8
+      baseFlowIndex = 0.8;
+      aiLog('Base Flow Index raised from', originalBaseFlowIndex, 'to 0.8 (minimum)', {
+        hasNoErrors,
+        hasNoCheats,
+        failedMatches,
+        cheatCount
+      });
+    } else if (baseFlowIndex > 1.0) {
+      // If calculated value is above 1.0, cap at 1.0
+      baseFlowIndex = 1.0;
+      aiLog('Base Flow Index lowered from', originalBaseFlowIndex, 'to 1.0 (maximum)');
+    } else {
+      // Value is in [0.8, 1.0] range
+      // If perfect performance (no errors, no cheats), ensure we get 1.0
+      if (hasNoErrors && hasNoCheats) {
+        // Perfect performance should get 1.0
+        baseFlowIndex = 1.0;
+        aiLog('Perfect performance detected (no errors, no cheats), set base Flow Index to 1.0', {
+          originalValue: originalBaseFlowIndex,
+          failedMatches,
+          cheatCount
+        });
+      } else {
+        aiLog('Base Flow Index within range [0.8, 1.0]:', baseFlowIndex, {
+          hasNoErrors,
+          hasNoCheats,
+          failedMatches,
+          cheatCount,
+          originalValue: originalBaseFlowIndex
+        });
+      }
+    }
+    
+    // Step 2: Apply error penalty (direct deduction, max 0.3)
+    // Formula: errorPenalty = min(0.3, failedMatches * 0.05)
+    const errorPenalty = Math.min(0.3, failedMatches * 0.05);
+    let flowIndex = baseFlowIndex - errorPenalty;
+    
+    aiLog('Error penalty applied:', {
+      failedMatches,
+      errorPenalty,
+      baseFlowIndex,
+      afterErrorPenalty: flowIndex
+    });
+    
+    // Step 3: Apply cheat penalty (direct deduction, max 0.2)
+    // Calculate cheat penalty as direct deduction instead of multiplication
+    // cheatPenalty = min(0.2, (cheatCount / totalPairs) * 0.2)
+    const cheatRatio = cheatCount / (totalPairs || 10);
+    const cheatPenaltyDeduction = Math.min(0.2, cheatRatio * 0.2);
+    flowIndex = flowIndex - cheatPenaltyDeduction;
+    
+    aiLog('Cheat penalty applied:', {
+      cheatCount,
+      cheatRatio,
+      cheatPenaltyDeduction,
+      afterCheatPenalty: flowIndex
+    });
+    
+    // Step 4: Apply time weight multiplier
+    // Within 30s: 100% weight, every 10s reduces 1%, max reduction 15% (minimum 85%)
+    let timeWeight = 1.0;
+    if (completionTime > 30) {
+      const extraSeconds = completionTime - 30;
+      const reductionPercent = Math.floor(extraSeconds / 10) * 0.01; // Reduce 1% per 10 seconds
+      timeWeight = Math.max(0.85, 1.0 - reductionPercent); // Maximum reduction 15% (minimum 85%)
+    }
+    flowIndex = flowIndex * timeWeight;
+    
+    aiLog('Time weight applied:', {
+      completionTime,
+      timeWeight,
+      beforeTimeWeight: flowIndex / timeWeight,
+      afterTimeWeight: flowIndex
+    });
+    
+    // Step 5: Final clamping to [0, 1] range
+    const finalFlowIndex = Math.max(0, Math.min(1, flowIndex));
+    
+    // Store values in context for reporting
     context.colorSensitivity = colorSensitivity;
     context.cheatCount = cheatCount;
-    context.cheatPenalty = cheatPenalty;
+    context.cheatPenalty = cheatPenaltyDeduction;
+    context.errorPenalty = errorPenalty;
+    context.baseFlowIndex = baseFlowIndex;
+    context.timeWeight = timeWeight;
     
-    // Clamp to [0, 1]
-    const finalFlowIndex = Math.max(0, Math.min(1, flowIndex));
-    console.log('Final Flow Index:', finalFlowIndex);
+    aiLog('Final Flow Index:', {
+      baseFlowIndex,
+      errorPenalty,
+      cheatPenaltyDeduction,
+      timeWeight,
+      completionTime,
+      beforeTimeWeight: flowIndex / timeWeight,
+      beforeClamping: flowIndex,
+      finalFlowIndex
+    });
     return finalFlowIndex;
   }
 }
@@ -574,7 +692,7 @@ class ContextualBandit {
     
     // LinUCB parameters
     this.alpha = 1.0;
-    this.d = 6;
+    this.d = 7;
     
     // Initialize per-arm parameters
     this.arms = [];
@@ -665,10 +783,11 @@ class ContextualBandit {
       avgFlow = 0.5,
       errorRate = 0.2,
       cadence = 0.5,
-      streak = 0,
-      fatigue = 0
+      fatigue = 0,
+      hiddenDifficulty = 0.5,
+      cheatRatio = 0
     } = playerState;
-    return [level / 3, avgFlow, errorRate, cadence, Math.min(streak / 10, 1), fatigue];
+    return [level / 3, avgFlow, errorRate, cadence, fatigue, hiddenDifficulty, cheatRatio];
   }
 
   /**
@@ -748,7 +867,8 @@ class ContextualBandit {
     let gridCols = 5;
     let gridRows = 4;
     if (level === 2 || level === 3) {
-      // Level 2 & 3: 5×4 (easiest) to 4×6 (hardest)
+      // Default grid mapping: Arm 0-1 use 5×4, Arm 2-3 use 4×6
+      // Actual grid selection is handled in AIEngine.decideNextConfig() based on performance
       const gridMap = [ [5,4], [5,4], [4,6], [4,6] ];
       const sel = gridMap[Math.min(gridMap.length - 1, Math.max(0, arm))];
       gridCols = sel[0];
@@ -827,9 +947,10 @@ class AIEngine {
         avgFlow: 0.5,
         errorRate: 0.2,
         cadence: 0.5,
-        streak: 0,
         fatigue: 0,
-        hiddenDifficulty: 0.5
+        hiddenDifficulty: 0.5,
+        cheatRatio: 0,
+        maxConsecutiveErrors: 0
       }
     };
   }
@@ -850,11 +971,13 @@ class AIEngine {
       totalClicks,
       colorStats,
       shapeStats,
-      cheatCount
+      cheatCount,
+      consecutiveErrors,
+      maxConsecutiveErrors
     } = gameData;
 
     // Debug: Log input data
-    console.log('AI Engine processGameEnd - Input data:', {
+    aiLog('AI Engine processGameEnd - Input data:', {
       completionTime,
       level,
       totalPairs,
@@ -880,7 +1003,7 @@ class AIEngine {
       cheatCount: cheatCount || 0
     });
     
-    console.log('AI Engine computed Flow Index:', flowIndex);
+    aiLog('AI Engine computed Flow Index:', flowIndex);
 
     // Update session state
     this.sessionState.rounds.push({
@@ -899,6 +1022,7 @@ class AIEngine {
     const cadence = this.fuzzyLogic.calculateCadenceStability(flipIntervals || []);
     this.sessionState.playerProfile.errorRate = err;
     this.sessionState.playerProfile.cadence = cadence;
+    this.sessionState.playerProfile.maxConsecutiveErrors = maxConsecutiveErrors || consecutiveErrors || 0;
 
     this.updateHiddenDifficulty(flowIndex, gameData);
 
@@ -910,6 +1034,45 @@ class AIEngine {
    * @param {number} level - Current level
    * @returns {Object} Next game configuration
    */
+  /**
+   * Determine if player is ready for larger grid (4×6) based on performance
+   * Uses Flow Index as the primary and only criterion since it's the most comprehensive metric
+   * @param {Object} playerProfile - Current player profile
+   * @param {Array} recentRounds - Recent game rounds (last 3)
+   * @param {boolean} currentlyUsingLargeGrid - Whether currently on 4×6 grid
+   * @returns {boolean} True if ready for 4×6 grid
+   */
+  shouldUseLargeGrid(playerProfile, recentRounds = [], currentlyUsingLargeGrid = false) {
+    const { avgFlow = 0.5 } = playerProfile;
+
+    // If already on large grid, check if should downgrade
+    if (currentlyUsingLargeGrid) {
+      // Downgrade criteria: Flow Index < 0.4 (struggling)
+      // Need 2 consecutive poor games to downgrade
+      const flowThreshold = 0.4;
+      const recentPoorGames = 2;
+      
+      const recentFlows = recentRounds
+        .slice(-2)
+        .map(r => r.flowIndex || 0)
+        .filter(f => f < flowThreshold);
+      
+      const hasRecentPoorPerformance = recentFlows.length >= recentPoorGames;
+      const hasLowFlow = avgFlow < flowThreshold;
+      
+      // Downgrade if: low flow AND recent poor performance
+      if (hasLowFlow && hasRecentPoorPerformance) {
+        return false; // Should downgrade
+      }
+      return true; // Keep large grid
+    }
+
+    // Upgrade criteria: Flow Index >= 0.7 (excellent performance)
+    // Flow Index is the most comprehensive and intuitive metric
+    const flowThreshold = 0.7;
+    return avgFlow >= flowThreshold;
+  }
+
   decideNextConfig(level) {
     this.sessionState.level = level;
     this.sessionState.playerProfile.fatigue = 
@@ -923,7 +1086,57 @@ class AIEngine {
       if (armRaw < last) selectedArm = Math.max(last - 1, armRaw);
     }
     selectedArm = Math.max(0, Math.min(3, selectedArm));
+    
+    // Get recent rounds for smart grid selection
+    const recentRounds = this.sessionState.rounds.slice(-3);
+    
+    // Check if currently using large grid
+    const currentlyUsingLargeGrid = this.sessionState.lastGridSize === 'large' || 
+                                    (this.sessionState.currentRound?.config?.gridCols === 4 && 
+                                     this.sessionState.currentRound?.config?.gridRows === 6);
+    
+    // Get base config from bandit
     const configBase = this.bandit.getConfigForArm(selectedArm, level);
+    
+    // Smart grid selection for Level 2 and 3
+    if ((level === 2 || level === 3) && this.sessionState.playerProfile) {
+      let useLargeGrid = false;
+      
+      // Default behavior based on Arm:
+      // Arm 0: Always 5×4 (easiest)
+      // Arm 1: Default 5×4, can upgrade to 4×6 if Flow Index >= 0.7
+      // Arm 2: Default 5×4, can upgrade to 4×6 if Flow Index >= 0.7
+      // Arm 3: Always 4×6 (hardest)
+      
+      if (selectedArm === 0) {
+        // Arm 0: Always small grid
+        useLargeGrid = false;
+      } else if (selectedArm === 3) {
+        // Arm 3: Always large grid
+        useLargeGrid = true;
+      } else if (selectedArm === 1 || selectedArm === 2) {
+        // Arm 1 and 2: Check performance to decide (Flow Index >= 0.7)
+        useLargeGrid = this.shouldUseLargeGrid(
+          this.sessionState.playerProfile, 
+          recentRounds, 
+          currentlyUsingLargeGrid
+        );
+      }
+      
+      // Update grid size in config
+      if (useLargeGrid) {
+        configBase.gridCols = 4;
+        configBase.gridRows = 6;
+        this.sessionState.lastGridSize = 'large';
+      } else {
+        configBase.gridCols = 5;
+        configBase.gridRows = 4;
+        this.sessionState.lastGridSize = 'small';
+      }
+      
+      // Update total pairs based on new grid size
+      configBase.totalPairs = Math.floor((configBase.gridCols * configBase.gridRows) / 2);
+    }
 
     let targetAdj = configBase.adjacentRate;
     let newAdj = targetAdj;
@@ -991,15 +1204,19 @@ class AIEngine {
     const cheats = metrics.cheatCount || 0;
     const pairs = metrics.totalPairs || 10;
     const cheatRatio = pairs > 0 ? Math.min(1, cheats / pairs) : 0;
+    const mce = metrics.maxConsecutiveErrors || 0;
     const err = this.fuzzyLogic.calculateErrorRate(fm, tm);
     const successful = tm - fm;
     const acc = this.fuzzyLogic.calculateClickAccuracy(successful, tc);
-    let target = 0.5 * flowIndex + 0.3 * (1 - cheatRatio) + 0.2 * acc - 0.2 * err;
+    const maxErrorsNorm = Math.min(1, mce / 5);
+    let target = 0.5 * flowIndex + 0.3 * (1 - cheatRatio) + 0.2 * acc - 0.2 * err - 0.1 * maxErrorsNorm;
     target = Math.max(0, Math.min(1, target));
     const prev = this.sessionState.playerProfile.hiddenDifficulty || 0.5;
     const alpha = 0.3;
     const next = alpha * target + (1 - alpha) * prev;
     this.sessionState.playerProfile.hiddenDifficulty = Math.max(0, Math.min(1, next));
+    this.sessionState.playerProfile.cheatRatio = cheatRatio;
+    this.sessionState.playerProfile.maxConsecutiveErrors = mce;
   }
 
   getHiddenLevel() {
@@ -1013,4 +1230,3 @@ class AIEngine {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { AIEngine, FuzzyLogicSystem, ContextualBandit, DecisionTree };
 }
-

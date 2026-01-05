@@ -1,5 +1,38 @@
 # Changelog
 
+Version: v2.2.0 (2026-01-05)
+
+## Major Updates
+- **Flow Index Scoring System Overhaul**: Complete redesign of scoring algorithm with direct error/cheat penalties and time weight multiplier
+  - Base Flow Index clamped to [0.8, 1.0] range
+  - Perfect performance (no errors, no cheats) automatically set to 1.0
+  - Direct error penalty: 0.05 per error, maximum 0.3 (6+ errors)
+  - Direct cheat penalty: maximum 0.2 deduction
+  - Time weight multiplier: 100% within 30s, -1% per 10s, maximum -15% (minimum 85%)
+- **Next Game Feature**: Added "Next Game" button to game-over screen for seamless progression to AI-adjusted difficulty
+- **Internationalization**: Removed all Chinese text from code and documentation, project now fully in English (Māori words preserved as cultural features)
+- **Design Overhaul**: Enforced fixed 800px width layout across all pages for consistent experience
+- **Scoring System**: Final score is derived from Flow Index (`score = round(flowIndex * 1000)`)
+
+## Improvements
+- **Flow Index Calculation**:
+  - Fixed issue where perfect performance could only achieve 0.8 instead of 1.0
+  - Improved error penalty system to accurately reflect player mistakes
+  - Added time-based scoring adjustment for completion speed
+- **Code Quality**:
+  - Removed all Chinese comments and documentation
+  - Improved code comments and documentation clarity
+  - Enhanced logging for Flow Index calculation debugging
+- **Documentation**:
+  - Added comprehensive `SCORING_BREAKDOWN.md` with detailed scoring formula explanations
+  - Updated all documentation to English-only
+  - Preserved Māori cultural terms (Matariki, Pīwakawaka, etc.)
+- **Accessibility**: Added `aria-label` to buttons and interactive elements
+- **Layout Fixes**: Standardized button spacing (30px gaps) and font sizes (18px/24px/96px)
+- **Frontend Optimization**: Removed inline styles and absolute positioning in favor of CSS Grid/Flexbox
+
+---
+
 Version: v2.1.1 (2025-12-19)
 
 ## Major Updates
@@ -16,10 +49,10 @@ Version: v2.1.0 (2025-12-16)
 - **Code Improvements**: Fixed Flow Index interpretation logic in analytics summary
 
 ## Documentation Improvements
-- Merged `FLOW_INDEX_EXPLANATION.md` and `FLOW_INDEX_DEBUG.md` into `FLOW_INDEX_GUIDE.md`
+- Consolidated Flow Index documentation into `AI_AND_SCORING.md`
 - Merged `ANALYTICS.md`, `DATA_COLLECTION.md`, and `VIEW_PROFILE_GUIDE.md` into `ANALYTICS_AND_DATA.md`
 - Removed redundant documentation files
-- Updated documentation index in `docs/README.md`
+- Updated main `README.md` to link to the current `docs/` structure
 - Updated main `README.md` with new documentation structure
 
 ## Bug Fixes

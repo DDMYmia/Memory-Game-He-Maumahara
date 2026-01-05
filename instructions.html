@@ -20,7 +20,7 @@ gtag('config', 'G-5M5BTEYB52');
 
 <div id="blue"></div>
 <div id="background"></div>
-<a href="https://rauawaawatpm.co.nz"><div id="rkct-menu"></div></a>
+<a href="https://rauawaawatpm.co.nz" id="rkct-menu"></a>
 
 <div id="menu-icon">
 <a href="index.html" class="menu-txt">Menu</a>
@@ -32,11 +32,13 @@ gtag('config', 'G-5M5BTEYB52');
 <b>He Maumahara</b><br>
 In this classic memory game, match all 10 pairs of cards in the quickest time possible.
 </div>
+<div id="in-dots">
 <div id="in01" class="in"></div><div id="in02" class="in"></div><div id="in03" class="in"></div><div id="in04" class="in"></div>
 <div id="in05" class="in"></div><div id="in06" class="in"></div><div id="in07" class="in"></div><div id="in08" class="in"></div>
 <div id="in09" class="in"></div><div id="in10" class="in"></div><div id="in11" class="in"></div><div id="in12" class="in"></div>
 <div id="in13" class="in"></div><div id="in14" class="in"></div><div id="in15" class="in"></div><div id="in16" class="in"></div>
 <div id="in17" class="in"></div><div id="in18" class="in"></div><div id="in19" class="in"></div><div id="in20" class="in"></div>
+</div>
 <div id="instructions"></div>
 <div id="scrollAnimation"></div>
 <div id="content-2">
@@ -47,18 +49,50 @@ The order of the cards for Level 1 never change.
 To select a card, click it with the left mouse button. Once flipped, choose a second card to make a pair. If the two 
 cards match they will disappear from the board; if they do not match, they will be hidden.
 <br><br>
-<img src="images/hidden-matched.png" style="margin-left: auto; margin-right: auto; display: block;"/>
+<img src="images/hidden-matched.png" class="centered-img"/>
 <br>
 You can use the Show Cards button to reveal every card on the board - and Hide Cards button to cover them again - 
 located in the same place - under the menu button. Cards can be selected while they are hidden, not shown, so use 
 the button wisely.
 <br><br>
-<img src="images/cards-shown.png" style="margin-left: auto; margin-right: auto; display: block; border: 2px #fff solid;"/>
+<img src="images/cards-shown.png" class="centered-img img-border"/>
 <br>
 The game ends when all ten pairs have been found. Use your memory & strategy to complete the board as quickly as you 
 can—every second counts toward your final time. Have fun!
 </div>
 </div>
 
+<script>
+let currentInIndex = 0;
+const viewer = document.getElementById('instructions');
+const ins = document.querySelectorAll('.in');
+
+function updateSlide(index) {
+  currentInIndex = index;
+  viewer.style.backgroundImage = `url('images/in${index}.png')`;
+  ins.forEach(el => el.style.background = '#fff3');
+  const activeIn = document.getElementById(`in${index.toString().padStart(2, '0')}`);
+  if (activeIn) activeIn.style.background = 'rgba(255, 255, 255, 0.5)';
+}
+
+let autoSlide = setInterval(() => {
+  currentInIndex = (currentInIndex + 1) % 21;
+  updateSlide(currentInIndex);
+}, 3000);
+
+ins.forEach(inEl => {
+  inEl.addEventListener('mouseenter', () => {
+    clearInterval(autoSlide);
+    const index = parseInt(inEl.id.replace('in', ''));
+    updateSlide(index);
+  });
+  inEl.addEventListener('mouseleave', () => {
+    autoSlide = setInterval(() => {
+      currentInIndex = (currentInIndex + 1) % 21;
+      updateSlide(currentInIndex);
+    }, 3000);
+  });
+});
+</script>
 </body>
 </html>

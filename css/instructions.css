@@ -4,6 +4,7 @@
 
 html {
   scrollbar-color: #333 #000;
+  min-width: 800px;
 }
 a {
   text-decoration: none;
@@ -11,13 +12,14 @@ a {
 }
 body {
   background: #000;
+  color: #fff;
   font-family: 'Roboto', sans-serif;
   font-size: 18px;
-  height: 100vh;
+  min-height: 100vh;
   margin: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-width: 800px;
 }
 #background {
   position: fixed;
@@ -33,40 +35,48 @@ body {
   z-index: -1;
 }
 #rkct-menu { 
-  position: absolute;
-  top: 50px;
-  left: 50px;
+  position: fixed;
+  top: 20px;
+  left: 20px;
   width: 195px;
   height: 43px;
   background: url('../images/rkct.png');
   background-size: cover; 
   filter: invert(1);
-  z-index: 1;
+  z-index: 20;
 }
 #menu-container {
   position: absolute;
-  top: calc(50% - 250px);
+  top: 0;
   left: 0;
   right: 0;
-  height: 550px;
+  min-height: 100vh;
   z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 30px;
+  padding-top: 93px;
+  padding-bottom: 100px;
+  box-sizing: border-box;
+}
+#menu-container > * {
+  pointer-events: auto;
 }
 #menu-icon {
   position: fixed;
-  top: 57px;
-  right: 57px;
+  top: 20px;
+  right: 20px;
   width: auto;
   height: auto;
   z-index: 1000;
 }
 #title {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: auto;
-  font-size: 108px;
+  font-size: 96px;
   font-weight: 100;
+  line-height: 1;
   text-align: center;
   color: #fff;
 }
@@ -82,272 +92,93 @@ body {
   right: 0;
   bottom: 0;
   background: #0064bd4f;
-}
-#content-1 {
-  position: absolute;
-  top: 157px;
-  left: calc(50% - 266px);
-  width: 550px;
-  height: auto;
-  color: #fff;
-  font-size: 24px;
-}
-#content-2 {
-  position: absolute;
-  top: 960px;
-  left: calc(50% - 266px);
-  width: 550px;
-  height: auto;
-  color: #fff;
-  font-size: 24px;
-  padding-bottom: 100px;
-}
-#instructions {
-  position: absolute;
-  top: 298px;
-  left: calc(50% - 482px);
-  width: 960px;
-  height: 540px;
-  background: url('../images/in0.png');
-  background-size: cover;
-  border: 2px #fff solid;
-}
-.in {
-  position: absolute;
-  top: 862px;
-  width: 40px;
-  height: 40px;
-  background: #fff3;
-  border-top: 2px #fff solid;
-  border-bottom: 2px #fff solid;
-}
-.in:hover {
-  background: rgba(255, 255, 255, 0.5);
-}
-#in01 {left: calc(50% - 400px); width: 38px; border-left: 2px #fff solid; border-top-left-radius: 20px; border-bottom-left-radius: 20px;}
-#in02 {left: calc(50% - 360px);}
-#in03 {left: calc(50% - 320px);}
-#in04 {left: calc(50% - 280px);}
-#in05 {left: calc(50% - 240px);}
-#in06 {left: calc(50% - 200px);}
-#in07 {left: calc(50% - 160px);}
-#in08 {left: calc(50% - 120px);}
-#in09 {left: calc(50% - 80px);}
-#in10 {left: calc(50% - 40px);}
-#in11 {left: calc(50% + 0px);}
-#in12 {left: calc(50% + 40px);}
-#in13 {left: calc(50% + 80px);}
-#in14 {left: calc(50% + 120px);}
-#in15 {left: calc(50% + 160px);}
-#in16 {left: calc(50% + 200px);}
-#in17 {left: calc(50% + 240px);}
-#in18 {left: calc(50% + 280px);}
-#in19 {left: calc(50% + 320px);}
-#in20 {left: calc(50% + 360px); width: 38px; border-right: 2px #fff solid; border-top-right-radius: 20px; border-bottom-right-radius: 20px;}
-
-#in01:hover ~ #instructions {
-  background: url('../images/in1.png');
-  background-size: cover;
-}
-#in02:hover ~ #instructions {
-  background: url('../images/in2.png');
-  background-size: cover;
-}
-#in03:hover ~ #instructions {
-  background: url('../images/in3.png');
-  background-size: cover;
-}
-#in04:hover ~ #instructions {
-  background: url('../images/in4.png');
-  background-size: cover;
-}
-#in05:hover ~ #instructions {
-  background: url('../images/in5.png');
-  background-size: cover;
-}
-#in06:hover ~ #instructions {
-  background: url('../images/in6.png');
-  background-size: cover;
-}
-#in07:hover ~ #instructions {
-  background: url('../images/in7.png');
-  background-size: cover;
-}
-#in08:hover ~ #instructions {
-  background: url('../images/in8.png');
-  background-size: cover;
-}
-#in09:hover ~ #instructions {
-  background: url('../images/in9.png');
-  background-size: cover;
-}
-#in10:hover ~ #instructions {
-  background: url('../images/in10.png');
-  background-size: cover;
-}
-#in11:hover ~ #instructions {
-  background: url('../images/in11.png');
-  background-size: cover;
-}
-#in12:hover ~ #instructions {
-  background: url('../images/in12.png');
-  background-size: cover;
-}
-#in13:hover ~ #instructions {
-  background: url('../images/in13.png');
-  background-size: cover;
-}
-#in14:hover ~ #instructions {
-  background: url('../images/in14.png');
-  background-size: cover;
-}
-#in15:hover ~ #instructions {
-  background: url('../images/in15.png');
-  background-size: cover;
-}
-#in16:hover ~ #instructions {
-  background: url('../images/in16.png');
-  background-size: cover;
-}
-#in17:hover ~ #instructions {
-  background: url('../images/in17.png');
-  background-size: cover;
-}
-#in18:hover ~ #instructions {
-  background: url('../images/in18.png');
-  background-size: cover;
-}
-#in19:hover ~ #instructions {
-  background: url('../images/in19.png');
-  background-size: cover;
-}
-#in20:hover ~ #instructions {
-  background: url('../images/in20.png');
-  background-size: cover;
-}
-.hl {
-  background: rgba(0, 147, 255, 0.4);
-  padding: 8px;
-  padding-left: 12px;
-  padding-right: 12px;
-}
-.menu-txt {
-  background-color: #fff3;
-  color: #fff;
-  font-size: 24px;
-  padding: 4px 20px 4px 20px;
-  font-weight: 400;
-  border-radius: 20px;
-  transition: 0.5s;
-}
-.menu-txt:hover {
-  background: rgba(0, 147, 255, 0.4);
-}
-#scrollAnimation {
-  position: absolute;
-  top: 874px;
-  left: calc(50% - 550px);
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fffa;
-  animation: scrolly1 16s ease-in-out infinite;
   z-index: -1;
 }
-@keyframes scrolly1 {
-  0% {left: calc(50% - 550px);}
-  50% {left: calc(50% + 550px);}
-  100% {left: calc(50% - 550px);}
+#content-1 {
+  width: 550px;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 100;
+  text-align: center;
+  line-height: 36px;
+}
+#content-2 {
+  width: 600px;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 100;
+  text-align: center;
+  line-height: 36px;
+}
+#instructions {
+  width: 550px;
+  height: 300px;
+  background-color: #000;
+  background-image: url('../images/in00.png');
+  background-size: cover;
+  background-position: center;
+  border-radius: 10px;
+  border: 2px #fff solid;
+  transition: 0.5s;
+}
+#in-dots {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 550px;
+  gap: 1px;
+}
+.in {
+  width: 25px;
+  height: 4px;
+  background: #fff3;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.in:hover {
+  background: #fff;
+}
+.menu-txt {
+  font-size: 24px;
+  color: #fff;
+  font-weight: 100;
+  margin-left: 20px;
+  text-shadow: 0px 0px 10px #000;
+}
+.menu-txt:hover {
+  text-shadow: 0px 0px 20px #fff;
+}
+#scrollAnimation {
+  width: 30px;
+  height: 50px;
+  border: 2px solid #fff;
+  border-radius: 15px;
+  position: relative;
+  overflow: hidden;
+  opacity: 0.7;
+}
+#scrollAnimation::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  animation: scrollDown 2s infinite;
+}
+@keyframes scrollDown {
+  0% { top: 8px; opacity: 1; }
+  100% { top: 35px; opacity: 0; }
 }
 
-/* ~~~~~~~~~~~~~~~~~~~ */
-/* ~ max width 850px ~ */
-/* ~~~~~~~~~~~~~~~~~~~ */
-
-@media screen and (max-width: 1280px), screen and (max-height: 850px) 
-{
-  #background {
-    transform: scale(1.8);
-  }
-  #content-1 {
-    top: 222px;
-    left: calc(50% - 207px);
-    width: 430px;
-    font-size: 18px;
-  }
-  #content-2 {
-    top: 857px;
-    left: calc(50% - 207px);
-    width: 430px;
-    font-size: 18px;
-    padding-bottom: 46px;
-  }
-  #instructions {
-    top: 275px;
-    transform: scale(0.8);
-  }
-  #menu-icon {
-    top: 27px;
-    right: 27px;
-  }
-  #title {
-    position: absolute;
-    top: 100px;
-    left: 0;
-    right: 0;
-    height: auto;
-    font-size: 84px;
-    font-weight: 100;
-    text-align: center;
-    color: #fff;
-  }
-  #rkct-menu {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    width: 195px;
-    height: 43px;
-    background: url('../images/rkct.png');
-    background-size: cover;
-    filter: invert(1);
-    z-index: 1;
-  }
-  .in {
-    top: 785px;
-    width: 30px;
-    height: 26px;
-  }
-  #in01 {left: calc(50% - 295px); width: 28px; border-left: 2px #fff solid; border-top-left-radius: 20px; border-bottom-left-radius: 20px;}
-  #in02 {left: calc(50% - 265px);}
-  #in03 {left: calc(50% - 235px);}
-  #in04 {left: calc(50% - 205px);}
-  #in05 {left: calc(50% - 175px);}
-  #in06 {left: calc(50% - 145px);}
-  #in07 {left: calc(50% - 115px);}
-  #in08 {left: calc(50% - 85px);}
-  #in09 {left: calc(50% - 55px);}
-  #in10 {left: calc(50% - 25px);}
-  #in11 {left: calc(50% + 5px);}
-  #in12 {left: calc(50% + 35px);}
-  #in13 {left: calc(50% + 65px);}
-  #in14 {left: calc(50% + 95px);}
-  #in15 {left: calc(50% + 125px);}
-  #in16 {left: calc(50% + 155px);}
-  #in17 {left: calc(50% + 185px);}
-  #in18 {left: calc(50% + 215px);}
-  #in19 {left: calc(50% + 245px);}
-  #in20 {left: calc(50% + 275px); width: 18px; border-right: 2px #fff solid; border-top-right-radius: 20px; border-bottom-right-radius: 20px;}
-
-  #scrollAnimation {
-    top: 793px;
-    left: calc(50% - 350px);
-    width: 14px;
-    height: 14px;
-    animation: scrolly2 16s ease-in-out infinite;
-  }
-  @keyframes scrolly2 {
-    0% {left: calc(50% - 350px);}
-    50% {left: calc(50% + 350px);}
-    100% {left: calc(50% - 350px);}
-  }
+.centered-img {
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+}
+.img-border {
+  border: 2px #fff solid;
 }

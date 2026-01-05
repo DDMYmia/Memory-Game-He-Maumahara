@@ -74,7 +74,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       summaryContainer = document.getElementById('analytics-display');
     }
     if (!summaryContainer) {
-      console.error('Analytics summary container not found in DOM');
+      if (typeof aiWarn === 'function') aiWarn('Analytics summary container not found in DOM');
       return;
     }
 
@@ -82,29 +82,28 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     let metrics = null;
     if (typeof extractPerformanceMetrics === 'function' && telemetry) {
       try {
-        console.log('Attempting to extract performance metrics for level', level);
+        if (typeof aiLog === 'function') aiLog('Attempting to extract performance metrics for level', level);
         metrics = await extractPerformanceMetrics(telemetry, level);
         if (!metrics) {
-          console.warn('extractPerformanceMetrics returned null for level', level);
+          if (typeof aiWarn === 'function') aiWarn('extractPerformanceMetrics returned null for level', level);
           // Try to get events to debug
           try {
             const allEvents = await telemetry.exportAll();
-            console.log('Total telemetry events:', allEvents.length);
+            if (typeof aiLog === 'function') aiLog('Total telemetry events:', allEvents.length);
             const startEvents = allEvents.filter(e => e.type === 'start' && e.data.level === level);
-            console.log('Start events for level', level, ':', startEvents.length);
+            if (typeof aiLog === 'function') aiLog('Start events for level', level, ':', startEvents.length);
             if (startEvents.length > 0) {
-              console.log('Latest start event:', startEvents[startEvents.length - 1]);
+              if (typeof aiLog === 'function') aiLog('Latest start event:', startEvents[startEvents.length - 1]);
             }
           } catch (debugError) {
-            console.error('Error debugging telemetry:', debugError);
+            if (typeof aiWarn === 'function') aiWarn('Error debugging telemetry:', debugError);
           }
         }
       } catch (e) {
-        console.error('Error extracting metrics:', e);
-        console.error('Error stack:', e.stack);
+        if (typeof aiWarn === 'function') aiWarn('Error extracting metrics:', e);
       }
     } else {
-      console.warn('extractPerformanceMetrics function not available or telemetry is null', {
+      if (typeof aiWarn === 'function') aiWarn('extractPerformanceMetrics function not available or telemetry is null', {
         hasFunction: typeof extractPerformanceMetrics === 'function',
         hasTelemetry: !!telemetry
       });
@@ -112,7 +111,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
 
     // If no metrics and we have mock data available, use it
     if (!metrics && typeof getMockAnalyticsData === 'function') {
-      console.log('No metrics extracted, using mock data');
+      if (typeof aiLog === 'function') aiLog('No metrics extracted, using mock data');
       const mockData = getMockAnalyticsData(level);
       metrics = mockData.metrics;
       if (!aiResult) {
@@ -124,12 +123,12 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     }
 
     if (!metrics) {
-      console.warn('Could not extract performance metrics and no mock data available, showing basic stats');
+      if (typeof aiWarn === 'function') aiWarn('Could not extract performance metrics and no mock data available, showing basic stats');
       // Show basic stats even if metrics extraction fails, but with more information
       let html = '<div class="analytics-header">Game Analytics</div>';
       
       // Session Results Section
-      html += '<div class="analytics-section session-results">';
+      html += '<div class="analytics-section session-results" data-section="results">';
       html += '<div class="analytics-title">🏆 Session Results</div>';
       html += '<div class="analytics-grid">';
       html += `<div class="analytics-item"><span class="label">Level:</span><span class="value">${level}</span></div>`;
@@ -140,33 +139,33 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
         html += `<div class="analytics-item streak-item"><span class="label">Best Streak:</span><span class="value streak-value">${gameStats.streak}</span></div>`;
       }
       if (gameStats.remainingTime !== undefined) {
-        html += `<div class="analytics-item"><span class="label">Time Remaining:</span><span class="value">${formatTime(gameStats.remainingTime)}</span></div>`;
+        html += `<div class="analytics-item"><span class="label">Time Elapsed:</span><span class="value">${formatTime(metrics ? metrics.completionTime : (300 - gameStats.remainingTime))}</span></div>`;
       }
       html += '</div></div>';
       
       // Performance Overview Section (with limited data)
-      html += '<div class="analytics-section">';
+      html += '<div class="analytics-section" data-section="performance">';
       html += '<div class="analytics-title">📊 Performance Overview</div>';
       html += '<div class="analytics-grid">';
       if (gameStats.remainingTime !== undefined) {
-        html += `<div class="analytics-item"><span class="label">Time Remaining:</span><span class="value">${formatTime(gameStats.remainingTime)}</span></div>`;
+        html += `<div class="analytics-item"><span class="label">Time Elapsed:</span><span class="value">${formatTime(metrics ? metrics.completionTime : (300 - gameStats.remainingTime))}</span></div>`;
       }
       html += '<div class="analytics-item"><span class="label">Status:</span><span class="value">Limited data available</span></div>';
       html += '</div></div>';
       
       // Note about data availability
-      html += '<div class="analytics-section">';
+      html += '<div class="analytics-section" data-section="note">';
       html += '<div class="analytics-title">ℹ️ Note</div>';
       html += '<div class="analytics-grid">';
-      html += '<div class="analytics-item"><span class="label">Data Status:</span><span class="value">Telemetry data extraction failed. Please check browser console for details.</span></div>';
+      html += '<div class="analytics-item"><span class="label">Data Status:</span><span class="value">Telemetry data extraction failed.</span></div>';
       html += '</div></div>';
       
       summaryContainer.innerHTML = html;
       summaryContainer.style.display = 'block';
       return;
     }
-    console.log('Metrics extracted successfully', metrics);
-    console.log('Summary container found:', summaryContainer.id);
+    if (typeof aiLog === 'function') aiLog('Metrics extracted successfully', metrics);
+    if (typeof aiLog === 'function') aiLog('Summary container found:', summaryContainer.id);
 
     // Get flow index event if available
     // Filter to only current game session (between most recent start and end events)
@@ -219,7 +218,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     const flowIndex = aiResult?.flowIndex || flowIndexEvent?.data?.flowIndex || null;
 
     // Debug log
-    console.log('Flow Index retrieval:', {
+    if (typeof aiLog === 'function') aiLog('Flow Index retrieval:', {
       fromAiResult: aiResult?.flowIndex,
       fromTelemetryEvent: flowIndexEvent?.data?.flowIndex,
       finalFlowIndex: flowIndex,
@@ -227,11 +226,8 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       sessionStartTimestamp: sessionStartEvent ? new Date(sessionStartEvent.ts).toLocaleTimeString() : null
     });
 
-    // Get game configuration from start event
     const startEvent = sessionStartEvent || sortedEvents.find(e => e.type === 'start');
     const gameConfig = startEvent?.data?.variant || {};
-
-    // Get default configuration based on level
     const defaultConfig = getDefaultGameConfig(level);
     const config = { ...defaultConfig, ...gameConfig };
 
@@ -279,7 +275,6 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     // Get cheat count
     const cheatCount = metrics.cheatCount || 0;
 
-    // Clear previous content
     summaryContainer.innerHTML = '';
 
     // Create summary HTML (skip header if already in a page with title)
@@ -290,10 +285,9 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     }
 
     // Helper for section title
-    const createTitle = (text) => `<div class="analytics-title" onclick="toggleSection(this)">${text} <span class="analytics-toggle">▼</span></div>`;
+    const createTitle = (text) => `<div class="analytics-title">${text}</div>`;
 
-    // Session Results Section - Flow Index as primary metric (Expanded by default)
-    html += '<div class="analytics-section session-results collapsed">';
+    html += '<div class="analytics-section session-results" data-section="results">';
     html += createTitle('🏆 Session Results');
     html += '<div class="analytics-grid">';
 
@@ -301,7 +295,22 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     if (flowIndex !== null) {
       const flowInfo = getFlowInterpretation(flowIndex);
       html += `<div class="analytics-item flow-index"><span class="label">Flow Index:</span><span class="value score-value" style="color: ${flowInfo.color}">${flowIndex.toFixed(3)}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Performance:</span><span class="value" style="color: ${flowInfo.color}">${flowInfo.label}</span></div>`;
+
+      const markerPosition = Math.min(Math.max(flowIndex * 100, 0), 100);
+      html += `
+      <div class="flow-meter-container">
+        <div class="flow-meter-labels">
+          <span>Hard</span>
+          <span>Balanced</span>
+          <span>Easy</span>
+        </div>
+        <div class="flow-meter-bar">
+          <div class="flow-meter-marker" style="left: ${markerPosition}%"></div>
+        </div>
+        <div class="flow-meter-value" style="color: ${flowInfo.color}">${flowInfo.label}</div>
+      </div>
+      `;
+
     } else {
       // Fallback if Flow Index not available
       html += `<div class="analytics-item score-item"><span class="label">Final Score:</span><span class="value score-value">${gameStats.score !== undefined ? gameStats.score : 'N/A'}</span></div>`;
@@ -311,18 +320,15 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       html += `<div class="analytics-item streak-item"><span class="label">Best Streak:</span><span class="value streak-value">${gameStats.streak}</span></div>`;
     }
     html += `<div class="analytics-item"><span class="label">Level:</span><span class="value">${level}</span></div>`;
-    // Use actual game time remaining instead of completion time if available
-    const displayTime = gameStats.remainingTime !== undefined
-      ? formatTime(gameStats.remainingTime)
-      : formatTime(metrics.completionTime);
-    html += `<div class="analytics-item"><span class="label">Time Remaining:</span><span class="value">${displayTime}</span></div>`;
+    // Use actual completion time for display
+    const displayTime = formatTime(metrics.completionTime);
+    html += `<div class="analytics-item"><span class="label">Time Elapsed:</span><span class="value">${displayTime}</span></div>`;
     html += '</div></div>';
 
-    // Performance Overview Section
-    html += '<div class="analytics-section collapsed">';
+    html += '<div class="analytics-section" data-section="performance">';
     html += createTitle('📊 Performance Overview');
     html += '<div class="analytics-grid">';
-    html += `<div class="analytics-item"><span class="label">Time Remaining:</span><span class="value">${displayTime}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Time Elapsed:</span><span class="value">${displayTime}</span></div>`;
     html += `<div class="analytics-item"><span class="label">Total Clicks:</span><span class="value">${totalClicks}</span></div>`;
     html += `<div class="analytics-item"><span class="label">Total Pairs:</span><span class="value">${metrics.totalPairs}</span></div>`;
     html += `<div class="analytics-item"><span class="label">Successful Matches:</span><span class="value">${successfulMatches}</span></div>`;
@@ -330,8 +336,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     html += `<div class="analytics-item"><span class="label">Accuracy:</span><span class="value">${formatPercent(accuracy)}</span></div>`;
     html += '</div></div>';
 
-    // Error Analysis Section
-    html += '<div class="analytics-section collapsed">';
+    html += '<div class="analytics-section" data-section="errors">';
     html += createTitle('❌ Error Analysis');
     html += '<div class="analytics-grid">';
     html += `<div class="analytics-item"><span class="label">Current Consecutive Errors:</span><span class="value">${consecutiveErrors}</span></div>`;
@@ -341,11 +346,8 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     html += `<div class="analytics-item"><span class="label">Error Rate:</span><span class="value">${formatPercent(errorRate)}</span></div>`;
     html += '</div></div>';
 
-    // Add data validation warning if data seems unrealistic
-    // Note: rawSuccessfulMatches can exceed maxPossibleMatches if player attempted more matches than pairs
-    // This is normal behavior, so we only warn if the difference is very large
     if (rawSuccessfulMatches > maxPossibleMatches * 1.5 || metrics.totalMatches > maxPossibleMatches * 5) {
-      console.warn('Data validation: Detected unrealistic match counts', {
+      if (typeof aiWarn === 'function') aiWarn('Data validation: Detected unrealistic match counts', {
         totalPairs: metrics.totalPairs,
         totalMatches: metrics.totalMatches,
         successfulMatches: rawSuccessfulMatches,
@@ -353,9 +355,8 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       });
     }
 
-    // Color Confusion Analysis Section
     if (metrics.colorStats && Object.keys(metrics.colorStats).length > 0) {
-      html += '<div class="analytics-section collapsed">';
+      html += '<div class="analytics-section" data-section="color">';
       html += createTitle('🎨 Color Confusion Analysis');
       html += '<div class="analytics-grid">';
       Object.keys(metrics.colorStats).forEach(color => {
@@ -367,8 +368,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       html += '</div></div>';
     }
 
-    // Behavioral Patterns Section
-    html += '<div class="analytics-section collapsed">';
+    html += '<div class="analytics-section" data-section="behavior">';
     html += createTitle('🔍 Behavioral Patterns');
     html += '<div class="analytics-grid">';
     html += `<div class="analytics-item"><span class="label">Avg Flip Interval:</span><span class="value">${avgFlipInterval.toFixed(0)}ms</span></div>`;
@@ -382,10 +382,10 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     html += `<div class="analytics-item"><span class="label">Hint Usage:</span><span class="value">${cheatCount} time${cheatCount !== 1 ? 's' : ''}</span></div>`;
     html += '</div></div>';
 
-    // AI Suggestions Section (if available)
     if (aiResult && aiResult.nextConfig) {
       const config = aiResult.nextConfig;
-      html += '<div class="analytics-section collapsed">';
+      // Expanded by default for better visibility of AI decisions
+      html += '<div class="analytics-section" data-section="adaptive">';
       html += createTitle('🤖 Adaptive Suggestions');
       html += '<div class="analytics-grid">';
       if (config.gridCols && config.gridRows) {
@@ -403,11 +403,50 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       if (config.adjacentRate !== undefined && !isNaN(config.adjacentRate)) {
         html += `<div class="analytics-item"><span class="label">Adjacent Rate:</span><span class="value">${formatPercent(config.adjacentRate)}</span></div>`;
       }
-      html += '</div></div>';
+      html += '</div>';
+
+      const currentGridCols = config.gridCols || config.cols || gameConfig.gridCols || gameConfig.cols || defaultConfig.cols;
+      const currentGridRows = config.gridRows || config.rows || gameConfig.gridRows || gameConfig.rows || defaultConfig.rows;
+      const nextGridCols = config.gridCols || config.cols || currentGridCols;
+      const nextGridRows = config.gridRows || config.rows || currentGridRows;
+      const fromPairs = metrics.totalPairs || defaultConfig.totalPairs;
+      const toPairs = config.totalPairs || fromPairs;
+      const fromTime = defaultConfig.initialTime;
+      const toTime = config.initialTime || fromTime;
+      const fromHideDelay = defaultConfig.hideDelay;
+      const toHideDelay = config.hideDelay || fromHideDelay;
+      const fromAdjacent = typeof gameConfig.adjacentRate === 'number' ? gameConfig.adjacentRate : defaultConfig.adjacentRate;
+      const toAdjacent = typeof config.adjacentRate === 'number' ? config.adjacentRate : fromAdjacent;
+
+      const changes = [];
+      if (fromPairs !== toPairs) {
+        changes.push({ label: 'Pairs', from: String(fromPairs), to: String(toPairs) });
+      }
+      if (fromTime !== toTime) {
+        changes.push({ label: 'Time', from: formatTime(fromTime), to: formatTime(toTime) });
+      }
+      if (fromHideDelay !== toHideDelay) {
+        changes.push({ label: 'Hide Delay', from: `${fromHideDelay}ms`, to: `${toHideDelay}ms` });
+      }
+      if (fromAdjacent !== undefined && toAdjacent !== undefined && !isNaN(fromAdjacent) && !isNaN(toAdjacent) && fromAdjacent !== toAdjacent) {
+        changes.push({ label: 'Adjacent Rate', from: formatPercent(fromAdjacent), to: formatPercent(toAdjacent) });
+      }
+      if (currentGridCols && currentGridRows && (nextGridCols !== currentGridCols || nextGridRows !== currentGridRows)) {
+        changes.push({ label: 'Grid', from: `${currentGridCols}×${currentGridRows}`, to: `${nextGridCols}×${nextGridRows}` });
+      }
+
+      if (changes.length > 0) {
+        html += '<div class="adaptive-diff">';
+        changes.forEach(change => {
+          html += `<div class="adaptive-diff-row"><span class="adaptive-diff-label">${change.label}:</span><span class="adaptive-diff-values">${change.from}<span class="adaptive-arrow">→</span>${change.to}</span></div>`;
+        });
+        html += '</div>';
+      }
+
+      html += '</div>';
     }
 
-    // Game Configuration Section - placed last
-    html += '<div class="analytics-section collapsed">';
+    html += '<div class="analytics-section" data-section="config">';
     html += createTitle('🎮 Game Configuration');
     html += '<div class="analytics-grid">';
 
@@ -470,12 +509,41 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
 
     html += '</div></div>';
 
+    if (typeof GameHistory !== 'undefined' && isStandalonePage) {
+      try {
+        const history = new GameHistory();
+        await history.openDatabase();
+        const sessions = await history.getSessionsByLevel(level, 30);
+        const withFlow = sessions.filter(s => s.summary && typeof s.summary.flowIndex === 'number');
+        if (withFlow.length > 1) {
+          const recent = withFlow.slice().reverse().slice(0, 20).reverse();
+          const maxFlow = recent.reduce((m, s) => Math.max(m, s.summary.flowIndex || 0), 0.01);
+          let timelineHtml = '<div class="analytics-section" data-section="timeline">';
+          timelineHtml += createTitle('📈 Flow Timeline');
+          timelineHtml += '<div class="timeline-chart">';
+          recent.forEach(s => {
+            const fi = s.summary.flowIndex || 0;
+            const height = Math.max(6, (fi / maxFlow) * 100);
+            const date = new Date(s.timestamp);
+            const label = `${date.toLocaleDateString()} ${date.toLocaleTimeString()} • ${fi.toFixed(3)}`;
+            timelineHtml += `<div class="timeline-point" style="height:${height}%" title="${label}"></div>`;
+          });
+          timelineHtml += '</div>';
+          timelineHtml += '<div class="timeline-legend">Recent games on this level, newest on the right.</div>';
+          timelineHtml += '</div>';
+          html += timelineHtml;
+        }
+      } catch (e) {
+        if (typeof aiWarn === 'function') aiWarn('Error building timeline analytics:', e);
+      }
+    }
+
     summaryContainer.innerHTML = html;
     summaryContainer.style.display = 'block';
-    console.log('Analytics summary displayed, HTML length:', html.length);
+    if (typeof aiLog === 'function') aiLog('Analytics summary displayed, HTML length:', html.length);
 
   } catch (error) {
-    console.error('Error displaying analytics summary:', error);
+    if (typeof aiWarn === 'function') aiWarn('Error displaying analytics summary:', error);
     // Show error message in container if it exists
     const summaryContainer = document.getElementById('analytics-summary');
     if (summaryContainer) {
@@ -578,7 +646,7 @@ function closeAnalyticsSummary() {
   const summaryContainer = document.getElementById('analytics-summary');
   if (summaryContainer) {
     summaryContainer.style.display = 'none';
-    console.log('Analytics summary closed');
+    if (typeof aiLog === 'function') aiLog('Analytics summary closed');
   }
 }
 
@@ -591,4 +659,3 @@ window.toggleSection = function (headerElement) {
     section.classList.toggle('collapsed');
   }
 };
-
