@@ -12,7 +12,7 @@ The system follows a **Zero-Data-Exfiltration** architecture where all AI proces
 graph TD
     subgraph "Presentation Layer (Browser)"
         UI[Adaptive UI / DOM]
-        Levels[Game Levels (L1, L2, L3)]
+        Levels["Game Levels (L1, L2, L3)"]
         Audio[Audio System]
     end
 
@@ -25,7 +25,7 @@ graph TD
     subgraph "AI Core (Local Inference)"
         Engine[AI Engine]
         Fuzzy[Fuzzy Logic System]
-        Bandit[Contextual Bandit (LinUCB)]
+        Bandit["Contextual Bandit (LinUCB)"]
     end
 
     subgraph "Persistence Layer (IndexedDB / LocalStorage)"
@@ -78,13 +78,13 @@ flowchart TD
         
         Rules --> Agg[Aggregation]
         Agg --> Defuzz[Defuzzification]
-        Defuzz --> Flow[**Flow Index**\n(0.0 - 1.0)]
+        Defuzz --> Flow["**Flow Index**\n(0.0 - 1.0)"]
     end
 
     subgraph "Phase 2: Difficulty Selection (Contextual Bandit)"
         Flow --> Reward[Reward Calculation]
         
-        Context[Player Context\n(Skill, Fatigue, History)]
+        Context["Player Context\n(Skill, Fatigue, History)"]
         
         Reward --> Update[Update LinUCB Model]
         Context --> Predict[Predict Best Arm]
@@ -92,9 +92,9 @@ flowchart TD
         
         Predict --> Arms{Select Arm}
         
-        Arms -->|Arm 0| Easy[**Easy Config**\nSmall Grid, Max Hints\nSlow Timer]
-        Arms -->|Arm 1| Std[**Standard Config**\nAdaptive Grid\nNormal Timer]
-        Arms -->|Arm 2| Hard[**Challenge Config**\nLarge Grid, Min Hints\nFast Timer]
+        Arms -->|Arm 0| Easy["**Easy Config**\nSmall Grid, Max Hints\nSlow Timer"]
+        Arms -->|Arm 1| Std["**Standard Config**\nAdaptive Grid\nNormal Timer"]
+        Arms -->|Arm 2| Hard["**Challenge Config**\nLarge Grid, Min Hints\nFast Timer"]
     end
 
     Easy --> Output[Next Game Config]
