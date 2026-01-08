@@ -1,5 +1,23 @@
 # Changelog
 
+Version: v2.3.2 (2026-01-09)
+
+## Fixes
+- **Documentation**: Fixed Mermaid.js syntax errors in `SYSTEM_DIAGRAMS.md` by quoting node labels containing special characters (parentheses, newlines), ensuring diagrams render correctly on GitHub.
+
+---
+
+Version: v2.3.1 (2026-01-09)
+
+## Documentation
+- **Enhanced Diagrams**: Major update to `SYSTEM_DIAGRAMS.md` adding comprehensive visualizations:
+  - **Game State Machine**: Detailed state transitions (Init → Preview → Playing → GameOver).
+  - **Lifecycle Sequence**: Step-by-step API call flows between Game Core, AI Engine, and Storage.
+  - **Data ERD**: Entity relationships for Profile, Session, Telemetry, and Config.
+  - **Detailed Architecture**: Updated high-level architecture with specific data flows.
+
+---
+
 Version: v2.3.0 (2026-01-09)
 
 ## Features
