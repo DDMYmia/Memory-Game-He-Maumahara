@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>He Maumahara</title>
 <link rel="shortcut icon" type="image/x-icon" href="images/icon.ico">
-<link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/roboto.css">
+<link rel="stylesheet" href="css/style.css?v=2">
+<link rel="stylesheet" href="css/roboto.css?v=2">
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script>
 (function(){
@@ -53,28 +53,21 @@
 
 <div id="game-over">
 <div class="game-over-left">
-      <div id="well-done-etc"><span id="current-score">0:00</span>! Well Done!</div>
-      <input type="text" id="name" placeholder="Type your name here.." aria-label="Player Name">
-      <div class="button-row">
-        <button id="submit-score" onclick="submitScore()" aria-label="Submit Score">Submit Score</button>
+        <div id="well-done-etc"><span id="current-score">0:00</span>! Well Done!</div>
+        <div class="button-row">
         <button id="download-btn" onclick="downloadResult()" aria-label="Download Result">Download</button>
         <button id="next-game-btn" onclick="startNextGame()" aria-label="Next Game">Next Game</button>
-      </div>
-    </div>
+        </div>
+</div>
 <div class="game-over-right" id="analytics-summary"></div>
 </div>
 
-<div id="leaderboard-container">
-<h3>Level 2</h3>
-<div id="leaderboard-list"></div>
-</div>
-
-<script src="js/game-core.js"></script>
-<script src="js/ai-engine.js"></script>
-<script src="js/ai-helper.js"></script>
-<script src="js/game-history.js"></script>
-<script src="js/analytics-summary.js"></script>
-<script src="js/lvl2.js"></script>
+<script src="js/game-core.js?v=2"></script>
+<script src="js/ai-engine.js?v=2"></script>
+<script src="js/ai-helper.js?v=2"></script>
+<script src="js/game-history.js?v=2"></script>
+<script src="js/analytics-summary.js?v=2"></script>
+<script src="js/lvl2.js?v=2"></script>
 <!-- AutoPilot removed for production -->
 
 </body>

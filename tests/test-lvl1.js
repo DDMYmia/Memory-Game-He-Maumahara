@@ -86,7 +86,7 @@ const sandbox = {
     playComboSound: (streak) => console.log(`[Sound] Combo: ${streak}`),
     playSound: (sound) => console.log(`[Sound] Play: ${sound}`),
     toggleInstructions: () => console.log('[UI] Toggle Instructions'),
-    showGameOverScreen: (score, data) => {
+    showGameOverScreen: (arg1, arg2) => {
         console.log('[UI] Game Over Screen Shown');
         sandbox.gameStop = 1; // Ensure stop state
     },
@@ -193,4 +193,3 @@ async function play() {
 }
 
 play();
-

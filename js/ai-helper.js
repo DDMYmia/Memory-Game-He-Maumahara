@@ -263,7 +263,7 @@ async function extractPerformanceMetrics(telemetry, level) {
       colorStats,
       shapeStats,
       cheatCount,
-      consecutiveErrors: maxConsecutiveErrors, // Current consecutive errors at end
+      consecutiveErrors,
       maxConsecutiveErrors: maxConsecutiveErrors
     };
   } catch (error) {
@@ -397,6 +397,10 @@ async function runAdaptiveGameEnd(telemetry, level, aiEngine, options = {}) {
     localStorage.setItem('ai_level3_config', JSON.stringify(lvl3Cfg));
     await telemetry.log('ai_level3_suggestion', { level: 3, nextConfig: lvl3Cfg, basedOn, completedRounds: completionCount });
   } catch (e) {}
+
+  if (typeof window !== 'undefined') {
+    window.lastAIResult = aiResult;
+  }
 
   return aiResult;
 }

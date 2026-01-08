@@ -241,7 +241,6 @@ class BatchSimPlayer {
         await this.clock.sleep(2000);
 
         return {
-            score: this.sandbox.finalScore || this.sandbox.score,
             time: this.sandbox.time,
             moves: this.moves,
             flowIndex: this.sandbox.finalFlowIndex || 0
@@ -440,18 +439,10 @@ async function runBatch() {
                             telemetryEvents.push({ type: ev, data, ts: clock.now() });
                             if (ev === 'end') {
                                 if (data.flowIndex !== undefined) sandbox.finalFlowIndex = data.flowIndex;
-                                if (data.score !== undefined) sandbox.finalScore = data.score;
                             }
                         } 
                         exportAll() { return Promise.resolve(telemetryEvents); } 
                         clearAll() {}
-                    },
-                    Leaderboard: class {
-                        constructor(name) {}
-                        openDatabase(){} 
-                        submitScore(){} 
-                        displayLeaderboard(){} 
-                        clearAll(){} 
                     },
                     aiEngine: null, // Will be initialized
                     isAdaptiveEnabled: () => true,
@@ -511,10 +502,9 @@ async function runBatch() {
                 const player = new BatchSimPlayer(sandbox, profile, clock);
                 await player.play();
                 
-                console.log(`[Result] Level ${level.id} ${profile.name}: Score=${sandbox.score}, FlowIndex=${sandbox.finalFlowIndex}`);
+                console.log(`[Result] Level ${level.id} ${profile.name}: FlowIndex=${sandbox.finalFlowIndex}`);
                 
-                // Use the score calculated by the game (which is now FlowIndex * 1000)
-                results[key].push(sandbox.score || 0);
+                results[key].push(sandbox.finalFlowIndex || 0);
                 
                 if (i % 10 === 0) process.stdout.write('.');
             }
@@ -523,7 +513,7 @@ async function runBatch() {
     }
     
     // Report
-    console.log("\n\n=== FINAL RESULTS (Flow Index Score 0-1000) ===");
+    console.log("\n\n=== FINAL RESULTS (Flow Index 0-1) ===");
     console.log("Profile | Min | Max | Avg | Median");
     console.log("--- | --- | --- | --- | ---");
     
@@ -532,11 +522,11 @@ async function runBatch() {
         const min = Math.min(...scores);
         const max = Math.max(...scores);
         const sum = scores.reduce((a, b) => a + b, 0);
-        const avg = Math.round(sum / scores.length);
+        const avg = sum / scores.length;
         const sorted = [...scores].sort((a, b) => a - b);
         const median = sorted[Math.floor(sorted.length / 2)];
         
-        console.log(`${key.padEnd(20)} | ${min} | ${max} | ${avg} | ${median}`);
+        console.log(`${key.padEnd(20)} | ${min.toFixed(3)} | ${max.toFixed(3)} | ${avg.toFixed(3)} | ${median.toFixed(3)}`);
     }
 }
 

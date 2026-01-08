@@ -34,62 +34,62 @@ class FuzzyLogicSystem {
     // Colors are categorized by base color family for sensitivity analysis
     this.cardAttributes = {
       'image1.png': { 
-        color: 'blue-dark',        // Main: blue, tone: dark
-        baseColor: 'blue',         // Base color family for sensitivity
+        color: 'blue',
+        baseColor: 'blue',
         name: 'Matariki' 
       },
       'image2.png': { 
-        color: 'orange-brown-dark', // Main: orange-brown, tone: dark
-        baseColor: 'orange-brown', 
+        color: 'yellow',
+        baseColor: 'yellow',
         name: 'Pīwakawaka' 
       },
       'image3.png': { 
-        color: 'gray-dark',         // Main: gray, tone: dark
-        baseColor: 'gray', 
+        color: 'black',
+        baseColor: 'black',
         name: 'Tūī' 
       },
       'image4.png': { 
-        color: 'green-olive-dark',  // Main: olive green, tone: dark
-        baseColor: 'green', 
+        color: 'green',
+        baseColor: 'green',
         name: 'Kea' 
       },
       'image5.png': { 
-        color: 'green-dark',        // Main: green, tone: dark
-        baseColor: 'green', 
+        color: 'green',
+        baseColor: 'green',
         name: 'Kawakawa' 
       },
       'image6.png': { 
-        color: 'red',               // Main: red, tone: primary
-        baseColor: 'red', 
+        color: 'red',
+        baseColor: 'red',
         name: 'Pōhutukawa' 
       },
       'image7.png': { 
-        color: 'yellow-bright',     // Main: yellow, tone: bright
-        baseColor: 'yellow', 
+        color: 'yellow',
+        baseColor: 'yellow',
         name: 'Kōwhai' 
       },
       'image8.png': { 
-        color: 'green-light',       // Main: green, tone: light
-        baseColor: 'green', 
+        color: 'green',
+        baseColor: 'green',
         name: 'Koru' 
       },
       'image9.png': { 
-        color: 'blue-dark',         // Main: blue, tone: dark
-        baseColor: 'blue', 
+        color: 'blue',
+        baseColor: 'blue',
         name: 'Hei Matau' 
       },
       'image10.png': { 
-        color: 'blue-light',        // Main: blue, tone: light
-        baseColor: 'blue', 
+        color: 'blue',
+        baseColor: 'blue',
         name: 'Pikorua' 
       },
       'image11.png': {
-        color: 'purple-dark',
+        color: 'blue',
         baseColor: 'blue',
         name: 'Image 11'
       },
       'image12.png': {
-        color: 'blue-medium',
+        color: 'blue',
         baseColor: 'blue',
         name: 'Image 12'
       }
@@ -128,13 +128,7 @@ class FuzzyLogicSystem {
       // Shape/image classification accuracy: high (0.8-1.0), medium (0.6-0.9), low (0-0.7)
       shapeHigh: { min: 0.7, max: 1.0, peak: 1.0 },
       shapeMedium: { min: 0.4, max: 0.9, peak: 0.65 },
-      shapeLow: { min: 0, max: 0.6, peak: 0.3 },
-      
-      // Cheat usage (show_cards): none (0), low (1-2), medium (3-4), high (5+)
-      cheatNone: { min: 0, max: 0, peak: 0 },
-      cheatLow: { min: 1, max: 2, peak: 1.5 },
-      cheatMedium: { min: 3, max: 4, peak: 3.5 },
-      cheatHigh: { min: 5, max: 20, peak: 10 }
+      shapeLow: { min: 0, max: 0.6, peak: 0.3 }
     };
   }
 
@@ -145,8 +139,10 @@ class FuzzyLogicSystem {
    * @returns {number} Membership value [0, 1]
    */
   triangularMembership(value, params) {
-    if (value <= params.min || value >= params.max) return 0;
+    if (!isFinite(value)) return 0;
+    if (!params || !isFinite(params.min) || !isFinite(params.max) || !isFinite(params.peak)) return 0;
     if (value === params.peak) return 1;
+    if (value <= params.min || value >= params.max) return 0;
     if (value < params.peak) {
       return (value - params.min) / (params.peak - params.min);
     } else {
@@ -163,10 +159,11 @@ class FuzzyLogicSystem {
    */
   normalizeTime(completionTime, level, totalPairs) {
     // Expected time per pair - all levels now use 300s total time
+    // Reduced significantly to create better differentiation between fast/slow players
     const expectedTimePerPair = {
-      1: 45,  // Level 1: 450s / 10 pairs (more lenient than 300s limit)
-      2: 45,  // Level 2: 450s / 10 pairs
-      3: 45   // Level 3: 450s / 10 pairs
+      1: 20,  // Level 1: 200s / 10 pairs
+      2: 15,  // Level 2: 150s / 10 pairs
+      3: 12   // Level 3: 120s / 10 pairs
     };
     
     const expectedTotal = expectedTimePerPair[level] * totalPairs;
@@ -398,7 +395,8 @@ class FuzzyLogicSystem {
       totalClicks = 0,
       colorStats = {},
       shapeStats = {},
-      cheatCount = 0
+      cheatCount = 0,
+      maxConsecutiveErrors = 0
     } = context;
 
     // Normalize inputs
@@ -457,90 +455,44 @@ class FuzzyLogicSystem {
 
     // Compute membership values for click accuracy
     const accuracyHigh = this.triangularMembership(clickAccuracy, this.config.accuracyHigh);
-    const accuracyMedium = this.triangularMembership(clickAccuracy, this.config.accuracyMedium);
     const accuracyLow = this.triangularMembership(clickAccuracy, this.config.accuracyLow);
 
     // Compute membership values for color accuracy
     const colorHigh = this.triangularMembership(colorAccuracy, this.config.colorHigh);
-    const colorMedium = this.triangularMembership(colorAccuracy, this.config.colorMedium);
     const colorLow = this.triangularMembership(colorAccuracy, this.config.colorLow);
 
     // Compute membership values for shape accuracy
     const shapeHigh = this.triangularMembership(shapeAccuracy, this.config.shapeHigh);
-    const shapeMedium = this.triangularMembership(shapeAccuracy, this.config.shapeMedium);
     const shapeLow = this.triangularMembership(shapeAccuracy, this.config.shapeLow);
 
-    // Compute membership values for cheat usage
-    const cheatNone = cheatCount === 0 ? 1 : 0;
-    const cheatLow = this.triangularMembership(cheatCount, this.config.cheatLow);
-    const cheatMedium = this.triangularMembership(cheatCount, this.config.cheatMedium);
-    const cheatHigh = this.triangularMembership(cheatCount, this.config.cheatHigh);
+    const rule1 = Math.min(timeMedium, errorLow, cadenceStable);
+    const rule2 = Math.min(timeFast, errorLow, cadenceStable);
+    const rule3 = Math.min(timeMedium, errorMedium, cadenceStable);
+    const rule4 = Math.min(timeSlow, errorLow);
+    const rule5 = Math.min(timeFast, errorHigh);
+    const rule6 = Math.min(timeSlow, errorHigh);
+    const rule7 = Math.min(errorHigh, cadenceVariable);
+    const rule8 = Math.min(timeMedium, errorLow, colorHigh, shapeHigh);
+    const rule9 = Math.min(timeMedium, Math.max(colorLow, shapeLow));
+    const rule10 = Math.min(accuracyHigh, cadenceStable);
+    const rule11 = Math.min(accuracyLow, colorLow);
+    const rule12 = Math.min(timeFast, errorMedium);
 
-    // Extended Fuzzy rule base (IF-THEN rules)
-    // Original rules
-    // Rule 1: If time=medium AND errors=low AND cadence=stable THEN flow=very_high
-    const rule1 = Math.min(timeMedium, errorLow, cadenceStable) * 0.95;
-
-    // Rule 2: If time=fast AND errors=low AND cadence=stable THEN flow=very_high (not perfect if errors exist)
-    // Cap at 0.95 if there are any errors, only 1.0 if zero errors
-    const rule2Base = Math.min(timeFast, errorLow, cadenceStable);
-    const rule2 = rule2Base * (failedMatches === 0 ? 1.0 : 0.95);
-
-    // Rule 3: If time=medium AND errors=medium AND cadence=stable THEN flow=medium_high
-    const rule3 = Math.min(timeMedium, errorMedium, cadenceStable) * 0.75;
-
-    // Rule 4: If time=slow AND errors=low THEN flow=medium_high
-    const rule4 = Math.min(timeSlow, errorLow) * 0.70;
-
-    // Rule 5: If time=fast AND errors=high THEN flow=low
-    const rule5 = Math.min(timeFast, errorHigh) * 0.35;
-
-    // Rule 6: If time=slow AND errors=high THEN flow=very_low
-    const rule6 = Math.min(timeSlow, errorHigh) * 0.15;
-
-    // Rule 7: If errors=high AND cadence=variable THEN flow=low
-    const rule7 = Math.min(errorHigh, cadenceVariable) * 0.25;
-
-    // New rules with color and shape classification
-    // Rule 8: If time=medium AND errors=low AND color=high AND shape=high THEN flow=extremely_high
-    const rule8 = Math.min(timeMedium, errorLow, colorHigh, shapeHigh) * 0.90;
-
-    // Rule 9: If time=fast AND errors=low AND color=high THEN flow=very_high (not perfect if errors exist)
-    // Cap at 0.95 if there are any errors, only 1.0 if zero errors
-    const rule9Base = Math.min(timeFast, errorLow, colorHigh);
-    const rule9 = rule9Base * (failedMatches === 0 ? 1.0 : 0.95);
-
-    // Rule 10: If time=medium AND color=low THEN flow=medium_low
-    const rule10 = Math.min(timeMedium, colorLow) * 0.55;
-
-    // Rule 11: If shape=low AND errors=high THEN flow=low
-    const rule11 = Math.min(shapeLow, errorHigh) * 0.30;
-
-    // Rule 12: If accuracy=high AND cadence=stable THEN flow=high
-    const rule12 = Math.min(accuracyHigh, cadenceStable) * 0.82;
-
-    // Rule 13: If accuracy=high AND color=high AND shape=high THEN flow=very_high
-    const rule13 = Math.min(accuracyHigh, colorHigh, shapeHigh) * 0.92;
-
-    // Rule 14: If accuracy=low AND color=low THEN flow=low
-    const rule14 = Math.min(accuracyLow, colorLow) * 0.28;
-
-    // New rules with cheat penalty
-    // Rule 15: If cheat=high THEN apply heavy penalty
-    const rule15 = cheatHigh * 0.20;
-    
-    // Rule 16: If cheat=medium THEN apply moderate penalty
-    const rule16 = cheatMedium * 0.40;
-    
-    // Rule 17: If cheat=low AND other factors good THEN slight penalty
-    const rule17 = Math.min(cheatLow, timeMedium, errorLow) * 0.60;
-
-    // Rule 18: If time=fast AND errors=medium THEN flow=high (Reward speed even with exploration errors)
-    const rule18 = Math.min(timeFast, errorMedium) * 0.90;
-
-    // Defuzzification: Weighted average (centroid method)
-    const rules = [rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12, rule13, rule14, rule15, rule16, rule17, rule18];
-    const weights = [0.95, 1.0, 0.75, 0.70, 0.35, 0.15, 0.25, 0.90, 1.0, 0.55, 0.30, 0.82, 0.92, 0.28, 0.20, 0.40, 0.60, 0.90];
+    const rules = [rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12];
+    const weights = [
+      0.85,
+      failedMatches === 0 ? 1.0 : 0.95,
+      0.60,
+      0.60,
+      0.30,
+      0.10,
+      0.20,
+      0.98,
+      0.35,
+      0.80,
+      0.20,
+      0.85
+    ];
     
     let numerator = 0;
     let denominator = 0;
@@ -553,8 +505,7 @@ class FuzzyLogicSystem {
     });
 
     let baseFlowIndex = denominator > 0 ? numerator / denominator : 0.5;
-    
-    // Debug: Log intermediate values
+
     if (denominator === 0) {
       aiWarn('Flow Index: denominator is 0, using default 0.5');
     } else {
@@ -565,113 +516,24 @@ class FuzzyLogicSystem {
         activeRules: rules.filter(r => r > 0).length
       });
     }
-    
-    // Step 1: Clamp base Flow Index to [0.8, 1.0] range
-    // Special case: If no errors and no cheats, allow base score to be up to 1.0
-    // Otherwise, ensure minimum is 0.8
-    const originalBaseFlowIndex = baseFlowIndex;
-    const hasNoErrors = failedMatches === 0;
-    const hasNoCheats = cheatCount === 0;
-    
-    if (baseFlowIndex < 0.8) {
-      // If calculated value is below 0.8, raise to 0.8
-      baseFlowIndex = 0.8;
-      aiLog('Base Flow Index raised from', originalBaseFlowIndex, 'to 0.8 (minimum)', {
-        hasNoErrors,
-        hasNoCheats,
-        failedMatches,
-        cheatCount
-      });
-    } else if (baseFlowIndex > 1.0) {
-      // If calculated value is above 1.0, cap at 1.0
-      baseFlowIndex = 1.0;
-      aiLog('Base Flow Index lowered from', originalBaseFlowIndex, 'to 1.0 (maximum)');
-    } else {
-      // Value is in [0.8, 1.0] range
-      // If perfect performance (no errors, no cheats), ensure we get 1.0
-      if (hasNoErrors && hasNoCheats) {
-        // Perfect performance should get 1.0
-        baseFlowIndex = 1.0;
-        aiLog('Perfect performance detected (no errors, no cheats), set base Flow Index to 1.0', {
-          originalValue: originalBaseFlowIndex,
-          failedMatches,
-          cheatCount
-        });
-      } else {
-        aiLog('Base Flow Index within range [0.8, 1.0]:', baseFlowIndex, {
-          hasNoErrors,
-          hasNoCheats,
-          failedMatches,
-          cheatCount,
-          originalValue: originalBaseFlowIndex
-        });
-      }
-    }
-    
-    // Step 2: Apply error penalty (direct deduction, max 0.3)
-    // Formula: errorPenalty = min(0.3, failedMatches * 0.05)
-    const errorPenalty = Math.min(0.3, failedMatches * 0.05);
-    let flowIndex = baseFlowIndex - errorPenalty;
-    
-    aiLog('Error penalty applied:', {
-      failedMatches,
-      errorPenalty,
-      baseFlowIndex,
-      afterErrorPenalty: flowIndex
-    });
-    
-    // Step 3: Apply cheat penalty (direct deduction, max 0.2)
-    // Calculate cheat penalty as direct deduction instead of multiplication
-    // cheatPenalty = min(0.2, (cheatCount / totalPairs) * 0.2)
-    const cheatRatio = cheatCount / (totalPairs || 10);
-    const cheatPenaltyDeduction = Math.min(0.2, cheatRatio * 0.2);
-    flowIndex = flowIndex - cheatPenaltyDeduction;
-    
-    aiLog('Cheat penalty applied:', {
-      cheatCount,
-      cheatRatio,
-      cheatPenaltyDeduction,
-      afterCheatPenalty: flowIndex
-    });
-    
-    // Step 4: Apply time weight multiplier
-    // Within 30s: 100% weight, every 10s reduces 1%, max reduction 15% (minimum 85%)
-    let timeWeight = 1.0;
-    if (completionTime > 30) {
-      const extraSeconds = completionTime - 30;
-      const reductionPercent = Math.floor(extraSeconds / 10) * 0.01; // Reduce 1% per 10 seconds
-      timeWeight = Math.max(0.85, 1.0 - reductionPercent); // Maximum reduction 15% (minimum 85%)
-    }
-    flowIndex = flowIndex * timeWeight;
-    
-    aiLog('Time weight applied:', {
-      completionTime,
-      timeWeight,
-      beforeTimeWeight: flowIndex / timeWeight,
-      afterTimeWeight: flowIndex
-    });
-    
-    // Step 5: Final clamping to [0, 1] range
-    const finalFlowIndex = Math.max(0, Math.min(1, flowIndex));
-    
-    // Store values in context for reporting
+
+    baseFlowIndex = Math.max(0, Math.min(1, baseFlowIndex));
+
+    const flowIndexRaw = baseFlowIndex * cheatPenalty;
+    // Final clamp - Minimum 0.3 to preserve player dignity/confidence
+    const finalFlowIndex = Math.max(0.3, Math.min(1, flowIndexRaw));
+
     context.colorSensitivity = colorSensitivity;
     context.cheatCount = cheatCount;
-    context.cheatPenalty = cheatPenaltyDeduction;
-    context.errorPenalty = errorPenalty;
+    context.cheatPenalty = cheatPenalty;
     context.baseFlowIndex = baseFlowIndex;
-    context.timeWeight = timeWeight;
-    
+
     aiLog('Final Flow Index:', {
       baseFlowIndex,
-      errorPenalty,
-      cheatPenaltyDeduction,
-      timeWeight,
-      completionTime,
-      beforeTimeWeight: flowIndex / timeWeight,
-      beforeClamping: flowIndex,
+      cheatPenalty,
       finalFlowIndex
     });
+
     return finalFlowIndex;
   }
 }
@@ -682,13 +544,12 @@ class FuzzyLogicSystem {
  * Selects optimal game configuration based on player context and Flow Index reward
  */
 class ContextualBandit {
-  constructor(numArms = 4) {
+  constructor(numArms = 3) {
     this.numArms = numArms;
     // Each arm represents a game configuration
     // Arm 0: Easiest (more hints, longer time, simpler layout) - DEFAULT
     // Arm 1: Standard (baseline)
-    // Arm 2: Hard (fewer hints, shorter time, complex layout)
-    // Arm 3: Hardest (minimal hints, shortest time, most complex layout)
+    // Arm 2: Challenge (minimal hints, shortest time, complex layout)
     
     // LinUCB parameters
     this.alpha = 1.0;
@@ -861,39 +722,43 @@ class ContextualBandit {
     };
 
     const base = baseConfig[level] || baseConfig[1];
-    // Difficulty multiplier: 0 (Arm 0) to 1.0 (Arm 3)
-    const difficultyMultiplier = arm / 3;
+    // Difficulty multiplier: 0 (Arm 0) to 1.0 (Arm 2)
+    const difficultyMultiplier = arm / 2;
 
     let gridCols = 5;
     let gridRows = 4;
     if (level === 2 || level === 3) {
-      // Default grid mapping: Arm 0-1 use 5×4, Arm 2-3 use 4×6
+      // Default grid mapping: Arm 0-1 use 5×4, Arm 2 uses 4×6
       // Actual grid selection is handled in AIEngine.decideNextConfig() based on performance
-      const gridMap = [ [5,4], [5,4], [4,6], [4,6] ];
+      const gridMap = [ [5,4], [5,4], [4,6] ];
       const sel = gridMap[Math.min(gridMap.length - 1, Math.max(0, arm))];
       gridCols = sel[0];
       gridRows = sel[1];
     }
     const totalPairs = Math.floor((gridCols * gridRows) / 2);
 
-    // Calculate adjacent rate for Level 2
-    const adjacentRate = level === 2 ? Math.max(0.2, 0.5 - 0.15 * arm) : undefined;
-    const adjacentTarget = level === 2 && adjacentRate ? Math.floor(totalPairs * adjacentRate) : undefined;
+    let adjacentTarget = undefined;
+    let adjacentRate = undefined;
+    if (level === 2) {
+      const targetByArm = [6, 5, 4];
+      adjacentTarget = Math.min(totalPairs, targetByArm[Math.min(targetByArm.length - 1, Math.max(0, arm))]);
+      adjacentRate = totalPairs > 0 ? adjacentTarget / totalPairs : 0.5;
+    }
 
     return {
       initialTime: 300, // Fixed 300 seconds for all levels and difficulties
       matchReward: Math.max(1, Math.round(base.matchReward * (1 - 0.3 * difficultyMultiplier))),
       hideDelay: Math.max(200, Math.round(base.hideDelay * (1 - 0.4 * difficultyMultiplier))),
       showScale: Math.max(1.1, base.showScale * (1 - 0.25 * difficultyMultiplier)),
-      hintPolicy: arm === 0 ? 'generous' : arm >= 2 ? 'limited' : 'standard',
+      hintPolicy: arm === 0 ? 'generous' : arm === 2 ? 'limited' : 'standard',
       gridCols,
       gridRows,
       totalPairs,
       // Level 2 specific fields
       ...(level === 2 && {
         neighborMode: '8',
-        adjacentRate: adjacentRate,
-        adjacentTarget: adjacentTarget
+        adjacentRate,
+        adjacentTarget
       }),
       // Level 3 specific fields
       ...(level === 3 && {
@@ -932,7 +797,7 @@ class DecisionTree {
 class AIEngine {
   constructor() {
     this.fuzzyLogic = new FuzzyLogicSystem();
-    this.bandit = new ContextualBandit(4);
+    this.bandit = new ContextualBandit(3);
     this.decisionTree = new DecisionTree();
     
     // Session state
@@ -942,7 +807,7 @@ class AIEngine {
       currentRound: null,
       lastHiddenLevel: null,
       lastArm: null,
-      lastAdjacentRate: null,
+      lastAdjacentTarget: null,
       playerProfile: {
         avgFlow: 0.5,
         errorRate: 0.2,
@@ -990,18 +855,7 @@ class AIEngine {
       cheatCount: cheatCount || 0
     });
     
-    const flowIndex = this.fuzzyLogic.computeFlowIndex({
-      completionTime: completionTime || 0,
-      level: level || 1,
-      totalPairs: totalPairs || 10,
-      failedMatches: failedMatches || 0,
-      totalMatches: totalMatches || 0,
-      flipIntervals: flipIntervals || [],
-      totalClicks: totalClicks || 0,
-      colorStats: colorStats || {},
-      shapeStats: shapeStats || {},
-      cheatCount: cheatCount || 0
-    });
+    const flowIndex = this.fuzzyLogic.computeFlowIndex(gameData);
     
     aiLog('AI Engine computed Flow Index:', flowIndex);
 
@@ -1085,7 +939,7 @@ class AIEngine {
       if (armRaw > last) selectedArm = Math.min(last + 1, armRaw);
       if (armRaw < last) selectedArm = Math.max(last - 1, armRaw);
     }
-    selectedArm = Math.max(0, Math.min(3, selectedArm));
+    selectedArm = Math.max(0, Math.min(2, selectedArm));
     
     // Get recent rounds for smart grid selection
     const recentRounds = this.sessionState.rounds.slice(-3);
@@ -1105,17 +959,16 @@ class AIEngine {
       // Default behavior based on Arm:
       // Arm 0: Always 5×4 (easiest)
       // Arm 1: Default 5×4, can upgrade to 4×6 if Flow Index >= 0.7
-      // Arm 2: Default 5×4, can upgrade to 4×6 if Flow Index >= 0.7
-      // Arm 3: Always 4×6 (hardest)
+      // Arm 2: Always 4×6 (challenge)
       
       if (selectedArm === 0) {
         // Arm 0: Always small grid
         useLargeGrid = false;
-      } else if (selectedArm === 3) {
-        // Arm 3: Always large grid
+      } else if (selectedArm === 2) {
+        // Arm 2: Always large grid
         useLargeGrid = true;
-      } else if (selectedArm === 1 || selectedArm === 2) {
-        // Arm 1 and 2: Check performance to decide (Flow Index >= 0.7)
+      } else if (selectedArm === 1) {
+        // Arm 1: Check performance to decide (Flow Index >= 0.7)
         useLargeGrid = this.shouldUseLargeGrid(
           this.sessionState.playerProfile, 
           recentRounds, 
@@ -1138,16 +991,32 @@ class AIEngine {
       configBase.totalPairs = Math.floor((configBase.gridCols * configBase.gridRows) / 2);
     }
 
-    let targetAdj = configBase.adjacentRate;
-    let newAdj = targetAdj;
-    if (typeof this.sessionState.lastAdjacentRate === 'number') {
-      const prev = this.sessionState.lastAdjacentRate;
-      const step = 0.05;
-      if (targetAdj > prev) newAdj = Math.min(prev + step, targetAdj);
-      if (targetAdj < prev) newAdj = Math.max(prev - step, targetAdj);
+    const baseAdjTarget = configBase.adjacentTarget;
+    const hasAdjTarget = level === 2 && typeof baseAdjTarget === 'number' && isFinite(baseAdjTarget);
+    let adjacentTarget = hasAdjTarget ? baseAdjTarget : null;
+    if (hasAdjTarget) {
+      const lastFlow = recentRounds.length ? (recentRounds[recentRounds.length - 1].flowIndex || 0) : (this.sessionState.playerProfile?.avgFlow || 0.5);
+      const targetByFlow = lastFlow < 0.45 ? 6 : lastFlow < 0.75 ? 5 : 4;
+      adjacentTarget = targetByFlow;
+
+      if (typeof this.sessionState.lastAdjacentTarget === 'number' && isFinite(this.sessionState.lastAdjacentTarget)) {
+        const prev = this.sessionState.lastAdjacentTarget;
+        const step = 1;
+        if (adjacentTarget > prev) adjacentTarget = Math.min(prev + step, adjacentTarget);
+        if (adjacentTarget < prev) adjacentTarget = Math.max(prev - step, adjacentTarget);
+      }
+
+      const totalPairs = typeof configBase.totalPairs === 'number' && isFinite(configBase.totalPairs) ? configBase.totalPairs : 10;
+      adjacentTarget = Math.max(0, Math.min(totalPairs, adjacentTarget));
     }
-    newAdj = Math.max(0.2, Math.min(0.5, newAdj));
-    const config = { ...configBase, adjacentRate: newAdj };
+
+    const adjacentRate = hasAdjTarget
+      ? ((typeof configBase.totalPairs === 'number' && configBase.totalPairs > 0) ? adjacentTarget / configBase.totalPairs : 0.5)
+      : undefined;
+
+    const config = hasAdjTarget
+      ? { ...configBase, adjacentTarget, adjacentRate }
+      : { ...configBase };
 
     const hiddenLevelRaw = this.getHiddenLevel();
     const prev = this.sessionState.lastHiddenLevel;
@@ -1164,7 +1033,7 @@ class AIEngine {
     this.sessionState.lastHiddenLevel = hiddenLevel;
 
     this.sessionState.lastArm = selectedArm;
-    this.sessionState.lastAdjacentRate = newAdj;
+    if (hasAdjTarget) this.sessionState.lastAdjacentTarget = adjacentTarget;
     this.sessionState.currentRound = {
       arm: selectedArm,
       config,

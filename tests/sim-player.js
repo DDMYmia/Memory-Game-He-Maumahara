@@ -42,7 +42,12 @@ class SimPlayer {
 
     async play() {
         // console.log(`Starting simulation: ${this.profile.name}`);
-        this.sandbox.initializeGame();
+        if (this.sandbox.window && typeof this.sandbox.window.onload === 'function') {
+            this.sandbox.window.onload();
+        } else if (typeof this.sandbox.initializeGame === 'function') {
+            this.sandbox.initializeGame();
+        }
+
         this.sandbox.gameStart = 1;
         this.sandbox.actualStartTime = Date.now();
 
@@ -50,9 +55,11 @@ class SimPlayer {
         const cards = this.sandbox.cards;
         
         // Loop until game over or timeout
-        let maxMoves = 100;
-        while (this.sandbox.gameStop === 0 && maxMoves > 0) {
-            maxMoves--;
+        let remainingMoves = 100;
+        while (this.sandbox.gameStop === 0 && remainingMoves > 0) {
+            await this.waitForReady();
+            if (this.sandbox.gameStop !== 0) break;
+            remainingMoves--;
             this.moves++;
             
             // 1. Check if we know a match
@@ -65,6 +72,8 @@ class SimPlayer {
 
             if (!move) {
                 // Should not happen unless all matched
+                // Wait a bit for any end-game timeouts (win animations etc) to complete
+                await sleep(1000);
                 break;
             }
 
@@ -91,18 +100,35 @@ class SimPlayer {
             }
             
             // Wait for game logic
-            await sleep(this.profile.clickDelay / 10 + 500); 
+            await this.waitForReady();
         }
 
         return {
-            score: this.sandbox.score,
+            flowIndex: this.sandbox.aiResult ? this.sandbox.aiResult.flowIndex : 0,
             time: this.sandbox.time,
             moves: this.moves,
             completed: this.sandbox.gameStop === 1 && this.sandbox.matchedPairs === this.sandbox.totalPairs
         };
     }
 
+    async waitForReady() {
+        const start = Date.now();
+        const maxWaitMs = 5000;
+        while (this.sandbox.gameStop === 0) {
+            const locked = !!this.sandbox.lockBoard;
+            const rippling = !!this.sandbox.isRippleActive;
+            const previewing = !!this.sandbox.isPreviewing;
+            const peeking = !!this.sandbox.isShowingCards;
+            if (!locked && !rippling && !previewing && !peeking) return;
+            if (Date.now() - start > maxWaitMs) return;
+            await sleep(20);
+        }
+    }
+
     async clickCard(card) {
+        await this.waitForReady();
+        if (this.sandbox.gameStop !== 0) return;
+        
         card.click();
         this.remember(card);
     }

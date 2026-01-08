@@ -4,6 +4,8 @@
 
 The game features a **pure frontend AI** that personalizes difficulty in real-time, keeping the cognitive load in the optimal "Flow Zone" (where challenge matches skill).
 
+Version: v2.3.0
+
 ## Game Concept & Structure
 
 He Maumahara is based on traditional "match and recall" formats. Players must remember card locations and identities to retrieve matching pairs under varying demands. The game evolves from simple visual matching to complex language-based challenges (introducing *kupu* or words).
@@ -32,10 +34,9 @@ Studies suggest that consistent play of memory card games can improve memory ret
 | **3** | **Mastery**: Image–Text pairs | Matches images with *kupu* (words). Highest cognitive load. |
 
 ### Scoring & Flow Index
-Unlike traditional games that just count points, He Maumahara calculates a **Flow Index** (0 to 1000) at the end of each game.
-- **Score = Flow Index × 1000**
-- A high score means you played with speed, accuracy, and a steady rhythm—indicating a state of "Flow".
-- The game uses this index to automatically adjust the difficulty for your next round.
+He Maumahara calculates a **Flow Index** (0 to 1) at the end of each game.
+- The **game-over screen** shows your **elapsed time** for that run (mm:ss) in the main header.
+- The AI uses Flow Index (plus layout factors like adjacency) to adjust the next round.
 
 ## Key Features
 
@@ -64,13 +65,26 @@ Unlike traditional games that just count points, He Maumahara calculates a **Flo
    Open `http://localhost:8010` in your browser.
 
 ## Documentation
+This repository is intentionally lightweight (pure HTML/JS/CSS), but includes developer-facing technical documentation in [docs/](docs/).
 
-For detailed technical information, please refer to the `docs/` folder:
+- **System Whitepaper**: [docs/SYSTEM_OVERVIEW.md](docs/SYSTEM_OVERVIEW.md) - **Start Here** for a comprehensive overview of philosophy, features, and AI.
+- **Technical Reference**: [docs/TECHNICAL_REFERENCE.md](docs/TECHNICAL_REFERENCE.md) - Deep dive into Architecture, Analytics, and Scoring logic.
+- **System Diagrams**: [docs/SYSTEM_DIAGRAMS.md](docs/SYSTEM_DIAGRAMS.md) - Visual charts of architecture and algorithms.
+- UI styling conventions: [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)
+- Change history: [docs/CHANGELOG.md](docs/CHANGELOG.md)
 
-- **[Architecture & Design](docs/ARCHITECTURE.md)**: System overview and data flow.
-- **[AI & Scoring System](docs/AI_AND_SCORING.md)**: Deep dive into the algorithms.
-- **[Design System](docs/DESIGN_SYSTEM.md)**: UI/UX specifications.
-- **[Analytics & Data](docs/ANALYTICS_AND_DATA.md)**: Privacy policy and data schema.
+### Testing
+- Automated simulation suite:
+  ```bash
+  node tests/run-suite.js
+  ```
+
+### Release Checklist
+- Open all levels in a browser and verify:
+  - Match success: image/text fades in ~0.2s while card frame remains
+  - Match failure: both stay open, then flipwave starts after ~0.2s, then close together
+  - Game-over screen shows elapsed time (mm:ss)
+  - Analytics Suggestions/Config show Adjacent Pairs clearly (e.g., 6 / 10)
 
 ## Core Roles & Responsibilities
 

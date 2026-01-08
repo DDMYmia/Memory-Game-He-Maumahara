@@ -437,15 +437,19 @@ body:has(#game-over.show) #glass-fx {
 
 .lvl-txt {
   width: 150px;
+  height: 150px;
   font-size: 24px;
   font-weight: 300;
   text-align: center;
   background-color: #fff3;
   color: #fff;
-  padding: 12px 16px;
+  padding: 0;
   border-radius: 26px;
   transition: 0.5s;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .lvl-txt:hover {
@@ -466,12 +470,14 @@ body:has(#game-over.show) #glass-fx {
 
 .desc {
   grid-column: 1 / -1;
+  grid-row: 3;
   text-align: center;
   font-size: 24px;
   font-weight: 300;
   color: #fff;
   opacity: 0;
   transition: 0.5s;
+  pointer-events: none;
 }
 
 #lvl-1:hover ~ #desc-1,
@@ -1080,17 +1086,17 @@ textarea:focus {
 
 .analytics-section {
   width: 100%;
-  margin-bottom: 30px;
+  margin-bottom: 12px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 15px;
-  padding: 15px;
+  padding: 10px;
   box-sizing: border-box;
 }
 
 .analytics-title {
   font-size: 18px;
   font-weight: 500;
-  margin-bottom: 30px;
+  margin-bottom: 12px;
   color: rgba(255, 255, 255, 0.9);
   display: flex;
   justify-content: flex-start;
@@ -1099,8 +1105,8 @@ textarea:focus {
 
 .analytics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 30px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
 }
 
 .analytics-item {
@@ -1108,7 +1114,7 @@ textarea:focus {
   justify-content: space-between;
   align-items: center;
   background: rgba(0, 0, 0, 0.2);
-  padding: 10px;
+  padding: 8px 10px;
   border-radius: 8px;
 }
 
@@ -1136,10 +1142,97 @@ textarea:focus {
 /* Flow Meter Styles */
 .flow-meter-container {
   grid-column: 1 / -1;
-  margin: 30px 0;
+  margin: 12px 0;
   padding: 10px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 8px;
+}
+
+.adaptive-diff {
+  margin-top: 8px;
+  grid-column: 1 / -1;
+}
+
+.adaptive-diff-title {
+  font-size: 0.85em;
+  color: #aaa;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+.adaptive-diff-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.card.matched-disappear {
+  background: transparent;
+  border: 2px #fff solid;
+  pointer-events: none;
+}
+
+.card.matched-disappear img,
+.card.matched-disappear span {
+  opacity: 0;
+  transform: scale(1.25);
+  transform-origin: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.adaptive-diff-item {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+
+.adaptive-diff-item:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.adaptive-diff-label {
+  font-size: 0.8em;
+  color: #ccc;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.adaptive-diff-values {
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+}
+
+.val-from {
+  color: #999;
+  font-size: 0.9em;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.val-to {
+  color: #fff;
+  font-weight: bold;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+}
+
+.adaptive-arrow {
+  margin: 0 6px;
+  color: #4CAF50;
+  font-size: 1em;
 }
 
 .flow-meter-labels {

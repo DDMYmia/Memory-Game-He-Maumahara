@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>He Maumahara</title>
 <link rel="shortcut icon" type="image/x-icon" href="images/icon.ico">
-<link rel="stylesheet" href="css/analytics.css">
-<link rel="stylesheet" href="css/roboto.css">
+<link rel="stylesheet" href="css/analytics.css?v=2">
+<link rel="stylesheet" href="css/roboto.css?v=2">
 <script>
 (function(){
   var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -56,12 +56,12 @@
 </div>
 </div>
 
-<script src="js/game-core.js"></script>
-<script src="js/ai-engine.js"></script>
-<script src="js/ai-helper.js"></script>
-<script src="js/game-history.js"></script>
-<script src="js/mock-data.js"></script>
-<script src="js/analytics-summary.js"></script>
+<script src="js/game-core.js?v=2"></script>
+<script src="js/ai-engine.js?v=2"></script>
+<script src="js/ai-helper.js?v=2"></script>
+<script src="js/game-history.js?v=2"></script>
+<script src="js/mock-data.js?v=2"></script>
+<script src="js/analytics-summary.js?v=2"></script>
 <script>
   let currentLevel = 1;
   let currentMode = 'history'; // 'history' or 'demo'
@@ -69,9 +69,9 @@
   // Show history list
   async function showHistoryList() {
     currentMode = 'history';
-    document.getElementById('level-selector').style.display = 'none';
-    document.getElementById('analytics-display').style.display = 'none';
-    document.getElementById('history-list').style.display = 'block';
+    document.getElementById('level-selector').classList.add('hidden');
+    document.getElementById('analytics-display').classList.add('hidden');
+    document.getElementById('history-list').classList.remove('hidden');
     
     // Update active button
     document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -112,15 +112,23 @@
         
         byLevel[level].forEach(session => {
           const date = new Date(session.timestamp);
-          const flowIndex = session.summary.flowIndex !== null ? session.summary.flowIndex.toFixed(3) : 'N/A';
+          const flowIndexValue = typeof session.summary.flowIndex === 'number' ? session.summary.flowIndex : null;
+          const displayFlowIndex = flowIndexValue !== null ? flowIndexValue.toFixed(4) : 'N/A';
           const accuracy = (session.summary.accuracy * 100).toFixed(1);
-          const timeRemaining = formatTime(session.summary.timeRemaining);
+          // Use actual completion time if available, otherwise fallback to remaining time logic (or calculate it)
+          let displayTime = 'N/A';
+          if (session.metrics && typeof session.metrics.completionTime === 'number') {
+            displayTime = formatTime(session.metrics.completionTime);
+          } else if (session.summary.timeRemaining !== undefined) {
+             // Fallback: This is not ideal but keeps existing behavior if metrics missing
+             displayTime = formatTime(session.summary.timeRemaining) + ' (left)';
+          }
           
           html += `
             <div class="history-item" onclick="window.loadHistorySession('${session.gameId}')">
               <div class="history-item-date">${date.toLocaleDateString()} ${date.toLocaleTimeString()}</div>
-              <div class="history-item-main">Flow: <strong>${flowIndex}</strong></div>
-              <div class="history-item-sub">Accuracy: ${accuracy}% | Time: ${timeRemaining} | Pairs: ${session.summary.totalPairs}</div>
+              <div class="history-item-main">Flow Index: <strong>${displayFlowIndex}</strong></div>
+              <div class="history-item-sub">Accuracy: ${accuracy}% | Time: ${displayTime} | Pairs: ${session.summary.totalPairs}</div>
             </div>
           `;
         });
@@ -149,8 +157,16 @@
       }
       
       // Hide history list, show analytics display
-      document.getElementById('history-list').style.display = 'none';
-      document.getElementById('analytics-display').style.display = 'block';
+      document.getElementById('level-selector').classList.add('hidden');
+      document.getElementById('history-list').classList.add('hidden');
+      document.getElementById('analytics-display').classList.remove('hidden');
+      
+      try {
+        const params = new URLSearchParams(window.location.search);
+        params.set('gameId', gameId);
+        const nextUrl = `${window.location.pathname}?${params.toString()}`;
+        window.history.pushState({ gameId }, '', nextUrl);
+      } catch (e) {}
       
       // Create a mock telemetry object from session data
       const mockTelemetry = {
@@ -166,7 +182,6 @@
               type: 'end', 
               ts: session.timestamp + (session.metrics.completionTime || 0) * 1000, 
               data: { 
-                score: session.gameStats.score, 
                 pairs: session.metrics.totalPairs, 
                 streak: session.gameStats.streak 
               } 
@@ -190,6 +205,13 @@
       backBtn.textContent = '← Back to History';
       backBtn.className = 'history-back-btn';
       backBtn.onclick = () => {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          params.delete('gameId');
+          const qs = params.toString();
+          const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+          window.history.pushState({}, '', nextUrl);
+        } catch (e) {}
         showHistoryList();
       };
       container.insertBefore(backBtn, container.firstChild);
@@ -202,9 +224,9 @@
   // Show demo mode
   function showDemoMode() {
     currentMode = 'demo';
-    document.getElementById('history-list').style.display = 'none';
-    document.getElementById('analytics-display').style.display = 'block';
-    document.getElementById('level-selector').style.display = 'flex';
+    document.getElementById('history-list').classList.add('hidden');
+    document.getElementById('analytics-display').classList.remove('hidden');
+    document.getElementById('level-selector').classList.remove('hidden');
     
     // Update active button
     document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -236,7 +258,7 @@
       exportAll: async function() {
         return [
           { type: 'start', ts: Date.now() - 125000, data: { level: currentLevel, variant: { totalPairs: 10 } } },
-          { type: 'end', ts: Date.now(), data: { score: 105, pairs: 10, streak: 5 } },
+          { type: 'end', ts: Date.now(), data: { pairs: 10, streak: 5 } },
           { type: 'flip', ts: Date.now() - 120000, data: { image: 'image1.png' } },
           { type: 'match', ts: Date.now() - 100000, data: { result: 'success', image: 'image1.png' } },
           { type: 'match', ts: Date.now() - 80000, data: { result: 'fail', images: ['image2.png', 'image3.png'] } }
@@ -301,9 +323,19 @@
   // Make loadMockData available globally
   window.loadMockData = loadMockData;
   
-  // Load history list on page load
+  function getQueryParam(name) {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(name);
+  }
+  
+  // Load history list on page load (optionally open a specific session)
   window.onload = () => {
-    showHistoryList();
+    const gameId = getQueryParam('gameId');
+    if (gameId) {
+      showHistoryList().then(() => loadHistorySession(gameId));
+    } else {
+      showHistoryList();
+    }
   };
 </script>
 

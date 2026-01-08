@@ -85,10 +85,15 @@ class MockDocument {
         }
         return null; 
     }
+
+    querySelectorAll(selector) {
+        return [];
+    }
 }
 
 const createSandbox = (levelScriptPath) => {
     const mockDoc = new MockDocument();
+    const localStore = new Map();
     
     // Global context
     const sandbox = {
@@ -96,8 +101,10 @@ const createSandbox = (levelScriptPath) => {
         window: {
             dataLayer: [],
             localStorage: {
-                getItem: () => null,
-                setItem: () => {}
+                getItem: (k) => (localStore.has(k) ? localStore.get(k) : null),
+                setItem: (k, v) => { localStore.set(k, String(v)); },
+                removeItem: (k) => { localStore.delete(k); },
+                clear: () => { localStore.clear(); }
             },
             location: { hostname: 'localhost', reload: () => {} },
             gtag: () => {}
@@ -112,49 +119,65 @@ const createSandbox = (levelScriptPath) => {
         Math: Math,
         Blob: class {},
         URL: { createObjectURL: () => 'blob:url', revokeObjectURL: () => {} },
-        
-        // Game specific mocks
-        telemetry: {
-            log: (event, data) => {}, // console.log(`[Telemetry] ${event}`, data)
-            exportAll: async () => [],
-            clearAll: async () => {}
-        },
-        leaderboard: {
-            submitScore: async () => {},
-            displayLeaderboard: async () => {},
-            clearAll: async () => {}
-        },
-        aiEngine: {
-            init: async () => {},
-            updateProfile: async () => {},
-            adjustDifficulty: () => ({})
-        },
-        
+        localStorage: null,
+
         // Missing global functions expected by level scripts
         alert: (msg) => {}, // console.log(`[Alert] ${msg}`)
         playComboSound: (streak) => {},
         playSound: (sound) => {},
         toggleInstructions: () => {},
-        showGameOverScreen: (score, data) => {
+        showGameOverScreen: (arg1, arg2) => {
             sandbox.gameStop = 1; // Force stop
         },
-        runAdaptiveGameEnd: () => {},
         saveSessionToHistoryFromTelemetry: () => {},
         resetData: () => {},
         isAdaptiveEnabled: () => false,
+        updateAdaptiveUI: () => {},
         updateAIProfileFromGameEnd: () => {},
         exportTelemetry: async () => {},
         toggleAdaptive: () => {}
     };
 
+    sandbox.localStorage = sandbox.window.localStorage;
+
+    sandbox.Telemetry = class Telemetry {
+        constructor(dbName = 'telemetry') {
+            this.dbName = dbName;
+            this.logs = [];
+        }
+        openDatabase() {
+            return Promise.resolve();
+        }
+        log(type, data) {
+            this.logs.push({ type, data, ts: Date.now() });
+            return Promise.resolve();
+        }
+        exportAll() {
+            return Promise.resolve(this.logs.slice());
+        }
+        clearAll() {
+            this.logs = [];
+            return Promise.resolve();
+        }
+    };
+
+    const projectRoot = path.join(__dirname, '..');
+
+    const aiEnginePath = path.join(projectRoot, 'js', 'ai-engine.js');
+    const aiHelperPath = path.join(projectRoot, 'js', 'ai-helper.js');
+    const aiEngineCode = fs.readFileSync(aiEnginePath, 'utf8');
+    const aiHelperCode = fs.readFileSync(aiHelperPath, 'utf8');
+
     // Load Script
     let scriptCode = fs.readFileSync(levelScriptPath, 'utf8');
     
     // Hack to expose let/const variables to sandbox
-    scriptCode = scriptCode.replace(/^let /gm, 'var ');
-    scriptCode = scriptCode.replace(/^const /gm, 'var ');
+    scriptCode = scriptCode.replace(/^\s*let /gm, 'var ');
+    scriptCode = scriptCode.replace(/^\s*const /gm, 'var ');
 
     vm.createContext(sandbox);
+    vm.runInContext(aiEngineCode, sandbox);
+    vm.runInContext(aiHelperCode, sandbox);
     vm.runInContext(scriptCode, sandbox);
     
     return sandbox;

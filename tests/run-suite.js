@@ -32,17 +32,19 @@ async function runSuite() {
                 
                 const result = await player.play();
                 
+                const flowDisplay = result.flowIndex !== undefined ? result.flowIndex.toFixed(3) : 'N/A';
+
                 if (result.completed) {
-                    console.log(`✅ Success | Score: ${result.score} | Moves: ${result.moves}`);
+                    console.log(`✅ Success | Flow: ${flowDisplay} | Moves: ${result.moves}`);
                 } else {
-                    console.log(`❌ Failed  | Score: ${result.score} | Moves: ${result.moves}`);
+                    console.log(`❌ Failed  | Flow: ${flowDisplay} | Moves: ${result.moves}`);
                 }
 
                 results.push({
                     level: level.name,
                     profile: profile.name,
                     success: result.completed,
-                    score: result.score,
+                    flow: flowDisplay,
                     moves: result.moves
                 });
 

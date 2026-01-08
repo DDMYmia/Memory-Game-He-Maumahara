@@ -1,24 +1,57 @@
 # Changelog
 
+Version: v2.3.0 (2026-01-09)
+
+## Features
+- **Simplified AI Arms**: Reduced Contextual Bandit complexity from 4 to 3 arms (Easy, Standard, Challenge).
+  - **Arm 0 (Easy)**: Max hints, slow timer, 5×4 grid.
+  - **Arm 1 (Standard)**: Baseline settings, adaptive grid (5×4 → 4×6).
+  - **Arm 2 (Challenge)**: Minimal hints, fast timer, always 4×6 grid.
+- **Documentation**: 
+  - Created `TECHNICAL_REFERENCE.md` (consolidating Architecture, Analytics, Scoring).
+  - Created `SYSTEM_DIAGRAMS.md` with visual architecture flows.
+  - Updated `SYSTEM_OVERVIEW.md` with new Arm definitions.
+
+---
+
+Version: v2.2.3 (2026-01-08)
+
+## Finalization
+- **Flow Index Only**: Removed remaining Score/Leaderboard paths and references.
+- **Analytics Consistency**: Updated demo/history rendering to avoid Score fields.
+- **Testing Output**: Updated simulations to report Flow Index only.
+- **Docs Consistency**: Aligned docs to match Flow Index-only behavior.
+- **Performance Optimization**:
+  - Removed deprecated penalty calculations (error/streak penalties) from `computeFlowIndex` to rely solely on Fuzzy Logic rules.
+  - Simplified AI engine logging and internal variable usage.
+
+## Verification
+- `node tests/run-suite.js` passes.
+
+---
+
+Version: v2.2.1 (2026-01-08)
+
+## Documentation Updates
+- **Design System Corrections**: Aligned `DESIGN_SYSTEM.md` with CSS (title/timer/HUD sizing, menu layout).
+- **Verification**: Verified consistency between docs and code for scoring parameters and GameHistory interface.
+- **Clarity**: Documented the difference between elapsed time and Flow Index in game-over UI.
+
+---
+
 Version: v2.2.0 (2026-01-05)
 
 ## Major Updates
-- **Flow Index Scoring System Overhaul**: Complete redesign of scoring algorithm with direct error/cheat penalties and time weight multiplier
-  - Base Flow Index clamped to [0.8, 1.0] range
-  - Perfect performance (no errors, no cheats) automatically set to 1.0
-  - Direct error penalty: 0.05 per error, maximum 0.3 (6+ errors)
-  - Direct cheat penalty: maximum 0.2 deduction
-  - Time weight multiplier: 100% within 30s, -1% per 10s, maximum -15% (minimum 85%)
+- **Flow Index Standardization**: Unified Flow Index as the primary post-game metric across Level 1–3.
+- **Flow Index Engine Updates**: Refined fuzzy logic memberships/rules and applied a multiplicative penalty for show-cards usage (hint/cheat behavior).
 - **Next Game Feature**: Added "Next Game" button to game-over screen for seamless progression to AI-adjusted difficulty
-- **Internationalization**: Removed all Chinese text from code and documentation, project now fully in English (Māori words preserved as cultural features)
+- **Language Consistency**: Standardized user-facing text and documentation to formal English (Māori terms preserved as cultural features)
 - **Design Overhaul**: Enforced fixed 800px width layout across all pages for consistent experience
-- **Scoring System**: Final score is derived from Flow Index (`score = round(flowIndex * 1000)`)
 
 ## Improvements
 - **Flow Index Calculation**:
-  - Fixed issue where perfect performance could only achieve 0.8 instead of 1.0
-  - Improved error penalty system to accurately reflect player mistakes
-  - Added time-based scoring adjustment for completion speed
+  - Added richer input signals (cadence, click accuracy, color/shape accuracy) to stabilize Flow Index behavior
+  - Improved telemetry logging for Flow Index diagnostics and analytics rendering
 - **Code Quality**:
   - Removed all Chinese comments and documentation
   - Improved code comments and documentation clarity
@@ -49,7 +82,7 @@ Version: v2.1.0 (2025-12-16)
 - **Code Improvements**: Fixed Flow Index interpretation logic in analytics summary
 
 ## Documentation Improvements
-- Consolidated Flow Index documentation into `AI_AND_SCORING.md`
+- Consolidated Flow Index documentation into `SCORING_BREAKDOWN.md`
 - Merged `ANALYTICS.md`, `DATA_COLLECTION.md`, and `VIEW_PROFILE_GUIDE.md` into `ANALYTICS_AND_DATA.md`
 - Removed redundant documentation files
 - Updated main `README.md` to link to the current `docs/` structure
@@ -110,7 +143,7 @@ Version: v2.0.0 (2025-12-16)
 - Created `docs/` folder with organized documentation
 - Merged duplicate documentation files
 - Translated all Chinese content to English
-- Added `FLOW_INDEX_DEBUG.md` for troubleshooting Flow Index issues
+- Expanded troubleshooting guidance across analytics and scoring documentation
 
 ---
 

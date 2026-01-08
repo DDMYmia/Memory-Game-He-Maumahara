@@ -1,5 +1,6 @@
 // Level 2: 5 minutes (300 seconds)
 const INITIAL_TIME = 300;
+const INITIAL_PREVIEW_SECONDS = 5;
 let time = INITIAL_TIME;
 let actualStartTime = null;
 let gameStart = 0;
@@ -21,8 +22,6 @@ let failedAttempts = 0;
 let showCardsCooldown = 0; // Cooldown timer for show cards (4 seconds for level 2)
 let showCardsCooldownInterval = null;
 
-let score = 0;
-let leaderboard;
 let telemetry;
 let aiEngine = null;
 
@@ -33,6 +32,10 @@ let GRID_ROWS_RUNTIME = GRID_ROWS;
 let ADJACENT_RATE_RUNTIME = 0.5;
 let ADJACENT_TARGET_RUNTIME = Math.floor(totalPairs * ADJACENT_RATE_RUNTIME);
 let ADJACENT_ACTUAL = 0;
+
+function pairsForGrid(cols, rows) {
+  return Math.min(12, Math.floor((cols * rows) / 2));
+}
 
 const cardTextMapping = {
   "image1": "Matariki",
@@ -126,10 +129,17 @@ function generateAdjacentLayout(totalPairs, cols, rows, target) {
 }
 
 let CARD_ORDER = [];
-const HIDE_DELAY_MS = 400;
+const HIDE_DELAY_MS = 1000;
 const SHOW_CARDS_SCALE = 1.4;
 let HIDE_DELAY_RUNTIME = HIDE_DELAY_MS;
 let SHOW_CARDS_SCALE_RUNTIME = SHOW_CARDS_SCALE;
+const MATCH_VANISH_MS = 200;
+const FLIPWAVE_START_DELAY_MS = 200;
+
+function scheduleFrame(fn) {
+  if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(fn);
+  return setTimeout(fn, 0);
+}
 let IMAGE_POOL_MAX = 24;
 let IMAGE_SELECTION = (() => {
   const arr = Array.from({ length: IMAGE_POOL_MAX }, (_, i) => i + 1);
@@ -155,7 +165,6 @@ const timerInterval = setInterval(() => {
     if (gameStop == 0) {
       if (time > 0) {
                 time--;
-                // score = time + (streak * 10);
           updateTimer();
       } else {
         gameStop = 1;
@@ -179,7 +188,10 @@ function initializeGame() {
   const gameBoard = document.getElementById("game-board");
   const cols = GRID_COLS_RUNTIME;
   const rows = GRID_ROWS_RUNTIME;
-  ADJACENT_TARGET_RUNTIME = Math.floor(totalPairs * ADJACENT_RATE_RUNTIME);
+  if (typeof ADJACENT_TARGET_RUNTIME !== 'number' || !isFinite(ADJACENT_TARGET_RUNTIME) || ADJACENT_TARGET_RUNTIME <= 0) {
+    ADJACENT_TARGET_RUNTIME = Math.floor(totalPairs * ADJACENT_RATE_RUNTIME);
+  }
+  ADJACENT_TARGET_RUNTIME = Math.max(0, Math.min(totalPairs, Math.floor(ADJACENT_TARGET_RUNTIME)));
   CARD_ORDER = generateAdjacentLayout(totalPairs, cols, rows, ADJACENT_TARGET_RUNTIME);
   gameBoard.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   gameBoard.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
@@ -215,27 +227,33 @@ function handleCardClick(event) {
     const imageElement = card.querySelector("img");
 
     if (flippedCards.length < 2 && !flippedCards.includes(card) && !card.classList.contains("matched")) {
-      imageElement.style.visibility = "visible";
-      flippedCards.push(card);
-
       cardReader(card);
       telemetry.log('flip', { level: 2, image: card.dataset.image, match: card.dataset.image });
+
+      scheduleFrame(() => {
+        if (imageElement) imageElement.style.visibility = "visible";
+        card.style.backgroundImage = 'none';
+        card.style.backgroundColor = '';
+      });
+
+      flippedCards.push(card);
 
       if (flippedCards.length === 2) {
         lockBoard = true;
         const [card1, card2] = flippedCards;
         if (card1.dataset.image === card2.dataset.image) {
-          card1.classList.add("matched");
-          card2.classList.add("matched");
-          matchedPairs++;
+        card1.classList.add("matched");
+        card2.classList.add("matched");
+        // Clear inline background to let CSS .matched class take over
+        card1.style.background = '';
+        card2.style.background = '';
+        card1.style.backgroundColor = '';
+        card2.style.backgroundColor = '';
+        matchedPairs++;
             streak++;
             time += 3;
             if (time > 300) time = 300;
             
-            // Cumulative Scoring removed - using Flow Index
-        // score += 50 + (streak * 30);
-        // document.getElementById('current-score').innerText = score;
-
             card1.classList.add('card-matched-highlight');
           card2.classList.add('card-matched-highlight');
           
@@ -252,45 +270,71 @@ function handleCardClick(event) {
             maxConsecutiveErrors: maxConsecutiveErrors
           });
           if (matchedPairs === totalPairs) {
-            score += time; // Time Bonus
-            document.getElementById('current-score').innerText = score;
             setTimeout(() => { document.getElementById("game-board").style.display = "none"; gameStop = 1; endGame(); }, 400);
           }
           playComboSound(streak);
+
+          setTimeout(() => {
+            card1.classList.add('matched-disappear');
+            card2.classList.add('matched-disappear');
+          }, 0);
+
+          setTimeout(() => {
+            flippedCards = [];
+            lockBoard = false;
+          }, MATCH_VANISH_MS);
+
+          return;
+        }
+        const isMismatch = card1.dataset.image !== card2.dataset.image;
+        const currentFlipped = [...flippedCards];
+
+        const closeFlipped = () => {
+          currentFlipped.forEach(card => {
+            if (isMismatch) {
+              card.style.background = "url('images/small-pattern.png')";
+              card.style.backgroundSize = '370px';
+              card.style.backgroundColor = '';
+
+              const imgKey = card.dataset.image.replace('.png', '');
+              card.classList.remove('card-lvl2-' + imgKey);
+
+              const imageElement2 = card.querySelector("img");
+              if (imageElement2) {
+                imageElement2.style.visibility = "hidden";
+              }
+            }
+          });
+
+          flippedCards = [];
+          lockBoard = false;
+        };
+
+        if (isMismatch) {
+          streak = 0;
+
+          consecutiveErrors++;
+          maxConsecutiveErrors = Math.max(maxConsecutiveErrors, consecutiveErrors);
+          telemetry.log('match', {
+            level: 2,
+            result: 'fail',
+            images: [card1.dataset.image, card2.dataset.image],
+            consecutiveErrors: consecutiveErrors,
+            maxConsecutiveErrors: maxConsecutiveErrors
+          });
+
+          failedAttempts++;
+          if (failedAttempts >= 2) {
+            failedAttempts = 0;
+            setTimeout(() => {
+              triggerRippleEffect(closeFlipped);
+            }, FLIPWAVE_START_DELAY_MS);
+            return;
+          }
         }
 
         setTimeout(() => {
-          const isMismatch = card1.dataset.image != card2.dataset.image;
-          flippedCards.forEach(card => {
-            if (isMismatch) {
-              streak = 0;
-              card1.style.backgroundImage = "url('images/small-pattern.png')";
-              card2.style.backgroundImage = "url('images/small-pattern.png')";
-              consecutiveErrors++;
-              maxConsecutiveErrors = Math.max(maxConsecutiveErrors, consecutiveErrors);
-              telemetry.log('match', { 
-                level: 2,
-                result: 'fail', 
-                images: [card1.dataset.image, card2.dataset.image],
-                consecutiveErrors: consecutiveErrors,
-                maxConsecutiveErrors: maxConsecutiveErrors
-              });
-              
-              // Remove color class
-              const imgKey = card.dataset.image.replace('.png', '');
-              card.classList.remove('card-lvl2-' + imgKey);
-              
-              failedAttempts++;
-              if (failedAttempts >= 2) {
-                triggerRippleEffect();
-                failedAttempts = 0;
-              }
-            }
-            const imageElement2 = card.querySelector("img");
-            if (imageElement2) { imageElement2.style.visibility = "hidden"; }
-          });
-          flippedCards = [];
-          lockBoard = false;
+          closeFlipped();
         }, HIDE_DELAY_RUNTIME);
       }
     }
@@ -299,26 +343,58 @@ function handleCardClick(event) {
 
 function restartFunction() { location.reload(); }
 
+const LVL2_PROMOTE_THRESHOLD = 0.7;
+const LVL2_GRAY_LOW = 0.68;
+const LVL2_GRAY_HIGH = 0.72;
+
+function isLargeGrid() {
+  return GRID_COLS_RUNTIME === 4 && GRID_ROWS_RUNTIME === 6;
+}
+
+function buildCurrentConfig() {
+  return {
+    initialTime: INITIAL_TIME,
+    gridCols: GRID_COLS_RUNTIME,
+    gridRows: GRID_ROWS_RUNTIME,
+    totalPairs: totalPairs,
+    adjacentRate: ADJACENT_RATE_RUNTIME,
+    hideDelay: HIDE_DELAY_RUNTIME,
+    showScale: SHOW_CARDS_SCALE_RUNTIME
+  };
+}
+
+function writeLvl2NextAction(action, config, meta = {}) {
+  try {
+    localStorage.setItem('lvl2_next_action', JSON.stringify({
+      action,
+      config: config || null,
+      meta: meta || {},
+      ts: Date.now()
+    }));
+  } catch (e) {}
+}
+
 // Start next game with AI-adjusted difficulty
 async function startNextGame() {
-  // Ensure AI has processed the last game and saved config
-  if (aiEngine && typeof aiEngine.decideNextConfig === 'function') {
-    try {
-      // Get the next configuration for this level
-      const nextConfig = aiEngine.decideNextConfig(2);
-      
-      // Save to localStorage (this should already be done, but ensure it)
-      localStorage.setItem('ai_level2_config', JSON.stringify(nextConfig));
-      
-      if (typeof aiLog === 'function') {
-        aiLog('Next game config:', nextConfig);
-      }
-    } catch (e) {
-      console.error('Error getting next config:', e);
-    }
+  let next = null;
+  try {
+    const raw = localStorage.getItem('lvl2_next_action');
+    next = raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    next = null;
   }
-  
-  // Reload page to apply new configuration
+
+  if (next && next.action === 'goto_lvl3') {
+    window.location.href = 'lvl-3.html';
+    return;
+  }
+
+  if (next && next.config) {
+    try {
+      localStorage.setItem('ai_level2_config', JSON.stringify(next.config));
+    } catch (e) {}
+  }
+
   location.reload();
 }
 
@@ -350,32 +426,48 @@ function startInitialPreview() {
   
   isPreviewing = true;
   const allCards = document.querySelectorAll('.card');
+  const timerElement = document.getElementById('game-timer');
+  let remaining = INITIAL_PREVIEW_SECONDS;
   
   // Show all cards
   allCards.forEach(card => {
     const img = card.querySelector('img');
     if (img) img.style.visibility = 'visible';
     card.classList.add('card-peek');
+    card.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+    card.style.zIndex = '1000';
   });
 
-  // Wait 3 seconds
-  setTimeout(() => {
-    // Hide all cards
-    allCards.forEach(card => {
-      if (!card.classList.contains('matched')) {
-        const img = card.querySelector('img');
-        if (img) img.style.visibility = 'hidden';
-        card.classList.remove('card-peek');
-      }
-    });
-    
-    isPreviewing = false;
-    gameStart = 1;
-    if (!actualStartTime) {
-      actualStartTime = Date.now();
+  if (timerElement) {
+    timerElement.innerText = `0:${remaining.toString().padStart(2, '0')}`;
+  }
+  
+  const previewInterval = setInterval(() => {
+    remaining--;
+    if (timerElement) {
+      timerElement.innerText = `0:${Math.max(remaining, 0).toString().padStart(2, '0')}`;
     }
-    telemetry.log('start', { level: 2, variant: { pairsType: 'image-image', layout: 'adjacency_driven', cols: GRID_COLS_RUNTIME, rows: GRID_ROWS_RUNTIME, totalPairs, neighborMode: '8', adjacentTarget: ADJACENT_TARGET_RUNTIME, adjacentActual: ADJACENT_ACTUAL, hideDelay: HIDE_DELAY_RUNTIME, showScale: SHOW_CARDS_SCALE_RUNTIME, timerMode: 'countdown', initialTime: time, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
-  }, 3000);
+    if (remaining <= 0) {
+      clearInterval(previewInterval);
+      allCards.forEach(card => {
+        if (!card.classList.contains('matched')) {
+          const img = card.querySelector('img');
+          if (img) img.style.visibility = 'hidden';
+          card.classList.remove('card-peek');
+          card.style.transform = '';
+          card.style.zIndex = '';
+        }
+      });
+      
+      isPreviewing = false;
+      gameStart = 1;
+      if (!actualStartTime) {
+        actualStartTime = Date.now();
+      }
+      updateTimer();
+      telemetry.log('start', { level: 2, variant: { pairsType: 'image-image', layout: 'adjacency_driven', cols: GRID_COLS_RUNTIME, rows: GRID_ROWS_RUNTIME, totalPairs, neighborMode: '8', adjacentRate: totalPairs > 0 ? (ADJACENT_TARGET_RUNTIME / totalPairs) : 0, adjacentTarget: ADJACENT_TARGET_RUNTIME, adjacentActual: ADJACENT_ACTUAL, hideDelay: HIDE_DELAY_RUNTIME, showScale: SHOW_CARDS_SCALE_RUNTIME, timerMode: 'countdown', initialTime: time, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
+    }
+  }, 1000);
 }
 
 let isShowingCards = false;
@@ -401,6 +493,8 @@ function showAllCards() {
       const img = card.querySelector('img');
       if (img) img.style.visibility = 'visible';
       card.classList.add('card-peek');
+      card.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+      card.style.zIndex = '1000';
     }
   });
 
@@ -428,6 +522,8 @@ function hideAllCards() {
 			const img = card.querySelector('img');
 			if (img) img.style.visibility = 'hidden';
 			card.classList.remove('card-peek');
+      card.style.transform = '';
+      card.style.zIndex = '';
 		}
 	});
   isShowingCards = false;
@@ -435,7 +531,6 @@ function hideAllCards() {
 }
 
 async function endGame() {
-  // score = time + (streak * 10);
   
   // Calculate Flow Index directly
   let aiResult = null;
@@ -450,57 +545,86 @@ async function endGame() {
     console.error("AI Error:", e);
   }
 
-  // Set score based on Flow Index (0-1 -> 0-1000)
-  if (aiResult && typeof aiResult.flowIndex === 'number') {
-    score = Math.round(aiResult.flowIndex * 1000);
+  const enabled = isAdaptiveEnabled();
+  const flowIndex = aiResult && typeof aiResult.flowIndex === 'number' ? aiResult.flowIndex : null;
+  let suggestedConfig = null;
+  try {
+    const cfgStr = localStorage.getItem('ai_level2_config');
+    suggestedConfig = cfgStr ? JSON.parse(cfgStr) : null;
+  } catch (e) {}
+
+  const currentConfig = buildCurrentConfig();
+  const baseConfig = suggestedConfig && typeof suggestedConfig === 'object' ? { ...suggestedConfig } : { ...currentConfig };
+
+  let confirmationActive = false;
+  try {
+    confirmationActive = localStorage.getItem('lvl2_confirmation_active') === 'true';
+  } catch (e) {}
+
+  if (enabled && flowIndex !== null) {
+    const large = isLargeGrid();
+
+    if (!confirmationActive && flowIndex >= LVL2_GRAY_LOW && flowIndex <= LVL2_GRAY_HIGH) {
+      try {
+        localStorage.setItem('lvl2_confirmation_active', 'true');
+      } catch (e) {}
+      const cfg = { ...currentConfig };
+      writeLvl2NextAction('confirm_lvl2', cfg, { flowIndex, large });
+    } else {
+      if (confirmationActive) {
+        try {
+          localStorage.removeItem('lvl2_confirmation_active');
+        } catch (e) {}
+      }
+
+      if (flowIndex >= LVL2_PROMOTE_THRESHOLD) {
+        if (large) {
+          writeLvl2NextAction('goto_lvl3', null, { flowIndex, large, confirmed: confirmationActive });
+        } else {
+          const cfg = { ...baseConfig, gridCols: 4, gridRows: 6 };
+          cfg.totalPairs = pairsForGrid(cfg.gridCols, cfg.gridRows);
+          writeLvl2NextAction('upgrade_large', cfg, { flowIndex, large, confirmed: confirmationActive });
+        }
+      } else {
+        const cfg = { ...baseConfig, gridCols: GRID_COLS_RUNTIME, gridRows: GRID_ROWS_RUNTIME };
+        cfg.totalPairs = pairsForGrid(cfg.gridCols, cfg.gridRows);
+        writeLvl2NextAction('stay', cfg, { flowIndex, large, confirmed: confirmationActive });
+      }
+    }
   } else {
-    score = 0;
+    writeLvl2NextAction('stay', baseConfig, { flowIndex, adaptive: enabled });
   }
   
   // Update Score UI for Game Over screen
-  const currentScoreEl = document.getElementById('current-score');
-  if (currentScoreEl) currentScoreEl.innerText = score;
-
   showGameOverScreen(actualStartTime, "<a href='play.html' class='menu-txt'>Menu</a><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>");
-  await telemetry.log('end', { level: 2, score, flowIndex: aiResult?.flowIndex, pairs: matchedPairs, streak: streak });
+  await telemetry.log('end', { level: 2, flowIndex: aiResult?.flowIndex, pairs: matchedPairs, streak: streak });
 
   const analyticsContainer = document.querySelector('#game-over .game-over-right') || document.getElementById('analytics-summary');
+  let gameId = null;
   if (typeof displayAnalyticsSummary === 'function' && analyticsContainer) {
-    await displayAnalyticsSummary(telemetry, 2, aiResult, { score, streak, remainingTime: time });
-    await saveSessionToHistoryFromTelemetry(telemetry, 2, aiResult, { score, streak, remainingTime: time });
+    await displayAnalyticsSummary(telemetry, 2, aiResult, { streak, remainingTime: time });
+    gameId = await saveSessionToHistoryFromTelemetry(telemetry, 2, aiResult, { streak, remainingTime: time });
+  }
+  if (gameId) {
+    const menuIcon = document.getElementById('menu-icon');
+    if (menuIcon) {
+      const link = document.createElement('a');
+      link.href = `analytics.html?gameId=${encodeURIComponent(gameId)}`;
+      link.className = 'menu-txt';
+      link.textContent = 'Analytics';
+      link.setAttribute('aria-label', 'View Analytics');
+      menuIcon.appendChild(link);
+    }
   }
 }
 
 async function resetData() {
 	try {
 		await telemetry.clearAll();
-		await leaderboard.clearAll();
 	} catch (e) {}
 }
 
-async function submitScore() {
-	const name = document.getElementById('name').value;
-	if (!name) return;
-	try {
-		telemetry.log('submit', { level: 2, name, score });
-		await leaderboard.submitScore(name, score);
-		document.getElementById('submit-score').disabled = true;
-		await displayLeaderboard();
-		document.getElementById('game-board').style.display = "none";
-		document.getElementById('game-over').style.display = 'none';
-		document.getElementById('leaderboard-container').style.display = "block";
-	} catch (error) {}
-}
-
-async function displayLeaderboard() {
-	document.body.style.overflow = 'visible';
-	const leaderboardList = document.getElementById('leaderboard-list');
-	try {
-		await leaderboard.displayLeaderboard(leaderboardList);
-	} catch (error) {}
-}
-
-function triggerRippleEffect() {
+function triggerRippleEffect(onComplete) {
   isRippleActive = true;
   telemetry.log('ripple_effect', { level: 2, timestamp: Date.now() });
 
@@ -544,13 +668,12 @@ function triggerRippleEffect() {
   setTimeout(() => {
     isRippleActive = false;
     lastInteractionTime = Date.now(); // Reset timer
+    if (typeof onComplete === 'function') onComplete();
   }, maxDelay);
 }
 
 window.onload = () => {
-	leaderboard = new Leaderboard('leaderboardDB_lvl2');
 	telemetry = new Telemetry('telemetry_lvl2');
-	leaderboard.openDatabase();
 	telemetry.openDatabase();
 	const enabled = isAdaptiveEnabled();
 	updateAdaptiveUI(enabled);
@@ -558,32 +681,42 @@ window.onload = () => {
 		aiEngine = new AIEngine();
 	}
 	try {
+		let lvl2Completed = 0;
+		try {
+			const raw = localStorage.getItem('ai_lvl2_completed_count');
+			lvl2Completed = raw ? parseInt(raw, 10) : 0;
+			if (!isFinite(lvl2Completed) || lvl2Completed < 0) lvl2Completed = 0;
+		} catch (e) {}
+
 		const cfgStr = localStorage.getItem('ai_level2_config');
 		if (enabled && cfgStr) {
 			const cfg = JSON.parse(cfgStr);
 			if (typeof cfg.initialTime === 'number') { time = cfg.initialTime; }
 			if (typeof cfg.hideDelay === 'number') { HIDE_DELAY_RUNTIME = cfg.hideDelay; }
 			if (typeof cfg.showScale === 'number') { SHOW_CARDS_SCALE_RUNTIME = cfg.showScale; }
-			if (typeof cfg.adjacentRate === 'number') { ADJACENT_RATE_RUNTIME = Math.max(0.2, Math.min(0.5, cfg.adjacentRate)); }
+			if (typeof cfg.adjacentTarget === 'number') { ADJACENT_TARGET_RUNTIME = Math.floor(cfg.adjacentTarget); }
+			if (typeof cfg.adjacentRate === 'number') { ADJACENT_RATE_RUNTIME = Math.max(0.1, Math.min(0.6, cfg.adjacentRate)); }
 			if (typeof cfg.gridCols === 'number' && typeof cfg.gridRows === 'number') {
-				GRID_COLS_RUNTIME = cfg.gridCols;
-				GRID_ROWS_RUNTIME = cfg.gridRows;
-				IMAGE_POOL_MAX = GRID_COLS_RUNTIME * GRID_ROWS_RUNTIME;
-				if (typeof cfg.totalPairs === 'number') { totalPairs = cfg.totalPairs; } else { totalPairs = Math.floor((GRID_COLS_RUNTIME * GRID_ROWS_RUNTIME) / 2); }
+				const wantsLarge = cfg.gridCols === 4 && cfg.gridRows === 6;
+				const allowLarge = lvl2Completed >= 1;
+				if (!wantsLarge || allowLarge) {
+					GRID_COLS_RUNTIME = cfg.gridCols;
+					GRID_ROWS_RUNTIME = cfg.gridRows;
+					IMAGE_POOL_MAX = GRID_COLS_RUNTIME * GRID_ROWS_RUNTIME;
+					totalPairs = pairsForGrid(GRID_COLS_RUNTIME, GRID_ROWS_RUNTIME);
+				}
 			}
 		}
 	} catch (e) {}
 	initializeGame();
-	updateTimer();
+	startInitialPreview();
 };
 
 async function downloadResult() {
   const gameOver = document.getElementById('game-over');
   const downloadBtn = document.getElementById('download-btn');
-  const submitBtn = document.getElementById('submit-score');
   
 	if (downloadBtn) downloadBtn.style.display = 'none';
-	if (submitBtn) submitBtn.style.display = 'none';
   
   try {
     const canvas = await html2canvas(document.body, {
@@ -593,7 +726,8 @@ async function downloadResult() {
       useCORS: true
     });
     
-    const playerName = document.getElementById('name').value || 'Player';
+    const nameEl = document.getElementById('name');
+    const playerName = (nameEl && nameEl.value) ? nameEl.value : 'Player';
     const date = new Date().toISOString().split('T')[0];
     const link = document.createElement('a');
     link.download = `MemoryGame_Result_${playerName}_${date}.png`;
@@ -604,6 +738,5 @@ async function downloadResult() {
     alert('Failed to generate image. Please try again.');
 	} finally {
 		if (downloadBtn) downloadBtn.style.display = 'block';
-		if (submitBtn) submitBtn.style.display = 'block';
 	}
 }

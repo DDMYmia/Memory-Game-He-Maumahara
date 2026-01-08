@@ -1,108 +1,3 @@
-class Leaderboard {
-  constructor(dbName) {
-    this.db = null;
-    this.dbName = dbName;
-  }
-
-  openDatabase() {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, 1);
-      request.onupgradeneeded = event => {
-        this.db = event.target.result;
-        if (!this.db.objectStoreNames.contains('scores')) {
-          const store = this.db.createObjectStore('scores', { keyPath: 'id', autoIncrement: true });
-          store.createIndex('scoreIndex', 'score', { unique: false });
-        }
-      };
-      request.onsuccess = event => {
-        this.db = event.target.result;
-        resolve();
-      };
-      request.onerror = event => {
-        reject(event.target.error);
-      };
-    });
-  }
-
-  submitScore(name, score) {
-    if (!name || !this.db) return Promise.reject('Invalid');
-    return new Promise((resolve, reject) => {
-      const transaction = this.db.transaction('scores', 'readwrite');
-      const store = transaction.objectStore('scores');
-      transaction.onerror = event => {
-        reject(event.target.error);
-      };
-      const addRequest = store.add({ name, score });
-      addRequest.onsuccess = () => {
-        const getAllRequest = store.getAll();
-        getAllRequest.onsuccess = () => {
-          const allScores = getAllRequest.result || [];
-          allScores.sort((a, b) => b.score - a.score); // Descending order (higher is better)
-          const scoresToDelete = allScores.slice(10);
-          scoresToDelete.forEach(entry => {
-            store.delete(entry.id);
-          });
-        };
-      };
-      transaction.oncomplete = () => {
-        resolve();
-      };
-    });
-  }
-
-  displayLeaderboard(container) {
-    if (!this.db) return Promise.reject('Invalid');
-    return new Promise((resolve, reject) => {
-      container.innerHTML = '';
-      const transaction = this.db.transaction('scores', 'readonly');
-      const store = transaction.objectStore('scores');
-      const index = store.index('scoreIndex');
-      // Use 'prev' direction to get highest scores first (descending order)
-      const request = index.openCursor(null, 'prev');
-      const entries = [];
-      request.onerror = event => {
-        reject(event.target.error);
-      };
-      request.onsuccess = event => {
-        const cursor = event.target.result;
-        if (cursor && entries.length < 10) {
-          entries.push(cursor.value);
-          cursor.continue();
-        } else {
-          // Sort entries in descending order (highest first) as a safety measure
-          entries.sort((a, b) => b.score - a.score);
-          while (entries.length < 10) {
-            entries.push({ name: `Player ${entries.length + 1}`, score: 0 });
-          }
-          entries.forEach((entry, index) => {
-            const listItem = document.createElement('div');
-            let className;
-            if (index === 0) className = 'first-class';
-            else if (index === 1) className = 'second-class';
-            else if (index === 2) className = 'third-class';
-            else className = 'score-container';
-            listItem.className = className;
-            listItem.innerHTML = `<span class='score-number'>${index + 1}.</span><span class='score-name'>${entry.name}</span><span class='score-score'>${entry.score}</span>`;
-            container.appendChild(listItem);
-          });
-          resolve();
-        }
-      };
-    });
-  }
-
-  clearAll() {
-    if (!this.db) return Promise.resolve();
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction('scores', 'readwrite');
-      const store = tx.objectStore('scores');
-      const req = store.clear();
-      req.onsuccess = () => { resolve(); };
-      req.onerror = e => { reject(e.target.error); };
-    });
-  }
-}
-
 class Telemetry {
   constructor(dbName) {
     this.db = null;
@@ -495,7 +390,9 @@ function showGameOverScreen(actualStartTime, menuHtml) {
   const elapsed = actualStartTime ? Math.floor((Date.now() - actualStartTime) / 1000) : 0;
   const currentScore = document.getElementById('current-score');
   if (currentScore) {
-    currentScore.innerHTML = `${Math.floor(elapsed / 60)}:${(elapsed % 60).toString().padStart(2, '0')}`;
+    const mins = Math.floor(Math.max(0, elapsed) / 60);
+    const secs = Math.floor(Math.max(0, elapsed) % 60);
+    currentScore.innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 
   const menuIcon = document.getElementById('menu-icon');

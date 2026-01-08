@@ -117,7 +117,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       if (!aiResult) {
         aiResult = mockData.aiResult;
       }
-      if (!gameStats.score) {
+      if (!gameStats || Object.keys(gameStats).length === 0) {
         gameStats = { ...mockData.gameStats, ...gameStats };
       }
     }
@@ -129,28 +129,25 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       
       // Session Results Section
       html += '<div class="analytics-section session-results" data-section="results">';
-      html += '<div class="analytics-title">🏆 Session Results</div>';
+      html += '<div class="analytics-title">🏆 Results</div>';
       html += '<div class="analytics-grid">';
       html += `<div class="analytics-item"><span class="label">Level:</span><span class="value">${level}</span></div>`;
-      if (gameStats.score !== undefined) {
-        html += `<div class="analytics-item score-item"><span class="label">Final Score:</span><span class="value score-value">${gameStats.score}</span></div>`;
-      }
       if (gameStats.streak !== undefined) {
-        html += `<div class="analytics-item streak-item"><span class="label">Best Streak:</span><span class="value streak-value">${gameStats.streak}</span></div>`;
+        html += `<div class="analytics-item streak-item"><span class="label">Streak:</span><span class="value streak-value">${gameStats.streak}</span></div>`;
       }
       if (gameStats.remainingTime !== undefined) {
-        html += `<div class="analytics-item"><span class="label">Time Elapsed:</span><span class="value">${formatTime(metrics ? metrics.completionTime : (300 - gameStats.remainingTime))}</span></div>`;
+        html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${formatTime(metrics ? metrics.completionTime : (300 - gameStats.remainingTime))}</span></div>`;
       }
       html += '</div></div>';
       
       // Performance Overview Section (with limited data)
       html += '<div class="analytics-section" data-section="performance">';
-      html += '<div class="analytics-title">📊 Performance Overview</div>';
+      html += '<div class="analytics-title">📊 Performance</div>';
       html += '<div class="analytics-grid">';
       if (gameStats.remainingTime !== undefined) {
-        html += `<div class="analytics-item"><span class="label">Time Elapsed:</span><span class="value">${formatTime(metrics ? metrics.completionTime : (300 - gameStats.remainingTime))}</span></div>`;
+        html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${formatTime(metrics ? metrics.completionTime : (300 - gameStats.remainingTime))}</span></div>`;
       }
-      html += '<div class="analytics-item"><span class="label">Status:</span><span class="value">Limited data available</span></div>';
+      html += `<div class="analytics-item"><span class="label">Status:</span><span class="value">Limited data</span></div>`;
       html += '</div></div>';
       
       // Note about data availability
@@ -260,12 +257,9 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       ? calculateCadenceVariance(validFlipIntervals)
       : 0;
 
-    // Get color and shape accuracy
+    // Get color accuracy
     const colorAccuracy = metrics.colorStats && Object.keys(metrics.colorStats).length > 0
       ? calculateAverageAccuracy(metrics.colorStats)
-      : null;
-    const shapeAccuracy = metrics.shapeStats && Object.keys(metrics.shapeStats).length > 0
-      ? calculateAverageAccuracy(metrics.shapeStats)
       : null;
 
     // Get consecutive errors
@@ -288,13 +282,13 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     const createTitle = (text) => `<div class="analytics-title">${text}</div>`;
 
     html += '<div class="analytics-section session-results" data-section="results">';
-    html += createTitle('🏆 Session Results');
+    html += createTitle('🏆 Results');
     html += '<div class="analytics-grid">';
 
     // Flow Index as primary metric (if available)
     if (flowIndex !== null) {
       const flowInfo = getFlowInterpretation(flowIndex);
-      html += `<div class="analytics-item flow-index"><span class="label">Flow Index:</span><span class="value score-value" style="color: ${flowInfo.color}">${flowIndex.toFixed(3)}</span></div>`;
+      // html += `<div class="analytics-item flow-index"><span class="label">Flow Index:</span><span class="value score-value" style="color: ${flowInfo.color}">${flowIndex.toFixed(4)}</span></div>`;
 
       const markerPosition = Math.min(Math.max(flowIndex * 100, 0), 100);
       html += `
@@ -307,44 +301,46 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
         <div class="flow-meter-bar">
           <div class="flow-meter-marker" style="left: ${markerPosition}%"></div>
         </div>
-        <div class="flow-meter-value" style="color: ${flowInfo.color}">${flowInfo.label}</div>
+        <div class="flow-meter-value" style="color: ${flowInfo.color}">
+          ${flowInfo.label} <span style="margin-left: 8px; font-size: 0.9em; opacity: 0.9;">${flowIndex.toFixed(4)}</span>
+        </div>
       </div>
       `;
 
     } else {
       // Fallback if Flow Index not available
-      html += `<div class="analytics-item score-item"><span class="label">Final Score:</span><span class="value score-value">${gameStats.score !== undefined ? gameStats.score : 'N/A'}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Flow Index:</span><span class="value">N/A</span></div>`;
     }
 
     if (gameStats.streak !== undefined) {
-      html += `<div class="analytics-item streak-item"><span class="label">Best Streak:</span><span class="value streak-value">${gameStats.streak}</span></div>`;
+      html += `<div class="analytics-item streak-item"><span class="label">Streak:</span><span class="value streak-value">${gameStats.streak}</span></div>`;
     }
     html += `<div class="analytics-item"><span class="label">Level:</span><span class="value">${level}</span></div>`;
     // Use actual completion time for display
     const displayTime = formatTime(metrics.completionTime);
-    html += `<div class="analytics-item"><span class="label">Time Elapsed:</span><span class="value">${displayTime}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${displayTime}</span></div>`;
     html += '</div></div>';
 
     html += '<div class="analytics-section" data-section="performance">';
-    html += createTitle('📊 Performance Overview');
+    html += createTitle('📊 Stats');
     html += '<div class="analytics-grid">';
-    html += `<div class="analytics-item"><span class="label">Time Elapsed:</span><span class="value">${displayTime}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Total Clicks:</span><span class="value">${totalClicks}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Total Pairs:</span><span class="value">${metrics.totalPairs}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Successful Matches:</span><span class="value">${successfulMatches}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Failed Matches:</span><span class="value">${validatedFailedMatches}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Accuracy:</span><span class="value">${formatPercent(accuracy)}</span></div>`;
-    html += '</div></div>';
+    html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${displayTime}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Clicks:</span><span class="value">${totalClicks}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Total Pairs:</span><span class="value">${metrics.totalPairs}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Matches:</span><span class="value">${successfulMatches}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Failed:</span><span class="value">${validatedFailedMatches}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Accuracy:</span><span class="value">${formatPercent(accuracy)}</span></div>`;
+      html += '</div></div>';
 
-    html += '<div class="analytics-section" data-section="errors">';
-    html += createTitle('❌ Error Analysis');
-    html += '<div class="analytics-grid">';
-    html += `<div class="analytics-item"><span class="label">Current Consecutive Errors:</span><span class="value">${consecutiveErrors}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Max Consecutive Errors:</span><span class="value">${maxConsecutiveErrors}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Total Failed Matches:</span><span class="value">${validatedFailedMatches}</span></div>`;
-    const errorRate = validatedTotalMatches > 0 ? validatedFailedMatches / validatedTotalMatches : 0;
-    html += `<div class="analytics-item"><span class="label">Error Rate:</span><span class="value">${formatPercent(errorRate)}</span></div>`;
-    html += '</div></div>';
+      html += '<div class="analytics-section" data-section="errors">';
+      html += createTitle('❌ Errors');
+      html += '<div class="analytics-grid">';
+      html += `<div class="analytics-item"><span class="label">Errors:</span><span class="value">${consecutiveErrors}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Max Errors:</span><span class="value">${maxConsecutiveErrors}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Failed:</span><span class="value">${validatedFailedMatches}</span></div>`;
+      const errorRate = validatedTotalMatches > 0 ? validatedFailedMatches / validatedTotalMatches : 0;
+      html += `<div class="analytics-item"><span class="label">Error Rate:</span><span class="value">${formatPercent(errorRate)}</span></div>`;
+      html += '</div></div>';
 
     if (rawSuccessfulMatches > maxPossibleMatches * 1.5 || metrics.totalMatches > maxPossibleMatches * 5) {
       if (typeof aiWarn === 'function') aiWarn('Data validation: Detected unrealistic match counts', {
@@ -359,54 +355,75 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       html += '<div class="analytics-section" data-section="color">';
       html += createTitle('🎨 Color Confusion Analysis');
       html += '<div class="analytics-grid">';
+      const buckets = {
+        blue: { attempts: 0, successes: 0, occurrences: 0 },
+        red: { attempts: 0, successes: 0, occurrences: 0 },
+        green: { attempts: 0, successes: 0, occurrences: 0 },
+        yellow: { attempts: 0, successes: 0, occurrences: 0 },
+        black: { attempts: 0, successes: 0, occurrences: 0 }
+      };
+
+      const toBase = {
+        blue: 'blue',
+        red: 'red',
+        green: 'green',
+        yellow: 'yellow',
+        black: 'black',
+
+        'blue-dark': 'blue',
+        'blue-light': 'blue',
+        'blue-medium': 'blue',
+        'purple-dark': 'blue',
+        'green-olive-dark': 'green',
+        'green-dark': 'green',
+        'green-light': 'green',
+        'yellow-bright': 'yellow',
+        'orange-brown-dark': 'yellow',
+        'gray-dark': 'black',
+        'grey-dark': 'black',
+        unknown: 'black'
+      };
+
       Object.keys(metrics.colorStats).forEach(color => {
-        const stat = metrics.colorStats[color];
-        const occurrences = stat.occurrences || 0;
-        const accuracy = stat.accuracy !== undefined ? stat.accuracy : (stat.attempts > 0 ? stat.successes / stat.attempts : 0);
-        html += `<div class="analytics-item"><span class="label">${color}:</span><span class="value">Occurrences: ${occurrences}, Accuracy: ${formatPercent(accuracy)}</span></div>`;
+        const stat = metrics.colorStats[color] || {};
+        const raw = (color || '').toString().trim().toLowerCase();
+        const base = toBase[raw] || 'black';
+        buckets[base].occurrences += stat.occurrences || 0;
+        buckets[base].attempts += stat.attempts || 0;
+        buckets[base].successes += stat.successes || 0;
       });
+
+      const render = (label, stat) => {
+        const accuracy = stat.attempts > 0 ? stat.successes / stat.attempts : 0;
+        html += `<div class="analytics-item"><span class="label">${label}:</span><span class="value">Occurrences: ${stat.occurrences || 0}, Accuracy: ${formatPercent(accuracy)}</span></div>`;
+      };
+
+      render('Blue', buckets.blue);
+      render('Red', buckets.red);
+      render('Green', buckets.green);
+      render('Yellow', buckets.yellow);
+      render('Black', buckets.black);
       html += '</div></div>';
     }
 
     html += '<div class="analytics-section" data-section="behavior">';
-    html += createTitle('🔍 Behavioral Patterns');
+    html += createTitle('🔍 Behavior');
     html += '<div class="analytics-grid">';
-    html += `<div class="analytics-item"><span class="label">Avg Flip Interval:</span><span class="value">${avgFlipInterval.toFixed(0)}ms</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Cadence Stability:</span><span class="value">${cadenceVariance < 0.15 ? 'Stable' : 'Variable'}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Speed:</span><span class="value">${avgFlipInterval.toFixed(0)}ms</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Stable:</span><span class="value">${cadenceVariance < 0.15 ? 'Yes' : 'No'}</span></div>`;
     if (colorAccuracy !== null) {
-      html += `<div class="analytics-item"><span class="label">Overall Color Accuracy:</span><span class="value">${formatPercent(colorAccuracy)}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Color:</span><span class="value">${formatPercent(colorAccuracy)}</span></div>`;
     }
-    if (shapeAccuracy !== null) {
-      html += `<div class="analytics-item"><span class="label">Shape Accuracy:</span><span class="value">${formatPercent(shapeAccuracy)}</span></div>`;
-    }
-    html += `<div class="analytics-item"><span class="label">Hint Usage:</span><span class="value">${cheatCount} time${cheatCount !== 1 ? 's' : ''}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Hints:</span><span class="value">${cheatCount}</span></div>`;
     html += '</div></div>';
 
     if (aiResult && aiResult.nextConfig) {
       const config = aiResult.nextConfig;
-      // Expanded by default for better visibility of AI decisions
       html += '<div class="analytics-section" data-section="adaptive">';
-      html += createTitle('🤖 Adaptive Suggestions');
-      html += '<div class="analytics-grid">';
-      if (config.gridCols && config.gridRows) {
-        html += `<div class="analytics-item"><span class="label">Next Grid:</span><span class="value">${config.gridCols}×${config.gridRows}</span></div>`;
-      }
-      if (config.totalPairs) {
-        html += `<div class="analytics-item"><span class="label">Next Pairs:</span><span class="value">${config.totalPairs}</span></div>`;
-      }
-      if (config.initialTime) {
-        html += `<div class="analytics-item"><span class="label">Next Time:</span><span class="value">${formatTime(config.initialTime)}</span></div>`;
-      }
-      if (config.hideDelay) {
-        html += `<div class="analytics-item"><span class="label">Hide Delay:</span><span class="value">${config.hideDelay}ms</span></div>`;
-      }
-      if (config.adjacentRate !== undefined && !isNaN(config.adjacentRate)) {
-        html += `<div class="analytics-item"><span class="label">Adjacent Rate:</span><span class="value">${formatPercent(config.adjacentRate)}</span></div>`;
-      }
-      html += '</div>';
+      html += createTitle('🤖 Suggestions');
 
-      const currentGridCols = config.gridCols || config.cols || gameConfig.gridCols || gameConfig.cols || defaultConfig.cols;
-      const currentGridRows = config.gridRows || config.rows || gameConfig.gridRows || gameConfig.rows || defaultConfig.rows;
+      const currentGridCols = gameConfig.gridCols || gameConfig.cols || defaultConfig.cols;
+      const currentGridRows = gameConfig.gridRows || gameConfig.rows || defaultConfig.rows;
       const nextGridCols = config.gridCols || config.cols || currentGridCols;
       const nextGridRows = config.gridRows || config.rows || currentGridRows;
       const fromPairs = metrics.totalPairs || defaultConfig.totalPairs;
@@ -418,93 +435,76 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       const fromAdjacent = typeof gameConfig.adjacentRate === 'number' ? gameConfig.adjacentRate : defaultConfig.adjacentRate;
       const toAdjacent = typeof config.adjacentRate === 'number' ? config.adjacentRate : fromAdjacent;
 
-      const changes = [];
-      if (fromPairs !== toPairs) {
-        changes.push({ label: 'Pairs', from: String(fromPairs), to: String(toPairs) });
-      }
-      if (fromTime !== toTime) {
-        changes.push({ label: 'Time', from: formatTime(fromTime), to: formatTime(toTime) });
-      }
-      if (fromHideDelay !== toHideDelay) {
-        changes.push({ label: 'Hide Delay', from: `${fromHideDelay}ms`, to: `${toHideDelay}ms` });
-      }
-      if (fromAdjacent !== undefined && toAdjacent !== undefined && !isNaN(fromAdjacent) && !isNaN(toAdjacent) && fromAdjacent !== toAdjacent) {
-        changes.push({ label: 'Adjacent Rate', from: formatPercent(fromAdjacent), to: formatPercent(toAdjacent) });
-      }
-      if (currentGridCols && currentGridRows && (nextGridCols !== currentGridCols || nextGridRows !== currentGridRows)) {
-        changes.push({ label: 'Grid', from: `${currentGridCols}×${currentGridRows}`, to: `${nextGridCols}×${nextGridRows}` });
-      }
+      const formatChange = (from, to) => (from === to ? `${to}` : `${from} → ${to}`);
 
-      if (changes.length > 0) {
-        html += '<div class="adaptive-diff">';
-        changes.forEach(change => {
-          html += `<div class="adaptive-diff-row"><span class="adaptive-diff-label">${change.label}:</span><span class="adaptive-diff-values">${change.from}<span class="adaptive-arrow">→</span>${change.to}</span></div>`;
-        });
-        html += '</div>';
+      html += '<div class="analytics-grid">';
+      html += `<div class="analytics-item"><span class="label">Grid:</span><span class="value">${formatChange(`${currentGridCols}×${currentGridRows}`, `${nextGridCols}×${nextGridRows}`)}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Pairs:</span><span class="value">${formatChange(String(fromPairs), String(toPairs))}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${formatChange(formatTime(fromTime), formatTime(toTime))}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Delay:</span><span class="value">${formatChange(`${fromHideDelay}ms`, `${toHideDelay}ms`)}</span></div>`;
+      if (toAdjacent !== undefined && !isNaN(toAdjacent)) {
+        html += `<div class="analytics-item"><span class="label">Adj:</span><span class="value">${formatChange(formatPercent(fromAdjacent), formatPercent(toAdjacent))}</span></div>`;
       }
+      html += '</div>';
 
       html += '</div>';
     }
 
     html += '<div class="analytics-section" data-section="config">';
-    html += createTitle('🎮 Game Configuration');
+    html += createTitle('🎮 Config');
     html += '<div class="analytics-grid">';
 
     // Matching Type
-    const matchingType = level === 3 ? 'Image-Text Matching' : 'Image-Image Matching';
-    html += `<div class="analytics-item"><span class="label">Matching Type:</span><span class="value">${matchingType}</span></div>`;
+    const matchingType = level === 3 ? 'Img-Txt' : 'Img-Img';
+    html += `<div class="analytics-item"><span class="label">Type:</span><span class="value">${matchingType}</span></div>`;
 
     // Grid Size
     const gridCols = config.cols || config.gridCols || (level === 3 ? 4 : 5);
     const gridRows = config.rows || config.gridRows || (level === 3 ? 6 : 4);
-    html += `<div class="analytics-item"><span class="label">Grid Size:</span><span class="value">${gridCols}×${gridRows}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Grid:</span><span class="value">${gridCols}×${gridRows}</span></div>`;
 
     // Total Pairs
-    html += `<div class="analytics-item"><span class="label">Total Pairs:</span><span class="value">${metrics.totalPairs || config.totalPairs || 10}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Pairs:</span><span class="value">${metrics.totalPairs || config.totalPairs || 10}</span></div>`;
 
     // Layout Type
-    const layoutType = level === 1 ? 'Fixed Template' : (level === 2 ? 'Adjacency-Driven' : 'Adaptive Random');
-    html += `<div class="analytics-item"><span class="label">Layout Type:</span><span class="value">${layoutType}</span></div>`;
+    const layoutType = level === 1 ? 'Fixed' : (level === 2 ? 'Adjacent' : 'Adaptive');
+    html += `<div class="analytics-item"><span class="label">Layout:</span><span class="value">${layoutType}</span></div>`;
 
     // Initial Time
     const initialTime = config.initialTime || 300;
-    html += `<div class="analytics-item"><span class="label">Initial Time:</span><span class="value">${formatTime(initialTime)}</span></div>`;
-
-    // Timer Mode
-    const timerMode = config.timerMode || 'Countdown';
-    html += `<div class="analytics-item"><span class="label">Timer Mode:</span><span class="value">${timerMode}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${formatTime(initialTime)}</span></div>`;
 
     // Hide Delay
     const hideDelay = config.hideDelay || 400;
-    html += `<div class="analytics-item"><span class="label">Hide Delay:</span><span class="value">${hideDelay}ms</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Delay:</span><span class="value">${hideDelay}ms</span></div>`;
 
     // Show Cards Scale
     const showScale = config.showScale || 1.4;
-    html += `<div class="analytics-item"><span class="label">Show Cards Scale:</span><span class="value">${showScale}x</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Scale:</span><span class="value">${showScale}x</span></div>`;
 
     // Match Reward (if available)
     if (config.matchRewardSeconds) {
-      html += `<div class="analytics-item"><span class="label">Match Reward:</span><span class="value">+${config.matchRewardSeconds}s per match</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Reward:</span><span class="value">+${config.matchRewardSeconds}s</span></div>`;
     }
 
     // Streak Bonus (if available)
     if (config.streakBonusPerMatch) {
-      html += `<div class="analytics-item"><span class="label">Streak Bonus:</span><span class="value">+${config.streakBonusPerMatch} per pair</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Bonus:</span><span class="value">+${config.streakBonusPerMatch}</span></div>`;
     }
 
     // Adjacent Rate (Level 2 only)
     if (level === 2) {
       if (config.adjacentRate !== undefined && !isNaN(config.adjacentRate) && config.adjacentRate !== null) {
-        html += `<div class="analytics-item"><span class="label">Adjacent Rate:</span><span class="value">${formatPercent(config.adjacentRate)}</span></div>`;
+        html += `<div class="analytics-item"><span class="label">Adj Rate:</span><span class="value">${formatPercent(config.adjacentRate)}</span></div>`;
       }
       if (config.adjacentTarget !== undefined && config.adjacentActual !== undefined) {
-        html += `<div class="analytics-item"><span class="label">Adjacent Pairs:</span><span class="value">${config.adjacentActual} / ${config.adjacentTarget}</span></div>`;
+        html += `<div class="analytics-item"><span class="label">Adj Pairs:</span><span class="value">${config.adjacentActual} / ${config.adjacentTarget}</span></div>`;
       }
     }
 
     // Color Groups (if available in config)
     if (config.colorGroups) {
-      html += `<div class="analytics-item"><span class="label">Color Groups:</span><span class="value">${Array.isArray(config.colorGroups) ? config.colorGroups.join(', ') : config.colorGroups}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Colors:</span><span class="value">${Array.isArray(config.colorGroups) ? config.colorGroups.join(', ') : config.colorGroups}</span></div>`;
     }
 
     html += '</div></div>';

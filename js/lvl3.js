@@ -1,5 +1,6 @@
 // Level 3: 5 minutes (300 seconds)
 const INITIAL_TIME = 300;
+const INITIAL_PREVIEW_SECONDS = 5;
 let time = INITIAL_TIME;
 let actualStartTime = null;
 let gameStart = 0;
@@ -26,13 +27,20 @@ const GRID_COLS = 5;
 const GRID_ROWS = 4;
 let GRID_COLS_RUNTIME = GRID_COLS;
 let GRID_ROWS_RUNTIME = GRID_ROWS;
-const HIDE_DELAY_RUNTIME = 600;
-const SHOW_CARDS_SCALE_RUNTIME = 1.0;
+const HIDE_DELAY_MS = 1000;
+let HIDE_DELAY_RUNTIME = HIDE_DELAY_MS;
+const SHOW_CARDS_SCALE = 1.0;
+let SHOW_CARDS_SCALE_RUNTIME = SHOW_CARDS_SCALE;
+const MATCH_VANISH_MS = 200;
+const FLIPWAVE_START_DELAY_MS = 200;
+
+function scheduleFrame(fn) {
+  if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(fn);
+  return setTimeout(fn, 0);
+}
 
 //
 
-let score = 0;
-let leaderboard;
 let telemetry;
 let aiEngine;
 
@@ -68,10 +76,6 @@ const timerInterval = setInterval(() => {
         if (gameStop === 0) {
             if (time > 0) {
                 time--;
-                // Score = time remaining + streak bonus (higher is better)
-                // score = time + (streak * 10);
-                // const elapsed = Math.floor((Date.now() - actualStartTime) / 1000);
-                // document.getElementById('current-score').innerHTML = `${Math.floor(elapsed / 60)}:${(elapsed % 60).toString().padStart(2, '0')}`;
                 updateTimer();
             } else {
                 // Time's up - game over
@@ -183,16 +187,22 @@ function handleCardClick(event) {
             cardReader(card);
             telemetry.log('flip', { level: 3, type: card.dataset.type, match: card.dataset.match });
 
-            // Show the image or text depending on the card type
-            if (card.dataset.type === "image") {
-                if (imageElement) {
-                    imageElement.style.visibility = "visible"; // Show the image
+            scheduleFrame(() => {
+                // Clear background on flip
+                card.style.backgroundImage = 'none';
+                card.style.backgroundColor = '';
+
+                // Show the image or text depending on the card type
+                if (card.dataset.type === "image") {
+                    if (imageElement) {
+                        imageElement.style.visibility = "visible"; // Show the image
+                    }
+                } else if (card.dataset.type === "text") {
+                    if (textElement) {
+                        textElement.style.visibility = "visible"; // Show the text
+                    }
                 }
-            } else if (card.dataset.type === "text") {
-                if (textElement) {
-                    textElement.style.visibility = "visible"; // Show the text
-                }
-            }
+            });
 
             flippedCards.push(card);
 
@@ -219,6 +229,12 @@ function handleCardClick(event) {
                 if (match1 === match2) {
                     card1.classList.add("matched");
                     card2.classList.add("matched");
+
+                    // Clear inline background to let CSS .matched class take over
+                    card1.style.background = '';
+                    card2.style.background = '';
+                    card1.style.backgroundColor = '';
+                    card2.style.backgroundColor = '';
                     
                     card1.classList.add('card-matched-highlight');
                     card2.classList.add('card-matched-highlight');
@@ -228,9 +244,6 @@ function handleCardClick(event) {
                     // Add 5 seconds when a pair is matched
                     time += 5;
                     if (time > 300) time = 300;
-                    // Cumulative Scoring removed - using Flow Index
-                    // score += 50 + (streak * 30);
-                    // document.getElementById('current-score').innerText = score;
                     consecutiveErrors = 0; // Reset on success
                     telemetry.log('match', { 
                       level: 3,
@@ -243,8 +256,6 @@ function handleCardClick(event) {
                     });
 
                     if (matchedPairs === totalPairs) {
-                        score += time; // Time Bonus
-                        document.getElementById('current-score').innerText = score;
                         setTimeout(() => {
                             document.getElementById("game-board").style.display = "none";
                             gameStop = 1;
@@ -252,44 +263,70 @@ function handleCardClick(event) {
                         }, 400);
                     }
                     playComboSound(streak);
+
+                    setTimeout(() => {
+                      card1.classList.add('matched-disappear');
+                      card2.classList.add('matched-disappear');
+                    }, 0);
+
+                    setTimeout(() => {
+                      flippedCards = [];
+                      lockBoard = false;
+                    }, MATCH_VANISH_MS);
+
+                    return;
+                }
+
+                const isMismatch = match1 !== match2;
+                const currentFlipped = [...flippedCards];
+
+                const closeFlipped = () => {
+                  if (isMismatch) {
+                    currentFlipped.forEach(card => {
+                      const imageElement = card.querySelector("img");
+                      const textElement = card.querySelector("span");
+
+                      if (imageElement) imageElement.style.visibility = "hidden";
+                      if (textElement) textElement.style.visibility = "hidden";
+
+                      card.style.background = "url('images/small-pattern.png')";
+                      card.style.backgroundSize = '370px';
+                      card.style.backgroundColor = '';
+
+                      const matchKey = card.dataset.match.replace('.png', '').replace(/\s+/g, '');
+                      card.classList.remove('card-lvl2-' + matchKey);
+                    });
+                  }
+
+                  flippedCards = [];
+                  lockBoard = false;
+                };
+
+                if (isMismatch) {
+                  streak = 0;
+
+                  consecutiveErrors++;
+                  maxConsecutiveErrors = Math.max(maxConsecutiveErrors, consecutiveErrors);
+                  telemetry.log('match', { 
+                    level: 3,
+                    result: 'fail', 
+                    pair: [match1, match2],
+                    consecutiveErrors: consecutiveErrors,
+                    maxConsecutiveErrors: maxConsecutiveErrors
+                  });
+
+                  failedAttempts++;
+                  if (failedAttempts >= 2) {
+                    failedAttempts = 0;
+                    setTimeout(() => {
+                      triggerRippleEffect(closeFlipped);
+                    }, FLIPWAVE_START_DELAY_MS);
+                    return;
+                  }
                 }
 
                 setTimeout(() => {
-                    flippedCards.forEach(card => {
-                        const imageElement = card.querySelector("img");
-                        const textElement = card.querySelector("span");
-
-                        if (imageElement) imageElement.style.visibility = "hidden"; // Hide the image
-                        if (textElement) textElement.style.visibility = "hidden";  // Hide the text
-
-                        if (match1 != match2)
-                        {
-                            streak = 0; // Reset streak on failed match
-                             card1.style.backgroundImage = "url('images/small-pattern.png')";
-                            card2.style.backgroundImage = "url('images/small-pattern.png')";
-                            consecutiveErrors++;
-                            maxConsecutiveErrors = Math.max(maxConsecutiveErrors, consecutiveErrors);
-                            telemetry.log('match', { 
-                              level: 3,
-                              result: 'fail', 
-                              pair: [match1, match2],
-                              consecutiveErrors: consecutiveErrors,
-                              maxConsecutiveErrors: maxConsecutiveErrors
-                            });
-                            
-                            // Remove color class
-                            let matchKey = card.dataset.match.replace('.png', '').replace(/\s+/g, '');
-                            card.classList.remove('card-lvl2-' + matchKey);
-                            
-                            failedAttempts++;
-                            if (failedAttempts >= 2) {
-                              triggerRippleEffect();
-                              failedAttempts = 0;
-                            }
-                        }
-                    });
-                    flippedCards = [];
-                    lockBoard = false;
+                  closeFlipped();
                 }, HIDE_DELAY_RUNTIME);
             }
         }
@@ -351,7 +388,6 @@ async function exportTelemetry() {
 async function resetData() {
   try {
     await telemetry.clearAll();
-    await leaderboard.clearAll();
   } catch (e) {}
 }
 
@@ -379,6 +415,8 @@ function startInitialPreview() {
   
   isPreviewing = true;
   const allCards = document.querySelectorAll('.card');
+  const timerElement = document.getElementById('game-timer');
+  let remaining = INITIAL_PREVIEW_SECONDS;
   
   // Show all cards
   allCards.forEach(card => {
@@ -387,28 +425,42 @@ function startInitialPreview() {
     if (img) img.style.visibility = 'visible';
     if (span) span.style.visibility = 'visible';
     card.classList.add('card-peek');
+    card.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+    card.style.zIndex = '1000';
   });
 
-  // Wait 3 seconds
-  setTimeout(() => {
-    // Hide all cards
-    allCards.forEach(card => {
-      if (!card.classList.contains('matched')) {
-        const img = card.querySelector('img');
-        const span = card.querySelector('span');
-        if (img) img.style.visibility = 'hidden';
-        if (span) span.style.visibility = 'hidden';
-        card.classList.remove('card-peek');
-      }
-    });
-    
-    isPreviewing = false;
-    gameStart = 1;
-    if (!actualStartTime) {
-      actualStartTime = Date.now();
+  if (timerElement) {
+    timerElement.innerText = `0:${remaining.toString().padStart(2, '0')}`;
+  }
+  
+  const previewInterval = setInterval(() => {
+    remaining--;
+    if (timerElement) {
+      timerElement.innerText = `0:${Math.max(remaining, 0).toString().padStart(2, '0')}`;
     }
-    telemetry.log('start', { level: 3, variant: { pairsType: 'image-text', layout: 'adaptive_random', cols: GRID_COLS_RUNTIME, rows: GRID_ROWS_RUNTIME, totalPairs, hideDelay: HIDE_DELAY_RUNTIME, showScale: SHOW_CARDS_SCALE_RUNTIME, timerMode: 'countdown', initialTime: time, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
-  }, 3000);
+    if (remaining <= 0) {
+      clearInterval(previewInterval);
+      allCards.forEach(card => {
+        if (!card.classList.contains('matched')) {
+          const img = card.querySelector('img');
+          const span = card.querySelector('span');
+          if (img) img.style.visibility = 'hidden';
+          if (span) span.style.visibility = 'hidden';
+          card.classList.remove('card-peek');
+          card.style.transform = '';
+          card.style.zIndex = '';
+        }
+      });
+      
+      isPreviewing = false;
+      gameStart = 1;
+      if (!actualStartTime) {
+        actualStartTime = Date.now();
+      }
+      updateTimer();
+      telemetry.log('start', { level: 3, variant: { pairsType: 'image-text', layout: 'adaptive_random', cols: GRID_COLS_RUNTIME, rows: GRID_ROWS_RUNTIME, totalPairs, hideDelay: HIDE_DELAY_RUNTIME, showScale: SHOW_CARDS_SCALE_RUNTIME, timerMode: 'countdown', initialTime: time, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
+    }
+  }, 1000);
 }
 
 let isShowingCards = false;
@@ -436,6 +488,8 @@ function showAllCards() {
       if (img) img.style.visibility = 'visible';
       if (span) span.style.visibility = 'visible';
       card.classList.add('card-peek');
+      card.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+      card.style.zIndex = '1000';
     }
   });
 
@@ -465,20 +519,15 @@ function hideAllCards() {
 			if (img) img.style.visibility = 'hidden';
 			if (span) span.style.visibility = 'hidden';
 			card.classList.remove('card-peek');
+      card.style.transform = '';
+      card.style.zIndex = '';
 		}
 	});
 	telemetry.log('show_cards', { level: 3, state: 'hide' });
-  isShowingCards = false;
+	isShowingCards = false;
 }
 
-// * * * * * Leaderboard Code * * * * * 
-
-// Initialize IndexedDB
- 
-
 async function endGame() {
-  // score = time + (streak * 10);
-  
   // Calculate Flow Index directly
   let aiResult = null;
   try {
@@ -492,50 +541,30 @@ async function endGame() {
     console.error("AI Error:", e);
   }
 
-  // Set score based on Flow Index (0-1 -> 0-1000)
-  if (aiResult && typeof aiResult.flowIndex === 'number') {
-    score = Math.round(aiResult.flowIndex * 1000);
-  } else {
-    score = 0;
-  }
-  
-  // Update Score UI for Game Over screen
-  const currentScoreEl = document.getElementById('current-score');
-  if (currentScoreEl) currentScoreEl.innerText = score;
-
   showGameOverScreen(actualStartTime, "<a href='play.html' class='menu-txt'>Menu</a><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>");
-  await telemetry.log('end', { level: 3, score, flowIndex: aiResult?.flowIndex, pairs: matchedPairs, streak: streak });
+  
+  await telemetry.log('end', { level: 3, flowIndex: aiResult?.flowIndex, pairs: matchedPairs, streak: streak });
 
   const analyticsContainer = document.querySelector('#game-over .game-over-right') || document.getElementById('analytics-summary');
+  let gameId = null;
   if (typeof displayAnalyticsSummary === 'function' && analyticsContainer) {
-    await displayAnalyticsSummary(telemetry, 3, aiResult, { score, streak, remainingTime: time });
-    await saveSessionToHistoryFromTelemetry(telemetry, 3, aiResult, { score, streak, remainingTime: time });
+    await displayAnalyticsSummary(telemetry, 3, aiResult, { streak, remainingTime: time });
+    gameId = await saveSessionToHistoryFromTelemetry(telemetry, 3, aiResult, { streak, remainingTime: time });
+  }
+  if (gameId) {
+    const menuIcon = document.getElementById('menu-icon');
+    if (menuIcon) {
+      const link = document.createElement('a');
+      link.href = `analytics.html?gameId=${encodeURIComponent(gameId)}`;
+      link.className = 'menu-txt';
+      link.textContent = 'Analytics';
+      link.setAttribute('aria-label', 'View Analytics');
+      menuIcon.appendChild(link);
+    }
   }
 }
 
-async function submitScore() {
-    const name = document.getElementById('name').value;
-    if (!name) return;
-    try {
-        telemetry.log('submit', { level: 3, name, score });
-        await leaderboard.submitScore(name, score);
-        document.getElementById('submit-score').disabled = true;
-        await displayLeaderboard();
-        document.getElementById('game-board').style.display = "none";
-        document.getElementById('game-over').style.display = 'none';
-        document.getElementById('leaderboard-container').style.display = "block";
-    } catch (error) {}
-}
-
-async function displayLeaderboard() {
-    document.body.style.overflow = 'visible';
-    const leaderboardList = document.getElementById('leaderboard-list');
-    try {
-        await leaderboard.displayLeaderboard(leaderboardList);
-    } catch (error) {}
-}
-
-function triggerRippleEffect() {
+function triggerRippleEffect(onComplete) {
   isRippleActive = true;
   telemetry.log('ripple_effect', { level: 3, timestamp: Date.now() });
 
@@ -589,13 +618,12 @@ function triggerRippleEffect() {
   setTimeout(() => {
     isRippleActive = false;
     lastInteractionTime = Date.now(); // Reset timer
+    if (typeof onComplete === 'function') onComplete();
   }, maxDelay);
 }
 
 window.onload = () => {
-  leaderboard = new Leaderboard('leaderboardDB_lvl3');
   telemetry = new Telemetry('telemetry_lvl3');
-  leaderboard.openDatabase();
   telemetry.openDatabase();
   if (typeof AIEngine !== 'undefined') { aiEngine = new AIEngine(); }
   
@@ -605,18 +633,31 @@ window.onload = () => {
   
   if (enabled) {
     try {
+      let lvl3Completed = 0;
+      try {
+        const raw = localStorage.getItem('ai_lvl3_completed_count');
+        lvl3Completed = raw ? parseInt(raw, 10) : 0;
+        if (!isFinite(lvl3Completed) || lvl3Completed < 0) lvl3Completed = 0;
+      } catch (e) {}
+
       const cfgStr = localStorage.getItem('ai_level3_config');
       if (cfgStr) {
         const cfg = JSON.parse(cfgStr);
         if (typeof cfg.initialTime === 'number') { time = cfg.initialTime; }
         if (typeof cfg.gridCols === 'number' && typeof cfg.gridRows === 'number') {
-          GRID_COLS_RUNTIME = cfg.gridCols;
-          GRID_ROWS_RUNTIME = cfg.gridRows;
+          const wantsLarge = cfg.gridCols === 4 && cfg.gridRows === 6;
+          const allowLarge = lvl3Completed >= 1;
+          if (!wantsLarge || allowLarge) {
+            GRID_COLS_RUNTIME = cfg.gridCols;
+            GRID_ROWS_RUNTIME = cfg.gridRows;
+          }
         }
+        if (typeof cfg.hideDelay === 'number') { HIDE_DELAY_RUNTIME = cfg.hideDelay; }
+        if (typeof cfg.showScale === 'number') { SHOW_CARDS_SCALE_RUNTIME = cfg.showScale; }
       }
     } catch (e) {}
   }
   
   initializeGame();
-  updateTimer();
+  startInitialPreview();
 };

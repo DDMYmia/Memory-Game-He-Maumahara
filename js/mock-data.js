@@ -38,12 +38,11 @@ function generateMockMetrics(level = 1) {
     totalClicks: totalMatches * 2, // 2 clicks per match attempt
     flipIntervals: flipIntervals,
     colorStats: {
-      'blue-dark': { attempts: 3, successes: 2, occurrences: 6 },
+      'blue': { attempts: 3, successes: 2, occurrences: 6 },
       'red': { attempts: 2, successes: 2, occurrences: 4 },
-      'green': { attempts: 2, successes: 2, occurrences: 4 },
-      'yellow-bright': { attempts: 2, successes: 1, occurrences: 4 },
-      'orange-brown-dark': { attempts: 2, successes: 1, occurrences: 4 },
-      'green-dark': { attempts: 2, successes: 2, occurrences: 4 }
+      'green': { attempts: 4, successes: 4, occurrences: 8 },
+      'yellow': { attempts: 4, successes: 2, occurrences: 8 },
+      'black': { attempts: 0, successes: 0, occurrences: 0 }
     },
     shapeStats: {
       'Matariki': { attempts: 2, successes: 2 },
@@ -83,7 +82,6 @@ function generateMockAIResult(level = 1) {
  */
 function generateMockGameStats() {
   return {
-    score: 105, // 55 seconds + 5 streak * 10
     streak: 5,
     remainingTime: 55
   };
@@ -148,4 +146,3 @@ function getMockAnalyticsData(level = 1) {
     config: defaultConfig[level] || defaultConfig[1]
   };
 }
-
