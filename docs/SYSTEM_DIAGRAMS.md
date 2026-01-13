@@ -39,16 +39,16 @@ graph TD
     UI <-->|Events/Updates| Levels
     Levels -->|Raw Events| Core
     Core -->|Log Data| Helper
-    
+  
     Helper -->|Write| TelDB
     Helper -->|Extract Metrics| Engine
-    
+  
     Engine -->|Compute Flow| Fuzzy
     Engine -->|Select Strategy| Bandit
-    
+  
     Bandit -->|Read/Update Model| Config
     Engine -->|Save Session| HistDB
-    
+  
     Engine -->|Next Config| Levels
     Analytics -->|Read| TelDB
     Analytics -->|Read| HistDB
@@ -74,11 +74,11 @@ flowchart TD
     subgraph "Phase 1: Performance Analysis (Fuzzy Logic)"
         Input --> Norm[Normalization]
         Norm --> Fuzz[Fuzzification]
-        
+      
         Fuzz --> Rules{Fuzzy Rules}
         note["16 Rules e.g.\nIf Errors High & Time Slow\nTHEN Flow is Low"]
         Rules -.-> note
-        
+      
         Rules --> Agg[Aggregation]
         Agg --> Defuzz[Defuzzification]
         Defuzz --> Flow["**Flow Index**\n(0.0 - 1.0)"]
@@ -86,15 +86,15 @@ flowchart TD
 
     subgraph "Phase 2: Difficulty Selection (Contextual Bandit)"
         Flow --> Reward[Reward Calculation]
-        
+      
         Context["Player Context\n(Skill, Fatigue, History)"]
-        
+      
         Reward --> Update[Update LinUCB Model]
         Context --> Predict[Predict Best Arm]
         Update --> Predict
-        
+      
         Predict --> Arms{Select Arm}
-        
+      
         Arms -->|Arm 0| Easy["**Easy Config**\nSmall Grid, Max Hints\nSlow Timer"]
         Arms -->|Arm 1| Std["**Standard Config**\nAdaptive Grid\nNormal Timer"]
         Arms -->|Arm 2| Hard["**Challenge Config**\nLarge Grid, Min Hints\nFast Timer"]
@@ -145,7 +145,7 @@ Represents the valid states and transitions within a game session.
 ```mermaid
 stateDiagram-v2
     [*] --> Init
-    
+  
     state Init {
         [*] --> LoadingAssets
         LoadingAssets --> ReadingAIConfig
@@ -153,33 +153,33 @@ stateDiagram-v2
     }
 
     Init --> Preview : Start Game
-    
+  
     state Preview {
         [*] --> ShowAllCards
         ShowAllCards --> HideAllCards : Timer Expired
     }
-    
+  
     Preview --> Playing : Cards Hidden
-    
+  
     state Playing {
         [*] --> Idle
         Idle --> CardFlipped : User Click
         CardFlipped --> CheckingMatch : 2nd Card Flipped
-        
+      
         CheckingMatch --> MatchFound : Images Match
         CheckingMatch --> Mismatch : Images Differ
-        
+      
         MatchFound --> Idle
         Mismatch --> PenaltyDelay
         PenaltyDelay --> Idle : Reset Cards
-        
+      
         Idle --> Paused : Menu Open
         Paused --> Idle : Resume
     }
-    
+  
     Playing --> GameOver : All Pairs Matched
     Playing --> GameOver : Time Expired
-    
+  
     state GameOver {
         [*] --> CalculateMetrics
         CalculateMetrics --> AIProcessing
@@ -221,21 +221,21 @@ sequenceDiagram
     User->>Lvl: Completes Level
     Lvl->>Core: telemetry.log('end')
     Lvl->>Helper: runAdaptiveGameEnd(telemetry)
-    
+  
     activate Helper
     Helper->>DB: Extract raw events
     Helper->>Engine: processGameEnd(metrics)
-    
+  
     activate Engine
     Engine->>Engine: Compute Flow Index (Fuzzy)
     Engine->>Engine: Update Bandit Model (Reward)
     Engine->>Engine: decideNextConfig(level)
-    
+  
     note right of Engine: Selects Arm 0, 1, or 2
-    
+  
     Engine-->>Helper: Returns {flowIndex, nextConfig}
     deactivate Engine
-    
+  
     Helper->>DB: Save 'ai_level_config'
     Helper->>DB: Save Game History
     Helper-->>Lvl: Returns Result
@@ -321,16 +321,16 @@ erDiagram
 
     GAME_SESSION {
         string sessionId
-        timestamp startTime
-        timestamp endTime
+        int startTimeMs
+        int endTimeMs
         int level
         string result
     }
 
     TELEMETRY_EVENT {
-        timestamp ts
+        int tsMs
         string type
-        json data
+        string data
         string sessionId
     }
 
@@ -345,4 +345,5 @@ erDiagram
     PLAYER_PROFILE ||--o{ GAME_SESSION : generates
     GAME_SESSION ||--o{ TELEMETRY_EVENT : contains
     GAME_SESSION ||--|| AI_CONFIG : used_settings
+
 ```
