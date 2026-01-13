@@ -62,6 +62,7 @@ class MockDocument {
         this.elements = new Map();
         this.body = new MockElement('BODY');
         this.head = new MockElement('HEAD');
+        this.listeners = {};
     }
 
     getElementById(id) {
@@ -88,6 +89,16 @@ class MockDocument {
 
     querySelectorAll(selector) {
         return [];
+    }
+
+    addEventListener(event, callback) {
+        if (!this.listeners[event]) this.listeners[event] = [];
+        this.listeners[event].push(callback);
+    }
+
+    removeEventListener(event, callback) {
+        if (!this.listeners[event]) return;
+        this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
     }
 }
 

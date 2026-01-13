@@ -182,3 +182,59 @@ body {
 .img-border {
   border: 2px #fff solid;
 }
+
+@media (max-width: 800px) {
+  html,
+  body {
+    min-width: 300px;
+  }
+
+  #rkct-menu {
+    top: 10px;
+    left: 10px;
+    width: 150px;
+    height: 33px;
+    z-index: 1000;
+    position: fixed;
+  }
+
+  #menu-icon {
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+    position: fixed;
+  }
+
+  #menu-container {
+    padding-top: 100px;
+    gap: 20px;
+  }
+
+  #title {
+    font-size: 56px;
+  }
+
+  #content-1,
+  #content-2,
+  #instructions,
+  #in-dots {
+    width: min(600px, 92vw);
+  }
+
+  #instructions {
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+}
+
+@media (max-width: 500px) {
+  #title {
+    font-size: 44px;
+  }
+
+  #content-1,
+  #content-2 {
+    font-size: 18px;
+    line-height: 28px;
+  }
+}

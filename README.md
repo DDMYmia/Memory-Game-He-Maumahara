@@ -2,9 +2,23 @@
 
 **He Maumahara** is a brain-training memory card game inspired by everyday moments, whakataukī, and Māori design. It strengthens recall, supports te reo Māori, and brings playful cognitive training to Kaumātua and whānau.
 
-The game features a **pure frontend AI** that personalizes difficulty in real-time, keeping the cognitive load in the optimal "Flow Zone" (where challenge matches skill).
+The game features a **pure frontend AI** that personalizes difficulty in real-time, keeping cognitive load in the optimal "Flow Zone" (where challenge matches skill).
 
-Version: v2.3.2
+Version: v3.0.0
+
+## Quick Start
+
+1. **Start a local server**
+   ```bash
+   # Python
+   python3 -m http.server 8010
+   # Node.js
+   npx http-server -p 8010
+   ```
+
+2. **Open**
+   - Home: `http://localhost:8010/index.html`
+   - Analytics: `http://localhost:8010/analytics.html`
 
 ## Game Concept & Structure
 
@@ -33,36 +47,24 @@ Studies suggest that consistent play of memory card games can improve memory ret
 | **2** | **Adaptive Challenge**: Variable grid | AI adjusts grid size and layout based on performance. Focus on adjacency. |
 | **3** | **Mastery**: Image–Text pairs | Matches images with *kupu* (words). Highest cognitive load. |
 
-### Scoring & Flow Index
-He Maumahara calculates a **Flow Index** (0 to 1) at the end of each game.
-- The **game-over screen** shows your **elapsed time** for that run (mm:ss) in the main header.
+## AI & Analytics
+
+### Flow Index
+He Maumahara calculates a **Flow Index** (0.0 to 1.0) at the end of each game.
+- The **game-over screen** shows **elapsed time** for that run (mm:ss).
 - The AI uses Flow Index (plus layout factors like adjacency) to adjust the next round.
+
+### Analytics Dashboard
+The Analytics dashboard provides a practical view of progress over time:
+- Session history with Flow Index and key performance metrics.
+- A **K-Means Overall Review** that clusters recent games using Flow/Accuracy/Speed to surface dominant patterns and short-term trend.
 
 ## Key Features
 
 - **Adaptive AI**: Uses Fuzzy Logic and Contextual Bandits to tune grid size, timer, and hints to your skill level.
 - **Privacy First**: **No data leaves your device.** All game history and profiles are stored locally in your browser (IndexedDB).
-- **Detailed Analytics**: View your performance history, error rates, and behavioral patterns in the Analytics dashboard.
+- **Detailed Analytics**: View performance history, error patterns, behavioral metrics, and a lightweight K-Means clustering summary.
 - **Lightweight**: Pure HTML/JS/CSS. No backend server required.
-
-## Quick Start
-
-1. **Clone repository**
-   ```bash
-   git clone https://github.com/DDMYmia/Memory-Game-He-Maumahara.git
-   cd Memory-Game-He-Maumahara
-   ```
-
-2. **Start local server**
-   ```bash
-   # Python
-   python3 -m http.server 8010
-   # Node.js
-   npx http-server -p 8010
-   ```
-
-3. **Play**
-   Open `http://localhost:8010` in your browser.
 
 ## Documentation
 This repository is intentionally lightweight (pure HTML/JS/CSS), but includes developer-facing technical documentation in [docs/](docs/).
@@ -72,6 +74,14 @@ This repository is intentionally lightweight (pure HTML/JS/CSS), but includes de
 - **System Diagrams**: [docs/SYSTEM_DIAGRAMS.md](docs/SYSTEM_DIAGRAMS.md) - Visual charts of architecture and algorithms.
 - UI styling conventions: [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)
 - Change history: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+
+## Project Pages
+- `index.html`: Main menu
+- `play.html`: Level selection
+- `lvl-1.html`, `lvl-2.html`, `lvl-3.html`: Play levels
+- `analytics.html`: Analytics dashboard (history + overall review)
+- `instructions.html`: Instructions
+- `credits.html`: Credits
 
 ### Testing
 - Automated simulation suite:

@@ -1,5 +1,18 @@
 # Changelog
 
+Version: v3.0.0 (2026-01-13)
+
+## Features
+- **Analytics**: K-Means Overall Review (lightweight clustering + visualization).
+
+## Documentation
+- **Version bump**: Updated documentation to v3.0.0 and performed a language audit (English + Māori only).
+
+## Maintenance
+- **Root cleanup**: Removed legacy release notes and unused asset folder.
+
+---
+
 Version: v2.3.2 (2026-01-09)
 
 ## Fixes

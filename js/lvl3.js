@@ -537,13 +537,14 @@ async function endGame() {
       completionKey: 'ai_lvl3_completed_count',
       basedOn: 'lvl3_update'
     });
+    window.lastAIResult = aiResult;
   } catch (e) {
     console.error("AI Error:", e);
   }
 
   showGameOverScreen(actualStartTime, "<a href='play.html' class='menu-txt'>Menu</a><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>");
   
-  await telemetry.log('end', { level: 3, flowIndex: aiResult?.flowIndex, pairs: matchedPairs, streak: streak });
+  await telemetry.log('end', { level: 3, flowIndex: aiResult?.flowIndexDisplay ?? aiResult?.flowIndex, pairs: matchedPairs, streak: streak });
 
   const analyticsContainer = document.querySelector('#game-over .game-over-right') || document.getElementById('analytics-summary');
   let gameId = null;
@@ -661,3 +662,7 @@ window.onload = () => {
   initializeGame();
   startInitialPreview();
 };
+
+async function downloadResult() {
+  await downloadGameResults(telemetry);
+}

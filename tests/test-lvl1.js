@@ -51,6 +51,7 @@ const document = {
         return mockElements.get(id);
     },
     createElement: (tagName) => new MockElement(tagName.toUpperCase()),
+    querySelector: (selector) => null,
     querySelectorAll: (selector) => [], // Stub
     location: { reload: () => console.log('Reload called') }
 };

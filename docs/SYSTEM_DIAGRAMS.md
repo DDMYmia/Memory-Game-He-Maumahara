@@ -2,7 +2,7 @@
 
 This document contains visual representations of the **He Maumahara** system architecture, AI workflows, and data logic using Mermaid.js syntax.
 
-**Version**: v2.3.0
+**Version**: v3.0.0 (2026-01-13)
 
 ## 1. High-Level System Architecture
 
@@ -20,6 +20,7 @@ graph TD
         Core[Game Core]
         Helper[AI Helper]
         Analytics[Analytics Engine]
+        KMeans["K-Means Overall Review"]
     end
 
     subgraph "AI Core (Local Inference)"
@@ -51,6 +52,8 @@ graph TD
     Engine -->|Next Config| Levels
     Analytics -->|Read| TelDB
     Analytics -->|Read| HistDB
+    Analytics --> KMeans
+    KMeans --> UI
 ```
 
 ---
@@ -73,7 +76,7 @@ flowchart TD
         Norm --> Fuzz[Fuzzification]
         
         Fuzz --> Rules{Fuzzy Rules}
-        note[12 Rules e.g.\n'If Errors High & Time Slow \nTHEN Flow is Low']
+        note["16 Rules e.g.\nIf Errors High & Time Slow\nTHEN Flow is Low"]
         Rules -.-> note
         
         Rules --> Agg[Aggregation]
@@ -100,6 +103,37 @@ flowchart TD
     Easy --> Output[Next Game Config]
     Std --> Output
     Hard --> Output
+```
+
+---
+
+## 3. Analytics Clustering Flow (K-Means Overall Review)
+
+This diagram shows how the Analytics page generates an unsupervised clustering summary from local game history.
+
+```mermaid
+flowchart TD
+    HistDB[(game_history)]
+    Page["analytics.html"]
+    Summary["renderKMeansOverallEvaluation()"]
+    Features["Feature extraction\n(Flow, Accuracy, Speed)"]
+    Norm["Min-max normalization"]
+    Model["K-Means\n(K=2 or 3)"]
+    Viz["Lightweight SVG\n(scatter + centroids)"]
+    Table["Cluster summary table\n(mean ± std dev)"]
+    Trend["Recent trend strip\n(last ~10)"]
+
+    Page --> Summary
+    Summary --> HistDB
+    HistDB --> Features
+    Features --> Norm
+    Norm --> Model
+    Model --> Viz
+    Model --> Table
+    Model --> Trend
+    Viz --> Page
+    Table --> Page
+    Trend --> Page
 ```
 
 ---

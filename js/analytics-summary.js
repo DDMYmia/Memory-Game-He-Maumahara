@@ -211,13 +211,19 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       }
     }
 
-    // Priority: 1. aiResult.flowIndex (most recent, passed directly), 2. flow_index event from telemetry, 3. null
-    const flowIndex = aiResult?.flowIndex || flowIndexEvent?.data?.flowIndex || null;
+    const flowIndex =
+      (aiResult && typeof aiResult.flowIndexDisplay === 'number' ? aiResult.flowIndexDisplay : null) ??
+      (flowIndexEvent && flowIndexEvent.data && typeof flowIndexEvent.data.flowIndex === 'number' ? flowIndexEvent.data.flowIndex : null) ??
+      (aiResult && typeof aiResult.flowIndex === 'number' ? Math.max(0.3, aiResult.flowIndex) : null) ??
+      (flowIndexEvent && flowIndexEvent.data && typeof flowIndexEvent.data.flowIndexRaw === 'number' ? Math.max(0.3, flowIndexEvent.data.flowIndexRaw) : null) ??
+      null;
 
     // Debug log
     if (typeof aiLog === 'function') aiLog('Flow Index retrieval:', {
-      fromAiResult: aiResult?.flowIndex,
-      fromTelemetryEvent: flowIndexEvent?.data?.flowIndex,
+      fromAiResultRaw: aiResult?.flowIndex,
+      fromAiResultDisplay: aiResult?.flowIndexDisplay,
+      fromTelemetryEventDisplay: flowIndexEvent?.data?.flowIndex,
+      fromTelemetryEventRaw: flowIndexEvent?.data?.flowIndexRaw,
       finalFlowIndex: flowIndex,
       flowIndexEventTimestamp: flowIndexEvent ? new Date(flowIndexEvent.ts).toLocaleTimeString() : null,
       sessionStartTimestamp: sessionStartEvent ? new Date(sessionStartEvent.ts).toLocaleTimeString() : null
@@ -650,9 +656,374 @@ function closeAnalyticsSummary() {
   }
 }
 
+function clamp01(value) {
+  if (!isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
+}
+
+function safeNumber(value) {
+  return typeof value === 'number' && isFinite(value) ? value : null;
+}
+
+function kmeans(points, k, maxIters = 25) {
+  const n = points.length;
+  const dim = points[0]?.length || 0;
+  if (n === 0 || dim === 0) return null;
+  const kk = Math.max(1, Math.min(k, n));
+
+  const squaredDistance = (a, b) => {
+    let sum = 0;
+    for (let i = 0; i < dim; i++) {
+      const d = a[i] - b[i];
+      sum += d * d;
+    }
+    return sum;
+  };
+
+  const seedRand = (seed) => {
+    let s = seed >>> 0;
+    return () => {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+  };
+
+  const rng = seedRand(n * 2654435761);
+
+  const centroids = [];
+  centroids.push(points[Math.floor(rng() * n)].slice());
+  while (centroids.length < kk) {
+    const distances = points.map(p => {
+      let best = Infinity;
+      for (let c = 0; c < centroids.length; c++) best = Math.min(best, squaredDistance(p, centroids[c]));
+      return best;
+    });
+    const total = distances.reduce((a, b) => a + b, 0);
+    if (total <= 1e-12) {
+      centroids.push(points[Math.floor(rng() * n)].slice());
+      continue;
+    }
+    let r = rng() * total;
+    let idx = 0;
+    for (; idx < distances.length; idx++) {
+      r -= distances[idx];
+      if (r <= 0) break;
+    }
+    centroids.push(points[Math.min(idx, n - 1)].slice());
+  }
+
+  let assignments = new Array(n).fill(0);
+  for (let iter = 0; iter < maxIters; iter++) {
+    let changed = false;
+
+    for (let i = 0; i < n; i++) {
+      let bestK = 0;
+      let bestD = Infinity;
+      for (let c = 0; c < kk; c++) {
+        const d = squaredDistance(points[i], centroids[c]);
+        if (d < bestD) {
+          bestD = d;
+          bestK = c;
+        }
+      }
+      if (assignments[i] !== bestK) {
+        assignments[i] = bestK;
+        changed = true;
+      }
+    }
+
+    const next = new Array(kk).fill(0).map(() => new Array(dim).fill(0));
+    const counts = new Array(kk).fill(0);
+    for (let i = 0; i < n; i++) {
+      const a = assignments[i];
+      counts[a] += 1;
+      for (let d = 0; d < dim; d++) next[a][d] += points[i][d];
+    }
+    for (let c = 0; c < kk; c++) {
+      if (counts[c] === 0) {
+        centroids[c] = points[Math.floor(rng() * n)].slice();
+        continue;
+      }
+      for (let d = 0; d < dim; d++) next[c][d] /= counts[c];
+      centroids[c] = next[c];
+    }
+
+    if (!changed) break;
+  }
+
+  return { centroids, assignments, k: kk };
+}
+
+function renderKMeansOverallEvaluation(container, sessions) {
+  if (!container) return;
+  const all = Array.isArray(sessions) ? sessions : [];
+  const recent = all.slice(0, 60);
+  const usableRaw = recent.filter(s => safeNumber(s?.summary?.flowIndex) !== null && safeNumber(s?.summary?.accuracy) !== null);
+
+  if (usableRaw.length < 6) {
+    container.innerHTML = '';
+    container.classList.add('hidden');
+    return;
+  }
+
+  const usable = usableRaw
+    .slice()
+    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+  const timeCandidates = usable
+    .map(s => {
+      const ct = safeNumber(s?.metrics?.completionTime);
+      const pairs = safeNumber(s?.metrics?.totalPairs) ?? safeNumber(s?.summary?.totalPairs) ?? 10;
+      if (ct === null) return null;
+      if (!isFinite(pairs) || pairs <= 0) return null;
+      return ct / pairs;
+    })
+    .filter(v => v !== null);
+
+  const useTime = timeCandidates.length >= Math.ceil(usable.length * 0.7);
+  const dim = useTime ? 3 : 2;
+
+  const flows = usable.map(s => clamp01(s.summary.flowIndex));
+  const accs = usable.map(s => clamp01(s.summary.accuracy));
+
+  const timePerPair = useTime
+    ? usable.map(s => {
+        const ct = safeNumber(s?.metrics?.completionTime);
+        const pairs = safeNumber(s?.metrics?.totalPairs) ?? safeNumber(s?.summary?.totalPairs) ?? 10;
+        const v = ct !== null && isFinite(pairs) && pairs > 0 ? ct / pairs : null;
+        return v;
+      })
+    : [];
+
+  const minMax = (arr, fallbackMin = 0, fallbackMax = 1) => {
+    const vals = arr.filter(v => typeof v === 'number' && isFinite(v));
+    if (!vals.length) return { min: fallbackMin, max: fallbackMax };
+    return { min: Math.min(...vals), max: Math.max(...vals) };
+  };
+
+  const flowRange = minMax(flows, 0, 1);
+  const accRange = minMax(accs, 0, 1);
+  const timeRange = useTime ? minMax(timePerPair, 0.1, 5) : { min: 0, max: 1 };
+
+  const norm = (v, r) => {
+    if (v === null || !isFinite(v)) return 0.5;
+    const span = r.max - r.min;
+    if (!isFinite(span) || span < 1e-9) return 0.5;
+    return clamp01((v - r.min) / span);
+  };
+
+  const featurePoints = usable.map((s, i) => {
+    const f = norm(flows[i], flowRange);
+    const a = norm(accs[i], accRange);
+    if (!useTime) return [f, a];
+    const t = timePerPair[i];
+    const tNorm = norm(t, timeRange);
+    const tScore = clamp01(1 - tNorm);
+    return [f, a, tScore];
+  });
+
+  const k = usable.length >= 10 ? 3 : 2;
+  const model = kmeans(featurePoints, k, 30);
+  if (!model) {
+    container.innerHTML = '';
+    container.classList.add('hidden');
+    return;
+  }
+
+  const { centroids, assignments } = model;
+
+  const centroidScore = (c) => c.reduce((sum, v) => sum + v, 0) / c.length;
+  const order = centroids
+    .map((c, idx) => ({ idx, score: centroidScore(c) }))
+    .sort((a, b) => b.score - a.score);
+
+  const rankToLabel = [
+    { title: 'High Performance', color: '#4CAF50' },
+    { title: 'Steady', color: '#FFC107' },
+    { title: 'Needs Improvement', color: '#F44336' }
+  ];
+
+  const clusterMeta = new Array(centroids.length).fill(null);
+  order.forEach((o, rank) => {
+    const m = rankToLabel[Math.min(rankToLabel.length - 1, rank)];
+    clusterMeta[o.idx] = m;
+  });
+
+  const counts = new Array(centroids.length).fill(0);
+  assignments.forEach(a => { counts[a] += 1; });
+
+  const lastN = Math.min(10, assignments.length);
+  const recentAssign = assignments.slice(-lastN);
+  const recentCounts = new Array(centroids.length).fill(0);
+  recentAssign.forEach(a => { recentCounts[a] += 1; });
+  let overallCluster = 0;
+  for (let i = 1; i < recentCounts.length; i++) {
+    if (recentCounts[i] > recentCounts[overallCluster]) overallCluster = i;
+  }
+
+  const overallMeta = clusterMeta[overallCluster] || rankToLabel[1];
+  const overallPct = assignments.length ? Math.round((recentCounts[overallCluster] / lastN) * 100) : 0;
+
+  const mean = (arr) => {
+    const vals = arr.filter(v => typeof v === 'number' && isFinite(v));
+    if (!vals.length) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  };
+
+  const std = (arr) => {
+    const m = mean(arr);
+    if (m === null) return null;
+    const vals = arr.filter(v => typeof v === 'number' && isFinite(v));
+    if (vals.length < 2) return 0;
+    const v = vals.reduce((sum, x) => sum + (x - m) * (x - m), 0) / vals.length;
+    return Math.sqrt(v);
+  };
+
+  const globalFlowMean = mean(flows);
+  const globalAccMean = mean(accs);
+  const globalTppMean = useTime ? mean(timePerPair) : null;
+
+  const clusterStats = new Array(centroids.length).fill(0).map(() => ({
+    flow: [],
+    acc: [],
+    tpp: [],
+    count: 0
+  }));
+
+  for (let i = 0; i < assignments.length; i++) {
+    const c = assignments[i];
+    clusterStats[c].count += 1;
+    clusterStats[c].flow.push(flows[i]);
+    clusterStats[c].acc.push(accs[i]);
+    if (useTime) clusterStats[c].tpp.push(timePerPair[i]);
+  }
+
+  const formatNum = (v, d = 3) => (typeof v === 'number' && isFinite(v) ? v.toFixed(d) : 'N/A');
+  const formatPct = (v) => (typeof v === 'number' && isFinite(v) ? `${(v * 100).toFixed(1)}%` : 'N/A');
+  const formatSec = (v) => (typeof v === 'number' && isFinite(v) ? `${v.toFixed(1)}s` : 'N/A');
+
+  const clusterRowsHtml = clusterStats
+    .map((s, idx) => {
+      const meta = clusterMeta[idx] || { title: `Cluster ${idx + 1}`, color: '#999' };
+      const n = s.count || 0;
+      const pct = assignments.length ? Math.round((n / assignments.length) * 100) : 0;
+      const fMean = mean(s.flow);
+      const fStd = std(s.flow);
+      const aMean = mean(s.acc);
+      const aStd = std(s.acc);
+      const tppMean = useTime ? mean(s.tpp) : null;
+      const tppStd = useTime ? std(s.tpp) : null;
+      const tag = idx === overallCluster ? 'Dominant' : '';
+      const speedCell = useTime ? `<div class="kmeans-cell">${formatSec(tppMean)} <span class="kmeans-subval">±${formatSec(tppStd)}</span></div>` : '';
+
+      return `
+        <div class="kmeans-table-row">
+          <div class="kmeans-cell kmeans-cluster">
+            <span class="kmeans-dot" style="background:${meta.color}"></span>
+            <span class="kmeans-cluster-name">${meta.title}</span>
+            ${tag ? `<span class="kmeans-tag" style="border-color:${meta.color};color:${meta.color}">${tag}</span>` : ''}
+          </div>
+          <div class="kmeans-cell kmeans-mono">${n} <span class="kmeans-subval">(${pct}%)</span></div>
+          <div class="kmeans-cell">${formatNum(fMean)} <span class="kmeans-subval">±${formatNum(fStd)}</span></div>
+          <div class="kmeans-cell">${formatPct(aMean)} <span class="kmeans-subval">±${formatPct(aStd)}</span></div>
+          ${speedCell}
+        </div>
+      `;
+    })
+    .join('');
+
+  const headerSpeed = useTime ? '<div class="kmeans-table-head">Time/Pair</div>' : '';
+  const globalSpeed = useTime ? `<div class="kmeans-metric"><span class="kmeans-metric-label">Avg time/pair</span><span class="kmeans-metric-value">${formatSec(globalTppMean)}</span></div>` : '';
+
+  const trendBars = assignments
+    .slice(-lastN)
+    .map((c) => {
+      const meta = clusterMeta[c] || { color: '#999' };
+      return `<span class="kmeans-trend-dot" style="background:${meta.color}"></span>`;
+    })
+    .join('');
+
+  const w = 240;
+  const h = 140;
+  const pad = 14;
+  const mapX = (v) => pad + clamp01(v) * (w - pad * 2);
+  const mapY = (v) => h - pad - clamp01(v) * (h - pad * 2);
+
+  const pointSvg = usable.map((s, i) => {
+    const x = mapX(flows[i]);
+    const y = mapY(accs[i]);
+    const meta = clusterMeta[assignments[i]] || { color: '#999' };
+    const date = new Date(s.timestamp || 0);
+    const title = `${date.toLocaleDateString()} ${date.toLocaleTimeString()} • Flow ${flows[i].toFixed(3)} • Acc ${(accs[i] * 100).toFixed(1)}%`;
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${meta.color}" fill-opacity="0.85"><title>${title}</title></circle>`;
+  }).join('');
+
+  const centroidSvg = centroids.map((c, idx) => {
+    const cx = mapX(clamp01(c[0]));
+    const cy = mapY(clamp01(c[1]));
+    const meta = clusterMeta[idx] || { color: '#fff' };
+    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="6.2" fill="none" stroke="${meta.color}" stroke-width="2.2"></circle>`;
+  }).join('');
+
+  const distHtml = counts
+    .map((n, idx) => {
+      const meta = clusterMeta[idx] || { title: `Cluster ${idx + 1}`, color: '#999' };
+      const pct = Math.round((n / assignments.length) * 100);
+      return `<div class="kmeans-legend-item"><span class="kmeans-dot" style="background:${meta.color}"></span><span class="kmeans-legend-text">${meta.title}</span><span class="kmeans-legend-pct">${pct}%</span></div>`;
+    })
+    .join('');
+
+  const subtitle = useTime ? 'Features: Flow Index, Accuracy, Speed' : 'Features: Flow Index, Accuracy';
+  const tableClass = useTime ? 'kmeans-table' : 'kmeans-table kmeans-table-2d';
+
+  container.innerHTML = `
+    <div class="kmeans-card">
+      <div class="kmeans-head">
+        <div class="kmeans-title">K-Means Overall Review</div>
+        <div class="kmeans-badge" style="border-color:${overallMeta.color}; color:${overallMeta.color}">${overallMeta.title} (${overallPct}% of last ${lastN})</div>
+      </div>
+      <div class="kmeans-subtitle">${subtitle} · Sample: last ${usable.length} games · K=${model.k} · Dim=${dim}</div>
+      <div class="kmeans-metrics">
+        <div class="kmeans-metric"><span class="kmeans-metric-label">Avg flow</span><span class="kmeans-metric-value">${formatNum(globalFlowMean)}</span></div>
+        <div class="kmeans-metric"><span class="kmeans-metric-label">Avg accuracy</span><span class="kmeans-metric-value">${formatPct(globalAccMean)}</span></div>
+        ${globalSpeed}
+        <div class="kmeans-metric"><span class="kmeans-metric-label">Recent trend</span><span class="kmeans-metric-value kmeans-trend">${trendBars}</span></div>
+      </div>
+      <div class="kmeans-row">
+        <div class="kmeans-chart">
+          <svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="K-Means scatter">
+            <rect x="0" y="0" width="${w}" height="${h}" fill="rgba(0,0,0,0.18)" rx="10" ry="10"></rect>
+            <path d="M ${pad} ${h - pad} L ${w - pad} ${h - pad}" stroke="rgba(255,255,255,0.18)" stroke-width="1"></path>
+            <path d="M ${pad} ${pad} L ${pad} ${h - pad}" stroke="rgba(255,255,255,0.18)" stroke-width="1"></path>
+            ${pointSvg}
+            ${centroidSvg}
+          </svg>
+          <div class="kmeans-axis">
+            <span>Flow (x)</span>
+            <span>Accuracy (y)</span>
+          </div>
+        </div>
+        <div class="kmeans-legend">${distHtml}</div>
+      </div>
+      <div class="${tableClass}">
+        <div class="kmeans-table-header">
+          <div class="kmeans-table-head">Cluster</div>
+          <div class="kmeans-table-head">Count</div>
+          <div class="kmeans-table-head">Flow</div>
+          <div class="kmeans-table-head">Accuracy</div>
+          ${headerSpeed}
+        </div>
+        ${clusterRowsHtml}
+      </div>
+    </div>
+  `;
+  container.classList.remove('hidden');
+}
+
 // Make function globally available for testing
 window.displayAnalyticsSummary = displayAnalyticsSummary;
 window.closeAnalyticsSummary = closeAnalyticsSummary;
+window.renderKMeansOverallEvaluation = renderKMeansOverallEvaluation;
 window.toggleSection = function (headerElement) {
   const section = headerElement.closest('.analytics-section');
   if (section) {

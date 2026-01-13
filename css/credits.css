@@ -142,3 +142,60 @@ body {
   background-color: rgba(0, 147, 255, 0.4);
 }
 
+@media (max-width: 800px) {
+  html,
+  body {
+    min-width: 300px;
+  }
+
+  #rkct-menu {
+    top: 10px;
+    left: 10px;
+    width: 150px;
+    height: 33px;
+    z-index: 1000;
+    position: fixed;
+  }
+
+  #menu-icon {
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: calc(100vw - 20px);
+    z-index: 1000;
+    position: fixed;
+  }
+
+  #menu-container {
+    padding-top: 100px;
+    gap: 20px;
+  }
+
+  #title {
+    font-size: 56px;
+  }
+
+  #thanks {
+    width: min(500px, 92vw);
+    font-size: 18px;
+    padding-bottom: 120px;
+  }
+
+  .txt {
+    width: min(700px, 92vw);
+    padding-left: 20px;
+    padding-right: 20px;
+    border-radius: 24px;
+  }
+}
+
+@media (max-width: 500px) {
+  #title {
+    font-size: 44px;
+  }
+}
+

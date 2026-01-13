@@ -541,6 +541,7 @@ async function endGame() {
       completionKey: 'ai_lvl2_completed_count',
       basedOn: 'lvl2_update'
     });
+    window.lastAIResult = aiResult;
   } catch (e) {
     console.error("AI Error:", e);
   }
@@ -597,7 +598,7 @@ async function endGame() {
   
   // Update Score UI for Game Over screen
   showGameOverScreen(actualStartTime, "<a href='play.html' class='menu-txt'>Menu</a><a href='#' onclick='restartFunction()' class='menu-txt'>Replay</a>");
-  await telemetry.log('end', { level: 2, flowIndex: aiResult?.flowIndex, pairs: matchedPairs, streak: streak });
+  await telemetry.log('end', { level: 2, flowIndex: aiResult?.flowIndexDisplay ?? aiResult?.flowIndex, pairs: matchedPairs, streak: streak });
 
   const analyticsContainer = document.querySelector('#game-over .game-over-right') || document.getElementById('analytics-summary');
   let gameId = null;
@@ -713,30 +714,5 @@ window.onload = () => {
 };
 
 async function downloadResult() {
-  const gameOver = document.getElementById('game-over');
-  const downloadBtn = document.getElementById('download-btn');
-  
-	if (downloadBtn) downloadBtn.style.display = 'none';
-  
-  try {
-    const canvas = await html2canvas(document.body, {
-      backgroundColor: '#000',
-      scale: 2, // Higher quality
-      logging: false,
-      useCORS: true
-    });
-    
-    const nameEl = document.getElementById('name');
-    const playerName = (nameEl && nameEl.value) ? nameEl.value : 'Player';
-    const date = new Date().toISOString().split('T')[0];
-    const link = document.createElement('a');
-    link.download = `MemoryGame_Result_${playerName}_${date}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  } catch (err) {
-    if (typeof aiWarn === 'function') aiWarn('Download failed:', err);
-    alert('Failed to generate image. Please try again.');
-	} finally {
-		if (downloadBtn) downloadBtn.style.display = 'block';
-	}
+  await downloadGameResults(telemetry);
 }

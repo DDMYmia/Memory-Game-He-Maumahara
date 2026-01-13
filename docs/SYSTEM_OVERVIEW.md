@@ -1,8 +1,8 @@
 # He Maumahara System Overview
 
-**Version**: 2.3.0  
-**Date**: 2026-01-09  
-**Status**: Production Ready
+**Version**: v3.0.0  
+**Date**: 2026-01-13  
+**Status**: Stable Release
 
 ## 1. Introduction
 
@@ -41,7 +41,7 @@ The system's primary metric is not "Score" or "Win/Loss," but the **Flow Index**
 ### 3.1. Adaptive Difficulty Engine
 The system dynamically adjusts game parameters based on real-time performance:
 - **Grid Size**: Expands from 5×4 to 4×6 as skill improves.
-- **Timer & Delays**: Adjusts the initial countdown and card "peek" time (e.g., 0.5s vs 2.0s).
+- **Timer & Delays**: Keeps a fixed round timer (300s), adjusts card reveal dynamics (hideDelay/showScale).
 - **Adjacency Rules**: In Level 2, the AI manipulates the probability of matching pairs being placed next to each other to assist struggling players.
 
 ### 3.2. Comprehensive Analytics Dashboard
@@ -49,6 +49,7 @@ Users and caregivers can view detailed performance breakdowns:
 - **Flow Index History**: A longitudinal view of cognitive engagement.
 - **Error Analysis**: Tracking consecutive errors and specific color/shape confusion patterns.
 - **Behavioral Metrics**: Click cadence stability (motor control) and response times.
+- **K-Means Overall Review**: A lightweight clustering summary of recent games (Flow/Accuracy/Speed) to highlight dominant performance patterns and short-term trend.
 
 ### 3.3. Multi-Level Cognitive Training
 - **Level 1 (Visual)**: Pure image matching (episodic memory).
@@ -73,10 +74,10 @@ This component translates raw telemetry into a meaningful human-centric metric: 
   - Cadence Stability (variance of flip intervals)
   - Click Accuracy & Color/Shape Sensitivity
 - **Fuzzification**: Inputs are mapped to linguistic variables (e.g., `Time` → `Fast`, `Medium`, `Slow`) using triangular membership functions.
-- **Rule Base**: A set of **12 Optimized Rules** (reduced from 18 for efficiency) determines the output.
-  - *Example Rule*: `IF Time is Fast AND Error is Low THEN Flow is High.`
+- **Rule Base**: A compact set of rules (currently **16 rules**) determines the output.
+  - *Example Rule*: `IF Time is Fast AND Error is Low AND Accuracy is High THEN Flow is High.`
 - **Defuzzification**: Weighted average calculation produces the Base Flow Index.
-- **Post-Processing**: A multiplicative **Cheat Penalty** (based on hint usage) is applied to produce the Final Flow Index.
+- **Post-Processing**: A multiplicative **Cheat Penalty** (based on hint usage) is applied, then a final clamp is applied to preserve player confidence (default floor at 0.3).
 
 ### 4.2. Contextual Bandit - LinUCB (The Director)
 This component decides the *next* game's configuration to maximize the user's Flow Index.
@@ -88,7 +89,6 @@ This component decides the *next* game's configuration to maximize the user's Fl
   - **Arm 0 (Easiest)**: Max hints, slow timer, simple grid.
   - **Arm 1 (Standard)**: Baseline settings.
   - **Arm 2 (Hard)**: Faster timer, reduced hints.
-  - **Arm 3 (Hardest)**: Complex grid (4×6), minimal hints, fast timer.
 - **Learning**: The bandit updates its internal model (matrix `A` and vector `b`) after every game, "learning" which configuration yields the best engagement for this specific user.
 
 ---

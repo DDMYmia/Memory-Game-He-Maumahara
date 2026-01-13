@@ -179,9 +179,7 @@ class FuzzyLogicSystem {
       return 0.5; // Default moderate value
     }
     
-    // If completionTime is 0 or very small, it means game ended immediately (unlikely but possible)
-    // Use a small default value instead of 0
-    const actualTime = completionTime || 1; // At least 1 second
+    const actualTime = completionTime > 0 ? completionTime : expectedTotal * 0.5;
     
     const normalized = Math.min(1, Math.max(0, actualTime / expectedTotal));
     
@@ -208,7 +206,7 @@ class FuzzyLogicSystem {
    * @returns {number} Error rate [0, 1]
    */
   calculateErrorRate(failedMatches, totalMatches) {
-    if (totalMatches === 0) return 0;
+    if (totalMatches === 0) return 0.5;
     return failedMatches / totalMatches;
   }
 
@@ -236,7 +234,7 @@ class FuzzyLogicSystem {
    * @returns {number} Click accuracy [0, 1]
    */
   calculateClickAccuracy(successfulMatches, totalClicks) {
-    if (totalClicks === 0) return 0;
+    if (totalClicks === 0) return 0.5;
     // Each match requires 2 clicks, so accuracy = successfulMatches * 2 / totalClicks
     return Math.min(1, (successfulMatches * 2) / totalClicks);
   }
@@ -477,10 +475,14 @@ class FuzzyLogicSystem {
     const rule10 = Math.min(accuracyHigh, cadenceStable);
     const rule11 = Math.min(accuracyLow, colorLow);
     const rule12 = Math.min(timeFast, errorMedium);
+    const rule13 = Math.min(timeFast, errorLow);
+    const rule14 = Math.min(timeFast, errorLow, accuracyHigh);
+    const rule15 = Math.min(timeFast, errorLow, cadenceVariable);
+    const rule16 = Math.min(timeMedium, errorLow);
 
-    const rules = [rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12];
+    const rules = [rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12, rule13, rule14, rule15, rule16];
     const weights = [
-      0.85,
+      0.90,
       failedMatches === 0 ? 1.0 : 0.95,
       0.60,
       0.60,
@@ -489,9 +491,13 @@ class FuzzyLogicSystem {
       0.20,
       0.98,
       0.35,
-      0.80,
+      0.95,
       0.20,
-      0.85
+      0.85,
+      0.97,
+      1.0,
+      0.95,
+      0.80
     ];
     
     let numerator = 0;
@@ -504,7 +510,9 @@ class FuzzyLogicSystem {
       }
     });
 
-    let baseFlowIndex = denominator > 0 ? numerator / denominator : 0.5;
+    let baseFlowIndex = denominator > 0
+      ? numerator / denominator
+      : (0.45 * (1 - normalizedTime) + 0.35 * (1 - errorRate) + 0.2 * clickAccuracy);
 
     if (denominator === 0) {
       aiWarn('Flow Index: denominator is 0, using default 0.5');
@@ -520,21 +528,23 @@ class FuzzyLogicSystem {
     baseFlowIndex = Math.max(0, Math.min(1, baseFlowIndex));
 
     const flowIndexRaw = baseFlowIndex * cheatPenalty;
-    // Final clamp - Minimum 0.3 to preserve player dignity/confidence
-    const finalFlowIndex = Math.max(0.3, Math.min(1, flowIndexRaw));
+    const trueFlowIndex = Math.max(0, Math.min(1, flowIndexRaw));
+    const displayFlowIndex = Math.max(0.3, trueFlowIndex);
 
     context.colorSensitivity = colorSensitivity;
     context.cheatCount = cheatCount;
     context.cheatPenalty = cheatPenalty;
     context.baseFlowIndex = baseFlowIndex;
+    context.flowIndexRaw = trueFlowIndex;
+    context.flowIndexDisplay = displayFlowIndex;
 
     aiLog('Final Flow Index:', {
       baseFlowIndex,
       cheatPenalty,
-      finalFlowIndex
+      finalFlowIndex: displayFlowIndex
     });
 
-    return finalFlowIndex;
+    return trueFlowIndex;
   }
 }
 
@@ -564,6 +574,7 @@ class ContextualBandit {
         theta: new Array(this.d).fill(0) // d-dimensional parameter vector
       });
     }
+    this.playCounts = new Array(numArms).fill(0);
   }
 
   /**
@@ -658,8 +669,17 @@ class ContextualBandit {
    */
   selectArm(playerState) {
     const context = this.extractContext(playerState);
-    let bestArm = 0;
+    const unplayed = [];
+    for (let i = 0; i < this.numArms; i++) {
+      if ((this.playCounts[i] || 0) === 0) unplayed.push(i);
+    }
+    if (unplayed.length > 0) {
+      return unplayed[Math.floor(Math.random() * unplayed.length)];
+    }
+
     let bestUCB = -Infinity;
+    let bestArms = [0];
+    const eps = 1e-12;
 
     for (let i = 0; i < this.numArms; i++) {
       const arm = this.arms[i];
@@ -680,13 +700,15 @@ class ContextualBandit {
       // UCB = expected reward + confidence bound
       const ucb = expectedReward + confidence;
       
-      if (ucb > bestUCB) {
+      if (ucb > bestUCB + eps) {
         bestUCB = ucb;
-        bestArm = i;
+        bestArms = [i];
+      } else if (Math.abs(ucb - bestUCB) <= eps) {
+        bestArms.push(i);
       }
     }
 
-    return bestArm;
+    return bestArms[Math.floor(Math.random() * bestArms.length)];
   }
 
   /**
@@ -696,8 +718,11 @@ class ContextualBandit {
    * @param {number} reward - Observed reward (Flow Index)
    */
   update(arm, playerState, reward) {
+    if (!isFinite(reward)) return;
+    if (!Number.isInteger(arm) || arm < 0 || arm >= this.numArms) return;
     const context = this.extractContext(playerState);
     const armData = this.arms[arm];
+    if (!armData) return;
     for (let i = 0; i < this.d; i++) {
       for (let j = 0; j < this.d; j++) {
         armData.A[i][j] += context[i] * context[j];
@@ -706,6 +731,7 @@ class ContextualBandit {
     for (let i = 0; i < this.d; i++) {
       armData.b[i] += reward * context[i];
     }
+    this.playCounts[arm] = (this.playCounts[arm] || 0) + 1;
   }
 
   /**
@@ -867,15 +893,18 @@ class AIEngine {
     });
 
     // Update player profile
-    const allFlows = this.sessionState.rounds.map(r => r.flowIndex);
-    this.sessionState.playerProfile.avgFlow = allFlows.reduce((a, b) => a + b, 0) / allFlows.length;
+    const smooth = 0.35;
+    const prevAvgFlow = isFinite(this.sessionState.playerProfile.avgFlow) ? this.sessionState.playerProfile.avgFlow : 0.5;
+    this.sessionState.playerProfile.avgFlow = smooth * flowIndex + (1 - smooth) * prevAvgFlow;
 
     const err = this.fuzzyLogic.calculateErrorRate(failedMatches || 0, totalMatches || 0);
     const successful = (totalMatches || 0) - (failedMatches || 0);
     const acc = this.fuzzyLogic.calculateClickAccuracy(successful, (gameData.totalClicks || 0));
     const cadence = this.fuzzyLogic.calculateCadenceStability(flipIntervals || []);
-    this.sessionState.playerProfile.errorRate = err;
-    this.sessionState.playerProfile.cadence = cadence;
+    const prevErr = isFinite(this.sessionState.playerProfile.errorRate) ? this.sessionState.playerProfile.errorRate : 0.2;
+    const prevCadence = isFinite(this.sessionState.playerProfile.cadence) ? this.sessionState.playerProfile.cadence : 0.5;
+    this.sessionState.playerProfile.errorRate = smooth * err + (1 - smooth) * prevErr;
+    this.sessionState.playerProfile.cadence = smooth * cadence + (1 - smooth) * prevCadence;
     this.sessionState.playerProfile.maxConsecutiveErrors = maxConsecutiveErrors || consecutiveErrors || 0;
 
     this.updateHiddenDifficulty(flowIndex, gameData);

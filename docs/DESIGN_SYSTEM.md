@@ -4,6 +4,9 @@ He Maumahara - Frontend Design Parameters
 This document summarizes the main visual design parameters for the web version
 of **He Maumahara** as implemented in the current codebase.
 
+Version: v3.0.0  
+Date: 2026-01-13
+
 ## 1. Typography & Color Comparison Table
 
 | Element Type | CSS Selector | Font Size | Font Weight | Font Style | Color | Background / Effects |
@@ -57,7 +60,7 @@ of **He Maumahara** as implemented in the current codebase.
   - Level 2: `Shuffled cards each run to train flexible memory and pattern switching.`
   - Level 3: `Match each image to its correct name for deeper recall and speed.`
 
-### 3.3 Game Board (lvl-1/2/3.html)
+### 3.3 Game Board (lvl-1.html / lvl-2.html / lvl-3.html)
 - **Grid Layout**: `5 columns x 4 rows` (Default), `gap: 20px`, `padding: 20px`
 - **HUD Buttons (Right Panel)**:
   - Width: `100px`
@@ -89,5 +92,19 @@ of **He Maumahara** as implemented in the current codebase.
   - Adaptive state persists via `localStorage ('ai_adaptive_enabled')`.
   - Initialized on `window.onload` across all levels using `updateAdaptiveUI()`.
 
+## 5. Analytics UI - K-Means Overall Review
+
+The Analytics main page includes a compact **K-Means Overall Review** card designed to summarize recent performance at a glance.
+
+- **Layout**: A single card with a header (title + status badge), metrics row, and a two-column content row (scatter + legend).
+- **Visualization**:
+  - Scatter plot maps **Flow (x)** vs **Accuracy (y)**.
+  - Points are colored by cluster assignment; centroids are shown as larger outlined markers.
+  - A compact “recent trend” strip shows recent cluster assignments.
+- **Core classes** (see `css/analytics.css`):
+  - Card + header: `.kmeans-card`, `.kmeans-head`, `.kmeans-title`, `.kmeans-badge`
+  - Chart + legend: `.kmeans-row`, `.kmeans-chart`, `.kmeans-axis`, `.kmeans-legend`
+  - Summary table: `.kmeans-table` and related table row/head styles
+
 ---
-*Last Updated: 2026-01-08*
+*Last Updated: 2026-01-13*

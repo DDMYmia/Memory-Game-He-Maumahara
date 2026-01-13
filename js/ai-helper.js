@@ -304,15 +304,18 @@ async function processGameEndWithAI(telemetry, level, aiEngine = null) {
       cheatCount: metrics.cheatCount
     });
     
-    // Compute Flow Index
     const flowIndex = aiEngine.processGameEnd(metrics);
+    const flowIndexDisplay = typeof metrics.flowIndexDisplay === 'number'
+      ? metrics.flowIndexDisplay
+      : (typeof flowIndex === 'number' ? Math.max(0.3, flowIndex) : null);
     
     // Debug: Log computed Flow Index
     aiLog('Computed Flow Index:', flowIndex);
     
     // Log Flow Index to telemetry with extended metrics
     await telemetry.log('flow_index', {
-      flowIndex,
+      flowIndex: flowIndexDisplay,
+      flowIndexRaw: flowIndex,
       level: metrics.level,
       completionTime: metrics.completionTime,
       failedMatches: metrics.failedMatches,
@@ -342,6 +345,7 @@ async function processGameEndWithAI(telemetry, level, aiEngine = null) {
     
     return {
       flowIndex,
+      flowIndexDisplay,
       nextConfig
     };
   } catch (error) {

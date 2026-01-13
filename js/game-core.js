@@ -441,3 +441,114 @@ async function saveSessionToHistoryFromTelemetry(telemetry, level, aiResult, gam
     return null;
   }
 }
+
+/**
+ * Helper to generate and download screenshot
+ */
+async function generateScreenshot(playerName, date) {
+  if (typeof html2canvas === 'function') {
+    try {
+      // Determine full height based on game-over scroll content if visible
+      const gameOver = document.getElementById('game-over');
+      const isGameOverVisible = gameOver && gameOver.classList.contains('show');
+      const fullHeight = isGameOverVisible ? gameOver.scrollHeight : document.documentElement.scrollHeight;
+      
+      const canvas = await html2canvas(document.documentElement, {
+        backgroundColor: '#000',
+        scale: 2, // Higher quality
+        logging: false,
+        useCORS: true,
+        height: fullHeight,
+        windowHeight: fullHeight,
+        scrollY: 0, // Reset scroll for capture
+        onclone: (clonedDoc) => {
+          // Hide buttons in the clone
+          const btnRow = clonedDoc.querySelector('.button-row');
+          if (btnRow) btnRow.style.display = 'none';
+
+          // Expand game-over modal to full height
+          const clonedGameOver = clonedDoc.getElementById('game-over');
+          if (clonedGameOver && clonedGameOver.classList.contains('show')) {
+            clonedGameOver.style.height = 'auto';
+            clonedGameOver.style.overflow = 'visible';
+            clonedGameOver.style.position = 'absolute'; // Unfix to allow full expansion
+          }
+        }
+      });
+
+      const imgLink = document.createElement('a');
+      imgLink.download = `MemoryGame_Result_${playerName}_${date}.png`;
+      imgLink.href = canvas.toDataURL('image/png');
+      document.body.appendChild(imgLink);
+      imgLink.click();
+      document.body.removeChild(imgLink);
+    } catch (err) {
+      console.error('Screenshot failed:', err);
+      alert('Failed to generate screenshot.');
+    }
+  } else {
+    console.warn('html2canvas not loaded');
+  }
+}
+
+/**
+ * Dedicated Screenshot Download Function
+ */
+async function downloadScreenshotOnly() {
+  const nameEl = document.getElementById('name');
+  const playerName = (nameEl && nameEl.value) ? nameEl.value : 'Player';
+  const date = new Date().toISOString().replace(/[:.]/g, '-');
+  
+  await generateScreenshot(playerName, date);
+}
+
+/**
+ * Shared download function for game results
+ * Handles both screenshot and data export
+ */
+async function downloadGameResults(telemetry) {
+  const downloadBtn = document.getElementById('download-btn');
+  // if (downloadBtn) downloadBtn.style.display = 'none'; // Handled in generateScreenshot via .button-row
+
+  try {
+    const nameEl = document.getElementById('name');
+    const playerName = (nameEl && nameEl.value) ? nameEl.value : 'Player';
+    const date = new Date().toISOString().replace(/[:.]/g, '-');
+
+    // 1. Generate Screenshot
+    await generateScreenshot(playerName, date);
+
+    // 2. Generate Data Export
+    if (telemetry) {
+      const events = await telemetry.exportAll();
+      const aiData = window.lastAIResult || {};
+      
+      const exportData = {
+        metadata: {
+          player: playerName,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent
+        },
+        aiAnalysis: aiData,
+        telemetry: events
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const jsonLink = document.createElement('a');
+      jsonLink.download = `MemoryGame_Data_${playerName}_${date}.json`;
+      jsonLink.href = URL.createObjectURL(blob);
+      document.body.appendChild(jsonLink);
+      jsonLink.click();
+      document.body.removeChild(jsonLink);
+      
+      // Delay revocation to ensure download starts
+      setTimeout(() => URL.revokeObjectURL(jsonLink.href), 1000);
+    }
+
+  } catch (err) {
+    console.error('Download failed:', err);
+    alert('Failed to generate export. Please try again.');
+  } finally {
+    // if (downloadBtn) downloadBtn.style.display = 'block'; // Handled in generateScreenshot
+  }
+}

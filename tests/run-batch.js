@@ -193,8 +193,10 @@ class BatchSimPlayer {
                 // Click the first card to trigger startInitialPreview
                 await this.clickCard(this.cards[0]); 
                 
-                // Wait for the 3-second preview to finish (plus buffer)
-                await this.clock.sleep(3100);
+                const startWait = this.clock.now();
+                while (this.sandbox.gameStart !== 1 && this.sandbox.gameStop === 0 && (this.clock.now() - startWait) < 15000) {
+                    await this.clock.sleep(250);
+                }
             } else {
                 console.error("[BatchSimPlayer] No cards found! Game cannot start.");
             }
@@ -222,7 +224,7 @@ class BatchSimPlayer {
             if (c2) {
                 await this.clickCard(c2);
             } else {
-                const second = this.pickRandomUnknown(cards, c1);
+                const second = this.pickRandomUnknown(this.cards, c1);
                 if (second) await this.clickCard(second[0]);
             }
 
@@ -240,10 +242,27 @@ class BatchSimPlayer {
         // Wait for async endGame to complete and log 'end' event
         await this.clock.sleep(2000);
 
+        let flowIndex = 0;
+        try {
+            const logs = (this.sandbox.telemetry && typeof this.sandbox.telemetry.exportAll === 'function')
+                ? await this.sandbox.telemetry.exportAll()
+                : [];
+            for (let i = logs.length - 1; i >= 0; i--) {
+                const e = logs[i];
+                if (e && e.type === 'flow_index' && e.data && isFinite(e.data.flowIndex)) {
+                    flowIndex = e.data.flowIndex;
+                    break;
+                }
+            }
+        } catch (e) {}
+        if (!isFinite(flowIndex) || flowIndex === 0) {
+            flowIndex = this.sandbox.finalFlowIndex || 0;
+        }
+
         return {
             time: this.sandbox.time,
             moves: this.moves,
-            flowIndex: this.sandbox.finalFlowIndex || 0
+            flowIndex
         };
     }
 
@@ -416,10 +435,7 @@ async function runBatch() {
                     localStorage: { getItem: () => null, setItem: () => {} },
                     setInterval: (cb, ms) => clock.setInterval(cb, ms),
                     clearInterval: (id) => clock.clearInterval(id),
-                    setTimeout: (cb, ms) => {
-                        console.log(`[Sandbox] setTimeout ${ms}ms`);
-                        return clock.setTimeout(cb, ms);
-                    },
+                    setTimeout: (cb, ms) => clock.setTimeout(cb, ms),
                     clearTimeout: (id) => clock.clearTimeout(id),
                     console: { 
                         log: console.log, 
@@ -467,7 +483,7 @@ async function runBatch() {
                 const aiHelperCode = fs.readFileSync('js/ai-helper.js', 'utf8');
                 
                 vm.createContext(sandbox);
-                vm.runInContext('var DEBUG_AI = true;', sandbox);
+                vm.runInContext('var DEBUG_AI = false;', sandbox);
                 vm.runInContext(aiCode, sandbox);
                 vm.runInContext(aiHelperCode, sandbox);
                 
@@ -476,10 +492,6 @@ async function runBatch() {
                 
                 // Load Level Script
                 let levelCode = fs.readFileSync(level.file, 'utf8');
-                // Inject debug log
-                levelCode = levelCode.replace('function startInitialPreview() {', 'function startInitialPreview() { console.log("DEBUG: startInitialPreview entered");');
-                levelCode = levelCode.replace('telemetry.log(\'start\'', 'console.log("DEBUG: telemetry.log start calling"); telemetry.log(\'start\'');
-                levelCode = levelCode.replace('function handleCardClick(event) {', 'function handleCardClick(event) { console.log("DEBUG: handleCardClick called. gameStart=" + gameStart);');
 
                 levelCode = levelCode.replace(/^let /gm, 'var ').replace(/^const /gm, 'var ');
                 
@@ -500,11 +512,11 @@ async function runBatch() {
                 }
                 
                 const player = new BatchSimPlayer(sandbox, profile, clock);
-                await player.play();
+                const result = await player.play();
                 
-                console.log(`[Result] Level ${level.id} ${profile.name}: FlowIndex=${sandbox.finalFlowIndex}`);
+                console.log(`[Result] Level ${level.id} ${profile.name}: FlowIndex=${result.flowIndex}`);
                 
-                results[key].push(sandbox.finalFlowIndex || 0);
+                results[key].push(result.flowIndex || 0);
                 
                 if (i % 10 === 0) process.stdout.write('.');
             }

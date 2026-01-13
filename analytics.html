@@ -51,6 +51,7 @@
     <button class="level-btn" onclick="window.loadMockData(3)">Level 3</button>
   </div>
   
+  <div id="overall-evaluation" class="hidden"></div>
   <div id="history-list" class="hidden"></div>
   <div id="analytics-display"></div>
 </div>
@@ -72,6 +73,7 @@
     document.getElementById('level-selector').classList.add('hidden');
     document.getElementById('analytics-display').classList.add('hidden');
     document.getElementById('history-list').classList.remove('hidden');
+    document.getElementById('overall-evaluation').classList.remove('hidden');
     
     // Update active button
     document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -86,9 +88,16 @@
       const history = new GameHistory();
       await history.openDatabase();
       const sessions = await history.getAllSessions(100);
+
+      if (typeof window.renderKMeansOverallEvaluation === 'function') {
+        try {
+          window.renderKMeansOverallEvaluation(document.getElementById('overall-evaluation'), sessions);
+        } catch (e) {}
+      }
       
       const listContainer = document.getElementById('history-list');
       if (sessions.length === 0) {
+        document.getElementById('overall-evaluation').classList.add('hidden');
         listContainer.innerHTML = '<div class="analytics-empty-state">No game history yet. Play a game to see your analytics here!</div>';
         return;
       }
@@ -160,6 +169,7 @@
       document.getElementById('level-selector').classList.add('hidden');
       document.getElementById('history-list').classList.add('hidden');
       document.getElementById('analytics-display').classList.remove('hidden');
+      document.getElementById('overall-evaluation').classList.add('hidden');
       
       try {
         const params = new URLSearchParams(window.location.search);
@@ -227,6 +237,7 @@
     document.getElementById('history-list').classList.add('hidden');
     document.getElementById('analytics-display').classList.remove('hidden');
     document.getElementById('level-selector').classList.remove('hidden');
+    document.getElementById('overall-evaluation').classList.add('hidden');
     
     // Update active button
     document.querySelectorAll('.mode-btn').forEach(btn => {

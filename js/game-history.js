@@ -60,7 +60,12 @@ class GameHistory {
         gameStats: sessionData.gameStats || {},
         config: sessionData.config || {},
         summary: {
-          flowIndex: sessionData.aiResult?.flowIndex || null,
+          flowIndex:
+            (sessionData.aiResult && typeof sessionData.aiResult.flowIndexDisplay === 'number'
+              ? sessionData.aiResult.flowIndexDisplay
+              : (sessionData.aiResult && typeof sessionData.aiResult.flowIndex === 'number'
+                ? Math.max(0.3, sessionData.aiResult.flowIndex)
+                : null)),
           accuracy: sessionData.metrics?.totalMatches > 0 
             ? (sessionData.metrics.totalMatches - sessionData.metrics.failedMatches) / sessionData.metrics.totalMatches 
             : 0,

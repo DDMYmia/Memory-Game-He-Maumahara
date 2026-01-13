@@ -12,21 +12,135 @@ const PROFILES = {
         memorySize: Infinity,
         mistakeRate: 0.0,
         clickDelay: 50,
-        thinkTime: 100
+        thinkTime: 100,
+        clickJitter: 10,
+        thinkJitter: 20,
+        hintRate: 0,
+        maxHintsPerGame: 0
     },
     AVERAGE: {
         name: 'Average Player',
         memorySize: 4, // Remembers last 4 cards seen
         mistakeRate: 0.1, // 10% chance to pick wrong card even if match known
         clickDelay: 300,
-        thinkTime: 800
+        thinkTime: 800,
+        clickJitter: 120,
+        thinkJitter: 300,
+        hintRate: 0.03,
+        maxHintsPerGame: 1
     },
     BAD: {
         name: 'Bad Player',
         memorySize: 1, // Remembers almost nothing
         mistakeRate: 0.4, // 40% chance to mess up
         clickDelay: 500,
-        thinkTime: 1500
+        thinkTime: 1500,
+        clickJitter: 250,
+        thinkJitter: 600,
+        hintRate: 0.12,
+        maxHintsPerGame: 3
+    },
+    SPEED_ACCURATE: {
+        name: 'Speed Accurate',
+        memorySize: Infinity,
+        mistakeRate: 0.02,
+        clickDelay: 80,
+        thinkTime: 180,
+        clickJitter: 20,
+        thinkJitter: 40,
+        hintRate: 0,
+        maxHintsPerGame: 0
+    },
+    SPEED_ERRATIC: {
+        name: 'Speed Erratic',
+        memorySize: 2,
+        mistakeRate: 0.35,
+        clickDelay: 90,
+        thinkTime: 220,
+        clickJitter: 80,
+        thinkJitter: 200,
+        hintRate: 0.08,
+        maxHintsPerGame: 2
+    },
+    SLOW_CAREFUL: {
+        name: 'Slow Careful',
+        memorySize: 6,
+        mistakeRate: 0.03,
+        clickDelay: 650,
+        thinkTime: 2200,
+        clickJitter: 80,
+        thinkJitter: 300,
+        hintRate: 0.01,
+        maxHintsPerGame: 1
+    },
+    FORGETFUL_GUESSER: {
+        name: 'Forgetful Guesser',
+        memorySize: 1,
+        mistakeRate: 0.5,
+        clickDelay: 420,
+        thinkTime: 1200,
+        clickJitter: 200,
+        thinkJitter: 700,
+        hintRate: 0.2,
+        maxHintsPerGame: 4
+    },
+    RHYTHMIC: {
+        name: 'Rhythmic',
+        memorySize: 5,
+        mistakeRate: 0.08,
+        clickDelay: 260,
+        thinkTime: 700,
+        clickJitter: 5,
+        thinkJitter: 10,
+        hintRate: 0.02,
+        maxHintsPerGame: 1
+    },
+    CADENCE_UNSTABLE: {
+        name: 'Cadence Unstable',
+        memorySize: 5,
+        mistakeRate: 0.12,
+        clickDelay: 260,
+        thinkTime: 700,
+        clickJitter: 260,
+        thinkJitter: 700,
+        hintRate: 0.04,
+        maxHintsPerGame: 2
+    },
+    HINT_DEPENDENT: {
+        name: 'Hint Dependent',
+        memorySize: 3,
+        mistakeRate: 0.18,
+        clickDelay: 360,
+        thinkTime: 900,
+        clickJitter: 120,
+        thinkJitter: 300,
+        hintRate: 0.35,
+        maxHintsPerGame: 8
+    },
+    COLOR_BIASED: {
+        name: 'Color Biased',
+        memorySize: 5,
+        mistakeRate: 0.1,
+        clickDelay: 320,
+        thinkTime: 850,
+        clickJitter: 90,
+        thinkJitter: 280,
+        hintRate: 0.03,
+        maxHintsPerGame: 2,
+        biasKeys: ['image6', 'image7', 'image2'],
+        biasMistakeMultiplier: 3
+    },
+    FATIGUED: {
+        name: 'Fatigued',
+        memorySize: 4,
+        mistakeRate: 0.12,
+        clickDelay: 320,
+        thinkTime: 850,
+        clickJitter: 110,
+        thinkJitter: 350,
+        hintRate: 0.06,
+        maxHintsPerGame: 3,
+        fatigueRamp: 0.9
     }
 };
 
@@ -56,11 +170,20 @@ class SimPlayer {
         
         // Loop until game over or timeout
         let remainingMoves = 100;
+        let hintsUsed = 0;
         while (this.sandbox.gameStop === 0 && remainingMoves > 0) {
             await this.waitForReady();
             if (this.sandbox.gameStop !== 0) break;
             remainingMoves--;
             this.moves++;
+
+            if (this.profile.hintRate && hintsUsed < (this.profile.maxHintsPerGame || 0)) {
+                if (typeof this.sandbox.showAllCards === 'function' && Math.random() < this.profile.hintRate) {
+                    this.sandbox.showAllCards();
+                    hintsUsed += 1;
+                    await this.waitForReady();
+                }
+            }
             
             // 1. Check if we know a match
             let move = this.findKnownMatch(cards);
@@ -84,7 +207,7 @@ class SimPlayer {
             await this.clickCard(c1);
             
             // Simulate think time
-            await sleep(this.profile.thinkTime / 10); // Speed up for test
+            await sleep(this.getThinkDelayMs() / 10);
 
             // Click Second
             // If random guess, c2 might be null if pickRandomUnknown only picked one
@@ -98,13 +221,39 @@ class SimPlayer {
                     await this.clickCard(second[0]);
                 }
             }
+
+            await sleep(this.getClickDelayMs() / 10);
             
             // Wait for game logic
             await this.waitForReady();
         }
 
+        let flowIndex = 0;
+        try {
+            if (this.sandbox.telemetry && typeof this.sandbox.telemetry.exportAll === 'function') {
+                const logs = await this.sandbox.telemetry.exportAll();
+                for (let i = logs.length - 1; i >= 0; i--) {
+                    const e = logs[i];
+                    if (e && e.type === 'flow_index' && e.data && isFinite(e.data.flowIndexRaw)) {
+                        flowIndex = e.data.flowIndexRaw;
+                        break;
+                    }
+                    if (e && e.type === 'flow_index' && e.data && isFinite(e.data.flowIndex)) {
+                        flowIndex = e.data.flowIndex;
+                        break;
+                    }
+                }
+            }
+        } catch (e) {}
+        if (!isFinite(flowIndex) || flowIndex === 0) {
+            try {
+                const last = this.sandbox.window && this.sandbox.window.lastAIResult;
+                if (last && isFinite(last.flowIndex)) flowIndex = last.flowIndex;
+            } catch (e) {}
+        }
+
         return {
-            flowIndex: this.sandbox.aiResult ? this.sandbox.aiResult.flowIndex : 0,
+            flowIndex,
             time: this.sandbox.time,
             moves: this.moves,
             completed: this.sandbox.gameStop === 1 && this.sandbox.matchedPairs === this.sandbox.totalPairs
@@ -131,6 +280,7 @@ class SimPlayer {
         
         card.click();
         this.remember(card);
+        await sleep(this.getClickDelayMs() / 10);
     }
 
     getCardKey(card) {
@@ -179,7 +329,7 @@ class SimPlayer {
             if (group.length >= 2) {
                 // Found a pair in memory!
                 // Apply mistake rate
-                if (Math.random() > this.profile.mistakeRate) {
+                if (Math.random() > this.getMistakeRateForKey(key)) {
                     return [group[0], group[1]];
                 }
             }
@@ -198,7 +348,7 @@ class SimPlayer {
         const key1 = this.getCardKey(c1);
         const matchInMemory = this.history.find(h => h.key === key1 && h.card !== c1 && available.includes(h.card));
         
-        if (matchInMemory && Math.random() > this.profile.mistakeRate) {
+        if (matchInMemory && Math.random() > this.getMistakeRateForKey(key1)) {
             return [c1, matchInMemory.card];
         }
 
@@ -211,6 +361,34 @@ class SimPlayer {
         }
         
         return [c1, null];
+    }
+
+    getClickDelayMs() {
+        const base = isFinite(this.profile.clickDelay) ? this.profile.clickDelay : 250;
+        const jitter = isFinite(this.profile.clickJitter) ? this.profile.clickJitter : 0;
+        const v = base + (Math.random() * 2 - 1) * jitter;
+        return Math.max(0, v);
+    }
+
+    getThinkDelayMs() {
+        const base = isFinite(this.profile.thinkTime) ? this.profile.thinkTime : 600;
+        const jitter = isFinite(this.profile.thinkJitter) ? this.profile.thinkJitter : 0;
+        const v0 = base + (Math.random() * 2 - 1) * jitter;
+        const ramp = isFinite(this.profile.fatigueRamp) ? this.profile.fatigueRamp : 0;
+        const fatigueFactor = ramp > 0 ? (1 + ramp * Math.min(1, this.moves / 40)) : 1;
+        return Math.max(0, v0 * fatigueFactor);
+    }
+
+    getMistakeRateForKey(key) {
+        let rate = isFinite(this.profile.mistakeRate) ? this.profile.mistakeRate : 0.1;
+        const keys = Array.isArray(this.profile.biasKeys) ? this.profile.biasKeys : null;
+        const mult = isFinite(this.profile.biasMistakeMultiplier) ? this.profile.biasMistakeMultiplier : 1;
+        if (keys && typeof key === 'string') {
+            const k = key.replace('.png', '').trim();
+            if (keys.includes(k)) rate = rate * mult;
+        }
+        if (!isFinite(rate)) rate = 0.1;
+        return Math.max(0, Math.min(1, rate));
     }
 }
 
