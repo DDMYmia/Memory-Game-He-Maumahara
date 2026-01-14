@@ -1,5 +1,13 @@
 # Changelog
 
+Version: v3.0.1 (2026-01-15)
+
+## Documentation
+- **Docs publishing**: Converted docs to Markdown + PDF and standardized printable margins.
+- **Diagrams**: Updated Mermaid syntax for v11 compatibility and exported a landscape, multi-diagram PDF.
+
+---
+
 Version: v3.0.0 (2026-01-13)
 
 ## Features
@@ -7,6 +15,7 @@ Version: v3.0.0 (2026-01-13)
 
 ## Documentation
 - **Version bump**: Updated documentation to v3.0.0 and performed a language audit (English + Māori only).
+- **Documentation expansion**: Expanded docs scope and restored full diagram coverage.
 
 ## Maintenance
 - **Root cleanup**: Removed legacy release notes and unused asset folder.

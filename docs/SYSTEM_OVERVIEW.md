@@ -1,118 +1,177 @@
 # He Maumahara System Overview
 
-**Version**: v3.0.0  
-**Date**: 2026-01-13  
+**Version**: v3.0.1  
+**Date**: 2026-01-15  
 **Status**: Stable Release
 
 ## 1. Introduction
 
-**He Maumahara** ("The Memory") is an adaptive cognitive training platform designed to support memory retention and cognitive resilience, particularly for Kaumātua (elders). Unlike traditional static games, He Maumahara employs an advanced **client-side AI engine** to personalize the experience in real-time, ensuring that the difficulty level always matches the player's current capability—a state known in psychology as the "Flow Zone."
+**He Maumahara** (“The Memory”) is a browser-based memory game designed for culturally grounded, bilingual learning and cognitive engagement. The experience targets accessibility for Kaumātua and whānau (high contrast UI, large touch targets, reduced clutter), while delivering a technically robust and privacy-preserving adaptive system.
 
-This document provides a comprehensive technical and design overview of the system, detailing its philosophy, core features, AI architecture, and future roadmap.
+The system’s differentiator is its fully client-side personalization loop:
+- Gameplay telemetry is stored locally (IndexedDB).
+- A **Flow Index** (0.0–1.0) summarizes “how well the round went” using a lightweight fuzzy-logic system.
+- A **contextual bandit** (LinUCB) chooses the next difficulty configuration (three discrete arms).
+- The next configuration is persisted locally (localStorage) and applied on the next run.
 
----
+No backend is required. No gameplay data is uploaded.
 
 ## 2. Design Philosophy
 
-Our design is guided by four core pillars:
+### 2.1 Cultural Safety and Integration
 
-### 2.1. Cultural Safety & Integration
-The system is built from the ground up to be culturally responsive to Māori users.
-- **Te Ao Māori**: The game integrates *kupu* (words), *whakataukī* (proverbs), and culturally significant imagery (e.g., Pīwakawaka, Kōwhai, Matariki).
-- **Respectful Engagement**: The AI is "Adaptive, not Punitive." It assists rather than penalizes, using subtle adjustments to guide users back to success without causing frustration.
+The project is built to support culturally resonant engagement rather than generic “gamification”.
+- Māori language and imagery are treated as core product value rather than decoration.
+- The UI and pacing are designed to be supportive and non-punitive.
+- The system avoids ranking/leaderboard mechanics; the primary feedback signal is Flow.
 
-### 2.2. Privacy-First "Edge AI" Architecture
-We operate on a strict **Zero-Data-Exfiltration** policy.
-- **Local Processing**: All AI calculations (Fuzzy Logic, Contextual Bandits) happen directly in the user's browser.
-- **Data Sovereignty**: No personal data, gameplay history, or telemetry is ever sent to a remote server. The user owns their data, stored in their device's IndexedDB.
+### 2.2 Privacy-First Architecture (Local-Only by Default)
 
-### 2.3. Flow Theory Application
-The system's primary metric is not "Score" or "Win/Loss," but the **Flow Index** (0.0–1.0).
-- **Optimal Challenge**: The goal is to keep the user in the "Flow Channel" (0.4–0.8), where the challenge is high enough to be stimulating but not so high as to cause anxiety, nor so low as to cause boredom.
+The architecture is “zero data exfiltration”:
+- All computation (gameplay logic, analytics, AI adaptation) runs in the browser.
+- Storage is device-local: IndexedDB and localStorage.
+- Export is user-initiated (JSON download) for evaluation and reproducibility.
 
-### 2.4. Accessibility
-- **Senior-Centric UI**: High contrast, large touch targets (96px+ cards), and clear typography (min 18px).
-- **Cognitive Load Management**: The interface minimizes distractions, focusing attention purely on the memory task.
+### 2.3 Flow Theory as the Core Objective
 
----
+The system optimizes for sustained engagement by balancing challenge with skill:
+- **Flow Index** is the primary post-game metric.
+- The adaptation goal is not simply “maximize difficulty” or “minimize time”, but to keep challenge appropriate over time.
 
-## 3. Key Features
+### 2.4 Accessibility and Cognitive Load Management
 
-### 3.1. Adaptive Difficulty Engine
-The system dynamically adjusts game parameters based on real-time performance:
-- **Grid Size**: Expands from 5×4 to 4×6 as skill improves.
-- **Timer & Delays**: Keeps a fixed round timer (300s), adjusts card reveal dynamics (hideDelay/showScale).
-- **Adjacency Rules**: In Level 2, the AI manipulates the probability of matching pairs being placed next to each other to assist struggling players.
+Key choices reflect senior-friendly design:
+- High contrast colors and large typography.
+- Large card targets and consistent spacing.
+- Minimal navigation and low UI noise during play.
 
-### 3.2. Comprehensive Analytics Dashboard
-Users and caregivers can view detailed performance breakdowns:
-- **Flow Index History**: A longitudinal view of cognitive engagement.
-- **Error Analysis**: Tracking consecutive errors and specific color/shape confusion patterns.
-- **Behavioral Metrics**: Click cadence stability (motor control) and response times.
-- **K-Means Overall Review**: A lightweight clustering summary of recent games (Flow/Accuracy/Speed) to highlight dominant performance patterns and short-term trend.
+## 3. Product Surface: Pages and User Journey
 
-### 3.3. Multi-Level Cognitive Training
-- **Level 1 (Visual)**: Pure image matching (episodic memory).
-- **Level 2 (Spatial)**: Variable grid sizes and adjacency (spatial memory).
-- **Level 3 (Linguistic)**: Image-to-Word matching (semantic memory & language retention).
+### 3.1 Pages
 
-### 3.4. Robust Offline Capability
-Built as a Progressive Web App (PWA) candidate, the entire system functions without an internet connection once loaded.
+- index.html: home menu (Play, Analytics, Instructions, Credits)
+- play.html: level selection
+- lvl-1.html, lvl-2.html, lvl-3.html: gameplay pages
+- analytics.html: analytics dashboard (history + demo)
+- instructions.html, credits.html: informational pages
 
----
+### 3.2 Typical Journey
 
-## 4. AI Architecture
+1. Home → Level selection → Play a level
+2. Game-over screen shows:
+   - elapsed time and post-game summary panel
+   - Flow Index feedback
+   - export/screenshot options
+   - “Next Game” progression using the next AI configuration
+3. Analytics page displays session history and overall trends.
 
-The intelligence core consists of two cooperating subsystems: the **Fuzzy Logic System** (Assessment) and the **Contextual Bandit** (Adaptation).
+## 4. Core Features (User-Visible)
 
-### 4.1. Fuzzy Logic System (The Assessor)
-This component translates raw telemetry into a meaningful human-centric metric: the **Flow Index**.
+### 4.1 Multi-Level Cognitive Tasks
 
-- **Inputs (Crisp Values)**:
-  - Completion Time (normalized by level)
-  - Error Rate (failed matches / total matches)
-  - Cadence Stability (variance of flip intervals)
-  - Click Accuracy & Color/Shape Sensitivity
-- **Fuzzification**: Inputs are mapped to linguistic variables (e.g., `Time` → `Fast`, `Medium`, `Slow`) using triangular membership functions.
-- **Rule Base**: A compact set of rules (currently **16 rules**) determines the output.
-  - *Example Rule*: `IF Time is Fast AND Error is Low AND Accuracy is High THEN Flow is High.`
-- **Defuzzification**: Weighted average calculation produces the Base Flow Index.
-- **Post-Processing**: A multiplicative **Cheat Penalty** (based on hint usage) is applied, then a final clamp is applied to preserve player confidence (default floor at 0.3).
+- **Level 1 (Visual baseline)**: image–image matching with a stable, onboarding-friendly layout.
+- **Level 2 (Spatial challenge)**: variable layouts and adjacency-based placement to tune search complexity.
+- **Level 3 (Linguistic challenge)**: image–text matching (kupu), adding semantic recall on top of visual memory.
 
-### 4.2. Contextual Bandit - LinUCB (The Director)
-This component decides the *next* game's configuration to maximize the user's Flow Index.
+### 4.2 Shared Gameplay Controls
 
-- **Algorithm**: Linear Upper Confidence Bound (LinUCB).
-- **Context Vector (7 Dimensions)**:
-  - `[Level, AvgFlow, ErrorRate, Cadence, Fatigue, HiddenDifficulty, CheatRatio]`
-- **Arms (Actions)**:
-  - **Arm 0 (Easiest)**: Max hints, slow timer, simple grid.
-  - **Arm 1 (Standard)**: Baseline settings.
-  - **Arm 2 (Hard)**: Faster timer, reduced hints.
-- **Learning**: The bandit updates its internal model (matrix `A` and vector `b`) after every game, "learning" which configuration yields the best engagement for this specific user.
+Gameplay pages include a consistent control set:
+- Show: temporary reveal of cards with a time cost (hint usage)
+- Export: telemetry download (JSON) for reproducibility
+- Adapt: toggle adaptive difficulty (persisted)
+- Reset: clear per-level telemetry store
 
----
+### 4.3 Analytics and Progress Feedback
 
-## 5. System Strengths & Advantages
+- Post-game summary panel on each level page.
+- Analytics dashboard with:
+  - session history (IndexedDB game_history)
+  - an overall review widget based on local clustering (K-Means).
 
-| Feature | Advantage |
-| :--- | :--- |
-| **Serverless** | Zero maintenance cost; no cloud infrastructure bills; infinite scalability. |
-| **Zero Latency** | AI decisions occur in <10ms locally, providing instant feedback even on slow networks. |
-| **Privacy Guarantee** | "Privacy by Design" ensures compliance with data protection standards for vulnerable populations. |
-| **Cultural Value** | Not just a game, but a tool for cultural preservation and language revitalization. |
-| **Resilience** | No single point of failure; the app works as long as the device has power. |
+## 5. System Architecture (Implementation View)
 
----
+### 5.1 Layers
 
-## 6. Limitations & Future Work
+- **Presentation**: static HTML + CSS
+- **Gameplay logic**: vanilla JavaScript per level
+- **AI and analytics**: vanilla JavaScript modules
+- **Persistence**:
+  - IndexedDB for telemetry, game history, and AI profile state
+  - localStorage for small settings and next-round configuration
 
-### 6.1. Current Limitations
-- **Device Silo**: As data is stored in `IndexedDB`, a user cannot switch from a tablet to a phone and retain their progress.
-- **Storage Constraints**: While `IndexedDB` is capacious, extremely long-term high-frequency data logging may eventually hit browser quotas.
-- **Cold Start**: The Contextual Bandit requires 5-10 games to converge on an optimal strategy for a new user.
+### 5.2 Key Modules
 
-### 6.2. Future Roadmap
-- **Export/Import Profile**: Allow users to manually export their profile to a JSON file to transfer progress between devices.
-- **Caregiver Mode**: A simplified dashboard for whānau/caregivers to monitor progress without navigating complex analytics.
-- **Voice Interaction**: Adding voice recognition for "reading" the cards in Level 3 to further stimulate language centers.
+- js/game-core.js: shared utilities, telemetry helpers, export/screenshot integration
+- js/lvl1.js, js/lvl2.js, js/lvl3.js: level-specific gameplay logic
+- js/ai-helper.js: extracts metrics from telemetry and orchestrates AI at game end
+- js/ai-engine.js: Flow Index scoring, contextual bandit decision layer, config generation
+- js/analytics-summary.js: post-game summary UI and overall review rendering
+- js/game-history.js: game_history storage access
+
+## 6. AI: Adaptive Difficulty Engine (Detailed Overview)
+
+### 6.1 Inputs (Telemetry-Derived Metrics)
+
+Common signals used by the AI include:
+- completionTime (seconds)
+- totalPairs
+- totalMatches and failedMatches (error rate)
+- totalClicks (click efficiency)
+- flipIntervals (cadence stability)
+- cheatCount (Show usage)
+- consecutiveErrors and maxConsecutiveErrors (difficulty/frustration indicators)
+
+### 6.2 Flow Index (Fuzzy Logic)
+
+The Flow Index compresses multi-dimensional gameplay signals into a stable scalar:
+- Designed for interpretability and robustness to noisy inputs.
+- Supports a user-facing display layer that can be clamped to avoid discouraging feedback.
+
+### 6.3 Decision Layer (Contextual Bandit: LinUCB)
+
+The bandit selects among three discrete “arms”:
+- Arm 0: easiest
+- Arm 1: standard
+- Arm 2: challenge
+
+The reward signal is derived from the Flow Index, enabling online learning per device without centralized training.
+
+### 6.4 Configuration Outputs
+
+Parameters adapted across rounds include:
+- grid size (notably Level 2 and 3: 5×4 vs 4×6)
+- reveal dynamics (hideDelay and showScale)
+- Level 2 adjacency assistance targets
+- step smoothing to prevent abrupt difficulty jumps
+
+## 7. Data Model (Storage and Ownership)
+
+### 7.1 IndexedDB Stores (Conceptual)
+
+- telemetry_lvl1 / telemetry_lvl2 / telemetry_lvl3: per-level event streams
+- game_history: completed sessions for the analytics dashboard
+- ai_player_profile: persisted AI player profile and bandit state
+
+### 7.2 localStorage Keys (Conceptual)
+
+- ai_adaptive_enabled
+- ai_level1_config / ai_level2_config / ai_level3_config
+
+## 8. Testing, Evaluation, and Demonstration
+
+- Automated player simulations exist under tests/ to regression-test gameplay and AI behavior.
+- Exported telemetry streams enable offline inspection and reproducible analysis during evaluation.
+
+## 9. Limitations and Future Work
+
+### 9.1 Known Constraints
+
+- Device-local progress: no cross-device syncing by default.
+- Cold start: adaptation stabilizes after a small number of rounds.
+- Browser storage limits: very long-term logging may reach quota on some devices.
+
+### 9.2 Roadmap Options
+
+- Manual export/import of profiles to support device migration.
+- Caregiver-friendly analytics mode.
+- Extended linguistic tasks and/or voice features for Level 3.

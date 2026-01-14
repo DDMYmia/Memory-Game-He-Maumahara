@@ -1,206 +1,191 @@
 # Technical Reference Manual
 
-This document provides deep technical details on the system architecture, data structures, analytics implementation, and the AI scoring algorithms. It serves as the primary reference for developers working on the core logic.
+**Version**: v3.0.1  
+**Date**: 2026-01-15
 
-**Version**: v3.0.0  
-**Date**: 2026-01-13  
+This document provides detailed technical reference material for the current implementation: architecture, module responsibilities, local data models, telemetry, analytics, and the adaptive AI system (Flow Index + contextual bandit).
 
----
+## 1. Runtime Architecture
 
-## 1. System Architecture
+He Maumahara is a pure-frontend system:
+- UI: static HTML pages + CSS
+- Logic: vanilla JavaScript (browser runtime)
+- AI: client-side fuzzy logic scoring and contextual bandit decision layer
+- Analytics: local session history and on-device clustering
+- Storage: IndexedDB + localStorage
 
-He Maumahara is a browser-based memory card game with a **privacy-first, pure-frontend** architecture. Gameplay, Flow Index, and adaptive difficulty run entirely in the browser without a backend service.
+There is no backend service and no network dependency for core features.
 
-### 1.1 Runtime Environment
+## 2. Codebase Map (Files and Responsibilities)
 
-- **UI Layer**: Static HTML pages + CSS (Responsive, High Contrast).
-- **Logic Layer**: Vanilla JavaScript (ES6+ modules).
-- **AI Layer**: Local Fuzzy Logic engine + Contextual Bandit (LinUCB).
-- **Data Layer**: IndexedDB (Structured storage) + localStorage (Settings).
+### 2.1 Pages
 
-### 1.2 Key Modules
+- index.html: home menu
+- play.html: level selection
+- lvl-1.html / lvl-2.html / lvl-3.html: gameplay pages
+- analytics.html: analytics dashboard
+- instructions.html / credits.html: informational pages
 
-| Module | Responsibility |
-|--------|----------------|
-| `js/game-core.js` | Core game loop, event logging (Telemetry), shared utilities. |
-| `js/ai-engine.js` | **The Brain**. Computes Flow Index (Fuzzy Logic) and selects difficulty (Bandit). |
-| `js/ai-helper.js` | **The Bridge**. Extracts metrics from raw telemetry and orchestrates the AI loop. |
-| `js/game-history.js` | Manages the `game_history` IndexedDB database. |
-| `js/analytics-summary.js` | Renders the post-game analysis UI. |
+### 2.2 JavaScript Modules
 
-### 1.3 Data Flow
+| File | Responsibility |
+|---|---|
+| js/game-core.js | Shared game utilities, telemetry integration, export/screenshot helpers, AI toggle UI glue, AI profile persistence |
+| js/lvl1.js | Level 1 gameplay logic (baseline fixed layout) |
+| js/lvl2.js | Level 2 gameplay logic (adjacency-based layout generation, progression logic) |
+| js/lvl3.js | Level 3 gameplay logic (image–text matching and normalization) |
+| js/ai-helper.js | Telemetry metric extraction and end-of-game AI orchestration |
+| js/ai-engine.js | Flow Index (fuzzy logic), contextual bandit (LinUCB), configuration generation |
+| js/game-history.js | game_history IndexedDB access layer |
+| js/analytics-summary.js | Post-game summary rendering and K-Means overall review |
 
-1.  **Interaction**: Player clicks cards (Generate `flip`/`match` events).
-2.  **Telemetry**: Events are pushed to `telemetry_lvlX` in IndexedDB.
-3.  **Analysis**: At game end, `ai-helper.js` pulls events and computes metrics (time, errors, cadence).
-4.  **AI Processing**: `ai-engine.js` computes **Flow Index** and updates the **Player Profile**.
-5.  **Decision**: The Bandit algorithm selects the configuration for the *next* game.
-6.  **Persistence**: Game results are saved to `game_history`; Profile is updated in `ai_player_profile`.
+## 3. Local Persistence Model
 
----
+### 3.1 IndexedDB Databases (Conceptual)
 
-## 2. Analytics & Data Collection
+Telemetry databases (per level)
+- telemetry_lvl1
+- telemetry_lvl2
+- telemetry_lvl3
 
-### 2.1 Telemetry Events
+History database
+- game_history
 
-Raw events are stored in IndexedDB stores: `telemetry_lvl1`, `telemetry_lvl2`, `telemetry_lvl3`.
+AI profile database
+- ai_player_profile
 
-| Event Type | Key Data Fields | Description |
-|------------|-----------------|-------------|
-| `start` | `level`, `variant` | Game initialization. |
-| `flip` | `cardId`, `image` | Player interaction. |
-| `match` | `result` (success/fail), `streak` | Logic outcome. |
-| `show_cards` | `state` (show/hide) | Cheat/Hint usage. |
-| `end` | `completionTime`, `pairs` | Game conclusion. |
-| `flow_index` | `flowIndex`, `metrics` | AI computation result. |
+### 3.2 localStorage Keys (Conceptual)
 
-### 2.2 Player Profile (`ai_player_profile`)
+- ai_adaptive_enabled: boolean flag for whether adaptation is applied
+- ai_level1_config / ai_level2_config / ai_level3_config: serialized “next config” payloads
+- lvl2_next_action: local action/state used by Level 2 progression logic
 
-This database stores the long-term "memory" of the AI.
+## 4. Telemetry Event Model
 
-- **`playerProfile`**: Aggregated stats (Average Flow Index, Error Rate, Fatigue level).
-- **`banditState`**: The brain of the Contextual Bandit.
-    - `A`: Covariance matrices (Inverse).
-    - `b`: Reward vectors.
-    - `theta`: Estimated coefficients.
-- **`recentRounds`**: Sliding window of recent Flow Indexes (used for trend analysis).
+Telemetry events are recorded during play to support analytics and the adaptive loop. Events are stored locally in IndexedDB and can be exported as JSON.
 
-### 2.3 Game History (`game_history`)
+### 4.1 Common Event Types
 
-Stores completed sessions for the Analytics Dashboard (`analytics.html`).
+Typical events include:
+- start: session begins (includes level and a configuration snapshot)
+- flip: each card flip
+- match: success/failure outcomes for a pair attempt
+- show_cards: hint usage (state transitions show/hide)
+- ripple_effect: hint animation triggered after repeated errors
+- end: session completion summary
+- flow_index: Flow Index computation payload and supporting metrics
+- ai_suggestion: next configuration suggestion
 
-```javascript
-{
-  gameId: "game_1736400000000_abc123",
-  timestamp: 1736400000000,
-  level: 1,
-  metrics: { ... }, // Extracted performance data
-  aiResult: {
-    flowIndex: 0.75,
-    nextConfig: { ... } // What the AI chose for next time
-  },
-  summary: { ... } // Pre-calculated stats for UI
-}
-```
+### 4.2 Session Segmentation (How a “game” is isolated)
 
-### 2.4 K-Means Overall Review (Analytics)
+At analysis time, a session is typically defined as:
+- the most recent start event for a level, and
+- the subsequent end event (if present),
+with all events in between treated as the current session.
 
-The Analytics main page includes a lightweight **K-Means Overall Review** to summarize recent performance patterns without requiring any server-side processing.
+This segmentation enables consistent metric extraction even if the store contains multiple historical runs.
 
-- **Goal**: Group recent games into a small number of performance clusters to provide a quick, interpretable “overall status” and short-term trend.
-- **Data source**: Recent sessions from `game_history` (IndexedDB).
-- **Implementation**: `js/analytics-summary.js` (`renderKMeansOverallEvaluation()` and `kmeans()`).
+## 5. Metric Extraction (ai-helper.js)
 
-#### Features (Input Vector)
-Each game session is mapped into a feature vector using recent, per-session metrics:
+The AI helper extracts performance signals from telemetry:
+- completion time (derived from event timestamps)
+- total matches and failed matches
+- click count / click efficiency
+- flip intervals (cadence series) and cadence stability measures
+- hint usage (Show count)
+- consecutive error streaks
+- optional attribute statistics (color/shape) when image metadata is present
 
-- **Flow Index**: `aiResult.flowIndex` when available (otherwise derived from stored metrics).
-- **Accuracy**: success rate / click efficiency from the session summary.
-- **Speed**: derived from **time per pair** (when timing is available), transformed into a “higher is better” score.
+The extracted metrics are the input to Flow Index scoring and configuration selection.
 
-The feature vector is **min-max normalized** over the sampled sessions to stabilize clustering across devices and play styles.
+## 6. Flow Index (Fuzzy Logic Scoring)
 
-#### Model Details
+### 6.1 Purpose
 
-- **Algorithm**: Standard K-Means (squared Euclidean distance).
-- **K selection**: `K=3` when there are enough samples (≥10), otherwise `K=2`.
-- **Iterations**: fixed small cap for responsiveness (default ~30 in current code path).
-- **Outputs**:
-  - `centroids`: cluster centers in feature space
-  - `assignments`: cluster index per session
+The Flow Index compresses multi-signal performance into a single interpretable value in [0, 1].
 
-#### UI Outputs
+### 6.2 Inputs (Representative)
 
-- **Dominant cluster**: the most frequent cluster within a recent window (up to the last 10 games).
-- **Scatter plot**: Flow (x-axis) vs Accuracy (y-axis), color-coded by cluster; centroids are highlighted.
-- **Cluster table**: count/percentage and per-cluster summary statistics (mean ± std dev for Flow/Accuracy and Speed when present).
-- **Trend strip**: recent cluster assignments visualized as a compact bar sequence.
+- normalized completion time
+- error rate
+- click accuracy proxy
+- cadence stability proxy
+- hint usage penalty
+- optional attribute sensitivity proxies
 
----
+### 6.3 Output Interpretation
 
-## 3. AI & Scoring Algorithms
+Higher Flow Index indicates better performance under the current configuration. The system aims to keep difficulty appropriate over time rather than maximizing raw difficulty.
 
-The AI system is the core differentiator of this project. It aims to keep the player in the "Flow Channel" (Flow Index 0.4 - 0.8).
+User-facing display may clamp values to avoid discouraging feedback while preserving an internal learning signal.
 
-### 3.1 Flow Index Calculation
+## 7. Contextual Bandit (LinUCB) and Configuration Selection
 
-The **Flow Index** (0.0 - 1.0) is a composite metric derived from a compact Fuzzy Logic rule base (currently **16 rules**).
+### 7.1 Why a Bandit
 
-#### Step 1: Normalization
-Raw metrics are normalized to [0, 1]:
-- **Time**: Normalized against expected time per level.
-- **Error Rate**: Failed matches / Total matches.
-- **Cadence**: Stability of click rhythm (Coefficient of Variation).
-- **Accuracy**: Click efficiency and Color/Shape recognition rates.
+A contextual bandit:
+- learns online from local rewards (Flow Index)
+- selects among discrete actions (difficulty arms)
+- balances exploration vs exploitation without centralized training
 
-#### Step 2: Fuzzy Rules (Rule Base)
-We use a Mamdani-style inference system.
-*Example Rules:*
-- **Rule 1 (Flow)**: If `Time is Medium` AND `Error is Low` AND `Cadence is Stable` → `Flow = High (0.85)`.
-- **Rule 5 (Rushing)**: If `Time is Fast` AND `Error is High` → `Flow = Low (0.30)`.
-- **Rule 8 (Mastery)**: If `Time is Medium` AND `ColorAcc is High` AND `ShapeAcc is High` → `Flow = Peak (0.98)`.
+### 7.2 Arms
 
-#### Step 3: Cheat Penalty
-Using the "Show All Cards" feature applies a multiplicative penalty **after** the fuzzy calculation to avoid logic conflicts.
-```javascript
-cheatRatio = cheatCount / totalPairs;
-penalty = min(0.5, cheatRatio * 0.5); // Max 50% penalty
-finalFlowIndex = baseFlowIndex * (1.0 - penalty);
-```
+Three arms are used:
+- Arm 0: easiest
+- Arm 1: standard
+- Arm 2: challenge
 
-#### Step 4: Display Clamp
-To preserve player confidence, the UI uses a display clamp:
-- `displayFlowIndex = clamp(trueFlowIndex, 0.3, 1.0)`
-while the AI learning and difficulty logic uses:
-- `trueFlowIndex = clamp(baseFlowIndex * cheatPenalty, 0, 1)`
+### 7.3 Configuration Outputs (Examples)
 
-#### Implementation Notes (Current Code)
-- The current code uses **16 fuzzy rules** and a weighted average over active rules.
-- If no rule activates (denominator = 0), a fallback score is computed from time/error/accuracy signals.
+Depending on level and selected arm, configuration parameters may include:
+- gridCols/gridRows for Levels 2 and 3 (5×4 vs 4×6)
+- totalPairs derived from grid size
+- hideDelay and showScale derived from a hidden difficulty level
+- Level 2 adjacency target (assistance) adjusted based on recent Flow Index
+- step smoothing to avoid abrupt jumps between arms and grid sizes
 
-### 3.2 Contextual Bandit (LinUCB)
+## 8. Analytics
 
-The system uses a Linear Upper Confidence Bound (LinUCB) algorithm to select the difficulty "Arm" for the next game.
+### 8.1 Post-Game Summary (analytics-summary.js)
 
-- **Arms**: 3 discrete difficulty levels (0=Easy, 1=Standard, 2=Challenge).
-- **Context**: The algorithm observes the current state (Level, Fatigue, Recent Performance).
-- **Reward (Current Implementation)**: The bandit is updated using the observed `flowIndex` directly (post-processing included).
+The game-over summary panel renders:
+- Flow Index and interpretation
+- time/accuracy proxies and error indicators
+- hint usage
+- configuration snapshot (e.g., hideDelay/showScale, adjacency stats on Level 2)
 
-#### Configuration Outputs
-The chosen Arm is converted into a configuration bundle:
-- **Timer**: fixed at 300 seconds across levels.
-- **Grid Size**:
-  - Level 1: 5×4
-  - Level 2 & 3: 5×4 or 4×6, selected using a combination of Arm choice and recent Flow Index trend.
-- **Hide/Reveal Dynamics**: a separate hidden difficulty signal maps into discrete `hiddenLevel`, then selects `hideDelay` and `showScale`.
-- **Level 2 Adjacency Assist**: `adjacentTarget` (and derived `adjacentRate`) is adjusted based on recent Flow Index.
+### 8.2 History (game_history)
 
----
+Completed sessions are stored to drive analytics.html. A session record typically contains:
+- timestamp
+- level
+- derived metrics/summary fields
+- AI results (Flow Index, suggested next configuration)
 
-## 4. Current Status (AI Logic)
+### 8.3 K-Means Overall Review (analytics-summary.js)
 
-- Flow Index no longer collapses to a constant mid-score across runs; it responds to time/accuracy/errors as intended.
-- Telemetry metric extraction is centralized in `js/ai-helper.js`, and results are recorded back to telemetry as `flow_index` and `ai_suggestion`.
-- Automated simulation tests exist under `tests/` to regress Flow Index and configuration behavior.
+The overall review clusters recent sessions using a compact feature vector such as:
+- Flow Index
+- Accuracy
+- optional Speed score derived from time-per-pair
 
-## 5. Recommended Closing Improvements (High Impact)
+Implementation notes:
+- min–max normalization stabilizes clustering across different play styles
+- K is chosen based on available sample size (e.g., K=2 or K=3)
+- outputs include assignments, centroids, and a short trend visual
 
-1. **Align bandit reward with “Flow Channel” goal**
-   - Current: maximize observed Flow Index.
-   - Suggested: use a shaped reward around a target zone (e.g., 0.65–0.75) so the bandit learns to keep players challenged but not overwhelmed.
-2. **Separate “display” Flow Index from “learning” reward**
-   - Keep the 0.3 floor for user-facing UX, but update the bandit using unclamped `baseFlowIndex` (or a shaped reward).
-3. **Make edge-case defaults consistent**
-   - Several normalizers default to 0.5 when data is missing; consider making missing-data behavior explicit and consistent to avoid biasing early games.
-4. **Add regression gates for configuration stability**
-   - Ensure config changes are bounded per round (already partially implemented), and add tests for “no wild oscillation” across several simulated runs.
+## 9. Testing and Tooling
 
----
+Automated tests under tests/ simulate players against level scripts to provide regression coverage for:
+- core gameplay progression under different player profiles
+- Flow Index variability under different behavioral patterns
+- configuration selection stability
 
-## 6. Viewing Data
+## 10. Debugging and Inspection
 
-Developers can inspect data using Browser DevTools (Application > IndexedDB).
+Browser DevTools:
+- Application → IndexedDB: telemetry, game_history, ai_player_profile
+- Application → Local Storage: ai_* keys and per-level next config
 
-- **`game_history`**: View past game records.
-- **`ai_player_profile`**: View internal AI state (matrices and weights).
-- **`telemetry_lvl*`**: View raw event streams.
+Export:
+- gameplay pages provide JSON export for offline analysis and reproducible evaluation.
