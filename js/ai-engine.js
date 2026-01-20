@@ -39,8 +39,8 @@ class FuzzyLogicSystem {
         name: 'Matariki' 
       },
       'image2.png': { 
-        color: 'yellow',
-        baseColor: 'yellow',
+        color: 'red',
+        baseColor: 'red',
         name: 'Pīwakawaka' 
       },
       'image3.png': { 
@@ -89,9 +89,14 @@ class FuzzyLogicSystem {
         name: 'Image 11'
       },
       'image12.png': {
-        color: 'blue',
-        baseColor: 'blue',
+        color: 'red',
+        baseColor: 'red',
         name: 'Image 12'
+      },
+      'image13.png': {
+        color: 'green',
+        baseColor: 'green',
+        name: 'Image 13'
       }
     };
 
@@ -754,9 +759,9 @@ class ContextualBandit {
     let gridCols = 5;
     let gridRows = 4;
     if (level === 2 || level === 3) {
-      // Default grid mapping: Arm 0-1 use 5×4, Arm 2 uses 4×6
+      // Default grid mapping: Arm 0-1 use 5×4, Arm 2 uses 6×4
       // Actual grid selection is handled in AIEngine.decideNextConfig() based on performance
-      const gridMap = [ [5,4], [5,4], [4,6] ];
+      const gridMap = [ [5,4], [5,4], [6,4] ];
       const sel = gridMap[Math.min(gridMap.length - 1, Math.max(0, arm))];
       gridCols = sel[0];
       gridRows = sel[1];
@@ -766,9 +771,10 @@ class ContextualBandit {
     let adjacentTarget = undefined;
     let adjacentRate = undefined;
     if (level === 2) {
-      const targetByArm = [6, 5, 4];
-      adjacentTarget = Math.min(totalPairs, targetByArm[Math.min(targetByArm.length - 1, Math.max(0, arm))]);
-      adjacentRate = totalPairs > 0 ? adjacentTarget / totalPairs : 0.5;
+      const rateByArm = [0.6, 0.4, 0.2];
+      adjacentRate = rateByArm[Math.min(rateByArm.length - 1, Math.max(0, arm))];
+      adjacentRate = Math.max(0.2, Math.min(0.6, adjacentRate));
+      adjacentTarget = totalPairs > 0 ? Math.max(0, Math.min(totalPairs, Math.round(adjacentRate * totalPairs))) : 0;
     }
 
     return {
@@ -834,6 +840,7 @@ class AIEngine {
       lastHiddenLevel: null,
       lastArm: null,
       lastAdjacentTarget: null,
+      lastAdjacentRate: null,
       playerProfile: {
         avgFlow: 0.5,
         errorRate: 0.2,
@@ -907,6 +914,11 @@ class AIEngine {
     this.sessionState.playerProfile.cadence = smooth * cadence + (1 - smooth) * prevCadence;
     this.sessionState.playerProfile.maxConsecutiveErrors = maxConsecutiveErrors || consecutiveErrors || 0;
 
+    // Update last grid size based on game data
+    if (gameData.gridCols && gameData.gridRows) {
+      this.sessionState.lastGridSize = (gameData.gridCols === 6 && gameData.gridRows === 4) ? 'large' : 'small';
+    }
+
     this.updateHiddenDifficulty(flowIndex, gameData);
 
     return flowIndex;
@@ -918,12 +930,12 @@ class AIEngine {
    * @returns {Object} Next game configuration
    */
   /**
-   * Determine if player is ready for larger grid (4×6) based on performance
+   * Determine if player is ready for larger grid (6×4) based on performance
    * Uses Flow Index as the primary and only criterion since it's the most comprehensive metric
    * @param {Object} playerProfile - Current player profile
    * @param {Array} recentRounds - Recent game rounds (last 3)
-   * @param {boolean} currentlyUsingLargeGrid - Whether currently on 4×6 grid
-   * @returns {boolean} True if ready for 4×6 grid
+   * @param {boolean} currentlyUsingLargeGrid - Whether currently on 6×4 grid
+   * @returns {boolean} True if ready for 6×4 grid
    */
   shouldUseLargeGrid(playerProfile, recentRounds = [], currentlyUsingLargeGrid = false) {
     const { avgFlow = 0.5 } = playerProfile;
@@ -952,8 +964,14 @@ class AIEngine {
 
     // Upgrade criteria: Flow Index >= 0.7 (excellent performance)
     // Flow Index is the most comprehensive and intuitive metric
+    // Strict progression: Require recent performance to be good, not just historical average
     const flowThreshold = 0.7;
-    return avgFlow >= flowThreshold;
+    
+    const lastRound = recentRounds.length > 0 ? recentRounds[recentRounds.length - 1] : null;
+    const lastRoundFlow = lastRound ? (lastRound.flowIndex || 0) : 0;
+    
+    // Upgrade if the most recent game demonstrated mastery
+    return lastRoundFlow >= flowThreshold;
   }
 
   decideNextConfig(level) {
@@ -975,8 +993,8 @@ class AIEngine {
     
     // Check if currently using large grid
     const currentlyUsingLargeGrid = this.sessionState.lastGridSize === 'large' || 
-                                    (this.sessionState.currentRound?.config?.gridCols === 4 && 
-                                     this.sessionState.currentRound?.config?.gridRows === 6);
+                                    (this.sessionState.currentRound?.config?.gridCols === 6 && 
+                                     this.sessionState.currentRound?.config?.gridRows === 4);
     
     // Get base config from bandit
     const configBase = this.bandit.getConfigForArm(selectedArm, level);
@@ -985,30 +1003,47 @@ class AIEngine {
     if ((level === 2 || level === 3) && this.sessionState.playerProfile) {
       let useLargeGrid = false;
       
-      // Default behavior based on Arm:
-      // Arm 0: Always 5×4 (easiest)
-      // Arm 1: Default 5×4, can upgrade to 4×6 if Flow Index >= 0.7
-      // Arm 2: Always 4×6 (challenge)
+      // Check if we have played this level before
+      const hasPlayedThisLevel = this.sessionState.rounds.some(r => r.gameData && r.gameData.level === level);
+
+      // Get recent rounds for smart grid selection
+      // We only care about rounds from the CURRENT level for progression decisions?
+      // Or do we allow global performance (avgFlow) to influence it?
+      // The user wants strict progression.
+      // But shouldUseLargeGrid uses playerProfile.avgFlow which is global.
+      // However, forcing S1 on first play of level satisfies the "Entry" requirement.
+      // The "Upgrade" requirement is handled by shouldUseLargeGrid.
       
-      if (selectedArm === 0) {
-        // Arm 0: Always small grid
-        useLargeGrid = false;
-      } else if (selectedArm === 2) {
-        // Arm 2: Always large grid
-        useLargeGrid = true;
-      } else if (selectedArm === 1) {
-        // Arm 1: Check performance to decide (Flow Index >= 0.7)
-        useLargeGrid = this.shouldUseLargeGrid(
-          this.sessionState.playerProfile, 
-          recentRounds, 
-          currentlyUsingLargeGrid
-        );
+      if (!hasPlayedThisLevel) {
+         // First time playing this level: Always start at Stage 1 (Small Grid)
+         useLargeGrid = false;
+      } else {
+          // Default behavior based on Arm:
+          // Arm 0: Always 5×4 (easiest)
+          // Arm 1: Default 5×4, can upgrade to 6×4 if Flow Index >= 0.7
+          // Arm 2: Always 6×4 (challenge)
+          
+          // Strict progression logic: lv1 -> lv2s1 -> lv2s2 -> lv3s1 -> lv3s2
+          // Only allow Large Grid (Stage 2) if performance warrants it, regardless of Arm
+          if (selectedArm === 0) {
+            // Arm 0 (Easiest): Force small grid
+            useLargeGrid = false;
+          } else {
+            // Arm 1 (Standard) or Arm 2 (Challenge):
+            // Only use Large Grid if the player is ready (Flow Index >= 0.7)
+            // This prevents jumping to S2 prematurely even if Arm 2 is selected
+            useLargeGrid = this.shouldUseLargeGrid(
+              this.sessionState.playerProfile, 
+              recentRounds, 
+              currentlyUsingLargeGrid
+            );
+          }
       }
       
       // Update grid size in config
       if (useLargeGrid) {
-        configBase.gridCols = 4;
-        configBase.gridRows = 6;
+        configBase.gridCols = 6;
+        configBase.gridRows = 4;
         this.sessionState.lastGridSize = 'large';
       } else {
         configBase.gridCols = 5;
@@ -1020,30 +1055,28 @@ class AIEngine {
       configBase.totalPairs = Math.floor((configBase.gridCols * configBase.gridRows) / 2);
     }
 
-    const baseAdjTarget = configBase.adjacentTarget;
-    const hasAdjTarget = level === 2 && typeof baseAdjTarget === 'number' && isFinite(baseAdjTarget);
-    let adjacentTarget = hasAdjTarget ? baseAdjTarget : null;
-    if (hasAdjTarget) {
+    const baseAdjRate = configBase.adjacentRate;
+    const hasAdjRate = level === 2 && typeof baseAdjRate === 'number' && isFinite(baseAdjRate);
+    let adjacentRate = hasAdjRate ? baseAdjRate : null;
+    let adjacentTarget = hasAdjRate ? configBase.adjacentTarget : null;
+    if (hasAdjRate) {
       const lastFlow = recentRounds.length ? (recentRounds[recentRounds.length - 1].flowIndex || 0) : (this.sessionState.playerProfile?.avgFlow || 0.5);
-      const targetByFlow = lastFlow < 0.45 ? 6 : lastFlow < 0.75 ? 5 : 4;
-      adjacentTarget = targetByFlow;
+      const targetRateByFlow = lastFlow < 0.45 ? 0.6 : lastFlow < 0.75 ? 0.4 : 0.2;
+      adjacentRate = targetRateByFlow;
 
-      if (typeof this.sessionState.lastAdjacentTarget === 'number' && isFinite(this.sessionState.lastAdjacentTarget)) {
-        const prev = this.sessionState.lastAdjacentTarget;
-        const step = 1;
-        if (adjacentTarget > prev) adjacentTarget = Math.min(prev + step, adjacentTarget);
-        if (adjacentTarget < prev) adjacentTarget = Math.max(prev - step, adjacentTarget);
+      if (typeof this.sessionState.lastAdjacentRate === 'number' && isFinite(this.sessionState.lastAdjacentRate)) {
+        const prev = this.sessionState.lastAdjacentRate;
+        const step = 0.05;
+        if (adjacentRate > prev) adjacentRate = Math.min(prev + step, adjacentRate);
+        if (adjacentRate < prev) adjacentRate = Math.max(prev - step, adjacentRate);
       }
 
+      adjacentRate = Math.max(0.2, Math.min(0.6, adjacentRate));
       const totalPairs = typeof configBase.totalPairs === 'number' && isFinite(configBase.totalPairs) ? configBase.totalPairs : 10;
-      adjacentTarget = Math.max(0, Math.min(totalPairs, adjacentTarget));
+      adjacentTarget = totalPairs > 0 ? Math.max(0, Math.min(totalPairs, Math.round(adjacentRate * totalPairs))) : 0;
     }
 
-    const adjacentRate = hasAdjTarget
-      ? ((typeof configBase.totalPairs === 'number' && configBase.totalPairs > 0) ? adjacentTarget / configBase.totalPairs : 0.5)
-      : undefined;
-
-    const config = hasAdjTarget
+    const config = hasAdjRate
       ? { ...configBase, adjacentTarget, adjacentRate }
       : { ...configBase };
 
@@ -1062,7 +1095,10 @@ class AIEngine {
     this.sessionState.lastHiddenLevel = hiddenLevel;
 
     this.sessionState.lastArm = selectedArm;
-    if (hasAdjTarget) this.sessionState.lastAdjacentTarget = adjacentTarget;
+    if (hasAdjRate) {
+      this.sessionState.lastAdjacentTarget = adjacentTarget;
+      this.sessionState.lastAdjacentRate = adjacentRate;
+    }
     this.sessionState.currentRound = {
       arm: selectedArm,
       config,

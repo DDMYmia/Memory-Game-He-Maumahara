@@ -51,6 +51,12 @@ class GameHistory {
       
       // Generate gameId if not provided
       const gameId = sessionData.gameId || `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const totalMatches = typeof sessionData.metrics?.totalMatches === 'number' && isFinite(sessionData.metrics.totalMatches) ? sessionData.metrics.totalMatches : 0;
+      const failedMatches = typeof sessionData.metrics?.failedMatches === 'number' && isFinite(sessionData.metrics.failedMatches) ? sessionData.metrics.failedMatches : 0;
+      const validatedTotalMatches = totalMatches > 0 ? totalMatches : 0;
+      const validatedFailedMatches = validatedTotalMatches > 0 ? Math.max(0, Math.min(failedMatches, validatedTotalMatches)) : 0;
+      const successfulMatches = validatedTotalMatches > 0 ? Math.max(0, validatedTotalMatches - validatedFailedMatches) : 0;
+      const accuracy = validatedTotalMatches > 0 ? successfulMatches / validatedTotalMatches : 0;
       const session = {
         gameId,
         timestamp: sessionData.timestamp || Date.now(),
@@ -60,18 +66,17 @@ class GameHistory {
         gameStats: sessionData.gameStats || {},
         config: sessionData.config || {},
         summary: {
+          ...sessionData.summary,
           flowIndex:
             (sessionData.aiResult && typeof sessionData.aiResult.flowIndexDisplay === 'number'
               ? sessionData.aiResult.flowIndexDisplay
               : (sessionData.aiResult && typeof sessionData.aiResult.flowIndex === 'number'
                 ? Math.max(0.3, sessionData.aiResult.flowIndex)
-                : null)),
-          accuracy: sessionData.metrics?.totalMatches > 0 
-            ? (sessionData.metrics.totalMatches - sessionData.metrics.failedMatches) / sessionData.metrics.totalMatches 
-            : 0,
-          timeRemaining: sessionData.gameStats?.remainingTime || 0,
-          totalPairs: sessionData.metrics?.totalPairs || 10,
-          totalClicks: sessionData.metrics?.totalClicks || 0
+                : (sessionData.summary && sessionData.summary.flowIndex) || null)),
+          accuracy: (sessionData.summary && sessionData.summary.accuracy) || accuracy,
+          timeRemaining: sessionData.gameStats?.remainingTime || (sessionData.summary && sessionData.summary.timeRemaining) || 0,
+          totalPairs: sessionData.metrics?.totalPairs || (sessionData.summary && sessionData.summary.totalPairs) || 10,
+          totalClicks: sessionData.metrics?.totalClicks || (sessionData.summary && sessionData.summary.totalClicks) || 0
         }
       };
       
@@ -95,24 +100,70 @@ class GameHistory {
     if (!this.db) {
       await this.openDatabase();
     }
-    
+
+    console.log('[GameHistory] Attempting to get all sessions...');
+
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction('sessions', 'readonly');
       const store = tx.objectStore('sessions');
       const index = store.index('timestampIndex');
       const request = index.openCursor(null, 'prev'); // Descending order
-      
+
       const sessions = [];
       request.onsuccess = event => {
         const cursor = event.target.result;
         if (cursor && sessions.length < limit) {
-          sessions.push(cursor.value);
+          try {
+            const session = cursor.value;
+            console.log('[GameHistory] Found a cursor. Raw data:', JSON.parse(JSON.stringify(session)));
+
+            // Normalize session data to ensure backward compatibility
+            const summary = session.summary || {};
+            const metrics = session.metrics || {};
+            const aiResult = session.aiResult || {};
+            const gameStats = session.gameStats || {};
+
+            let accuracy = 0;
+            if (typeof summary.accuracy === 'number' && isFinite(summary.accuracy)) {
+              accuracy = summary.accuracy;
+            } else if (metrics.totalMatches > 0) {
+              const successfulMatches = Math.max(0, (metrics.totalMatches || 0) - (metrics.failedMatches || 0));
+              accuracy = successfulMatches / metrics.totalMatches;
+            }
+
+            let flowIndex = null;
+            if (typeof summary.flowIndex === 'number' && isFinite(summary.flowIndex)) {
+              flowIndex = summary.flowIndex;
+            } else if (aiResult && typeof aiResult.flowIndexDisplay === 'number') {
+              flowIndex = aiResult.flowIndexDisplay;
+            } else if (aiResult && typeof aiResult.flowIndex === 'number') {
+              flowIndex = Math.max(0.3, aiResult.flowIndex);
+            }
+
+            session.summary = {
+              ...summary,
+              accuracy: Math.max(0, Math.min(1, accuracy || 0)),
+              flowIndex: flowIndex,
+              timeRemaining: gameStats.remainingTime || summary.timeRemaining || 0,
+              totalPairs: metrics.totalPairs || summary.totalPairs || 0,
+              totalClicks: metrics.totalClicks || summary.totalClicks || 0
+            };
+            
+            sessions.push(session);
+          } catch (e) {
+            console.error('[GameHistory] Error normalizing session data:', e, cursor.value);
+          }
           cursor.continue();
         } else {
+          if (!cursor) {
+            console.log('[GameHistory] No more cursors. Finalizing sessions.');
+          }
+          console.log(`[GameHistory] Resolving with ${sessions.length} sessions.`);
           resolve(sessions);
         }
       };
       request.onerror = e => {
+        console.error('[GameHistory] request.onerror fired:', e.target.error);
         reject(e.target.error);
       };
     });

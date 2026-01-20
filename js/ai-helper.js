@@ -128,6 +128,8 @@ async function extractPerformanceMetrics(telemetry, level) {
     
     // Get total pairs from start event or default
     const totalPairs = startEvent.data.variant?.totalPairs || 10;
+    const gridCols = startEvent.data.variant?.gridCols || 5;
+    const gridRows = startEvent.data.variant?.gridRows || 4;
     
     // Count cheat usage (show_cards events, only from current game session)
     const showCardsEvents = events.filter(e => e.type === 'show_cards' && e.data.state === 'show');
@@ -162,24 +164,17 @@ async function extractPerformanceMetrics(telemetry, level) {
     
     // First pass: Count color occurrences from all flip events
     flipEvents.forEach(event => {
-      if (event.data.image) {
-        let imageName = event.data.image;
-        if (typeof imageName === 'string') {
-          const m = imageName.match(/^image\s*(\d+)$/i);
-          if (m) {
-            imageName = `image${m[1]}.png`;
-          }
-        }
-        if (imageName && fuzzyLogic) {
-          const color = fuzzyLogic.getColorForImage(imageName);
-          colorOccurrences[color] = (colorOccurrences[color] || 0) + 1;
-        }
+      const raw = event?.data?.image ?? event?.data?.match;
+      const imageName = normalizeToImagePng(raw);
+      if (imageName && fuzzyLogic) {
+        const color = fuzzyLogic.getColorForImage(imageName);
+        colorOccurrences[color] = (colorOccurrences[color] || 0) + 1;
       }
     });
     
     // Process match events to build color and shape statistics
     matchEvents.forEach(event => {
-      const data = event.data;
+      const data = event.data || {};
       const isSuccess = data.result === 'success';
       
       // Track consecutive errors
@@ -189,31 +184,31 @@ async function extractPerformanceMetrics(telemetry, level) {
       } else {
         consecutiveErrors = 0;
       }
-      
-      // Extract image information
-      let imageName = null;
-      if (data.image) {
-        imageName = data.image;
-      } else if (data.images && data.images.length > 0) {
-        // For failed matches, use first image
-        imageName = data.images[0];
-      } else if (data.pair) {
-        imageName = data.pair;
-      }
 
-      if (typeof imageName === 'string') {
-        const m = imageName.match(/^image\s*(\d+)$/i);
-        if (m) {
-          imageName = `image${m[1]}.png`;
+      const imageCandidates = [];
+      if (Array.isArray(data.images) && data.images.length > 0) {
+        imageCandidates.push(...data.images);
+      } else if (data.image) {
+        imageCandidates.push(data.image);
+      } else if (data.pair) {
+        if (Array.isArray(data.pair)) {
+          imageCandidates.push(...data.pair);
+        } else {
+          imageCandidates.push(data.pair);
         }
       }
-      
-      if (imageName && fuzzyLogic) {
-        // Get color and shape for this image
+
+      const images = imageCandidates
+        .filter(v => typeof v === 'string')
+        .map(normalizeToImagePng)
+        .filter(Boolean);
+
+      if (images.length === 0 || !fuzzyLogic) return;
+
+      images.forEach((imageName) => {
         const color = fuzzyLogic.getColorForImage(imageName);
         const shape = fuzzyLogic.getShapeForImage(imageName);
         
-        // Update color statistics
         if (!colorStats[color]) {
           colorStats[color] = { attempts: 0, successes: 0, occurrences: colorOccurrences[color] || 0 };
         }
@@ -222,7 +217,6 @@ async function extractPerformanceMetrics(telemetry, level) {
           colorStats[color].successes++;
         }
         
-        // Update shape statistics
         if (!shapeStats[shape]) {
           shapeStats[shape] = { attempts: 0, successes: 0 };
         }
@@ -230,7 +224,7 @@ async function extractPerformanceMetrics(telemetry, level) {
         if (isSuccess) {
           shapeStats[shape].successes++;
         }
-      }
+      });
     });
     
     // Calculate accuracy for each color
@@ -245,9 +239,9 @@ async function extractPerformanceMetrics(telemetry, level) {
     // Track which images were attempted (even if not matched)
     const attemptedImages = new Set();
     flipEvents.forEach(event => {
-      if (event.data.image) {
-        attemptedImages.add(event.data.image);
-      }
+      const raw = event?.data?.image ?? event?.data?.match;
+      const imageName = normalizeToImagePng(raw);
+      if (imageName) attemptedImages.add(imageName);
     });
 
     
@@ -255,6 +249,8 @@ async function extractPerformanceMetrics(telemetry, level) {
     return {
       level,
       totalPairs,
+      gridCols,
+      gridRows,
       completionTime,
       failedMatches,
       totalMatches,

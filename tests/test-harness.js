@@ -128,6 +128,11 @@ const createSandbox = (levelScriptPath) => {
         console: console,
         Date: Date,
         Math: Math,
+        Audio: class {
+            constructor() {}
+            play() { return Promise.resolve(); }
+            pause() {}
+        },
         Blob: class {},
         URL: { createObjectURL: () => 'blob:url', revokeObjectURL: () => {} },
         localStorage: null,
@@ -144,6 +149,9 @@ const createSandbox = (levelScriptPath) => {
         resetData: () => {},
         isAdaptiveEnabled: () => false,
         updateAdaptiveUI: () => {},
+        isMutedEnabled: () => false,
+        updateMuteUI: () => {},
+        toggleMute: () => {},
         updateAIProfileFromGameEnd: () => {},
         exportTelemetry: async () => {},
         toggleAdaptive: () => {}

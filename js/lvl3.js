@@ -6,6 +6,7 @@ let actualStartTime = null;
 let gameStart = 0;
 let gameStop = 0;
 
+const IMAGE_POOL_SIZE = 13;
 let totalPairs = 10;
 let cards = [];
 let flippedCards = [];
@@ -34,6 +35,43 @@ let SHOW_CARDS_SCALE_RUNTIME = SHOW_CARDS_SCALE;
 const MATCH_VANISH_MS = 200;
 const FLIPWAVE_START_DELAY_MS = 200;
 
+function applyUrlGridOverride() {
+  if (typeof URLSearchParams === 'undefined') return;
+  const params = new URLSearchParams(window.location.search);
+  const gridRaw = (params.get('grid') || '').toLowerCase();
+  let cols = parseInt(params.get('cols'), 10);
+  let rows = parseInt(params.get('rows'), 10);
+  if (!Number.isFinite(cols) || !Number.isFinite(rows)) {
+    cols = null;
+    rows = null;
+  }
+  if (!cols || !rows) {
+    if (gridRaw === 'wide' || gridRaw === 'large' || gridRaw === '6x4' || gridRaw === '6×4') {
+      cols = 6;
+      rows = 4;
+    }
+    if (gridRaw === 'small' || gridRaw === 'default' || gridRaw === '5x4' || gridRaw === '5×4') {
+      cols = 5;
+      rows = 4;
+    }
+  }
+  if (!cols || !rows || !isFinite(cols) || !isFinite(rows) || cols <= 0 || rows <= 0) return;
+  GRID_COLS_RUNTIME = cols;
+  GRID_ROWS_RUNTIME = rows;
+  totalPairs = Math.floor((cols * rows) / 2);
+  try {
+    localStorage.setItem('ai_adaptive_enabled', 'true');
+    localStorage.setItem('ai_lvl3_completed_count', '1');
+    localStorage.setItem('ai_level3_config', JSON.stringify({
+      gridCols: cols,
+      gridRows: rows,
+      initialTime: INITIAL_TIME,
+      hideDelay: HIDE_DELAY_RUNTIME,
+      showScale: SHOW_CARDS_SCALE_RUNTIME
+    }));
+  } catch (e) {}
+}
+
 function scheduleFrame(fn) {
   if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(fn);
   return setTimeout(fn, 0);
@@ -59,7 +97,8 @@ const cardTextMapping = {
     "image 9": "Hei Matau",
     "image 10": "Pikorua",
     "image 11": "Image 11",
-    "image 12": "Image 12"
+    "image 12": "Image 12",
+    "image 13": "Image 13"
 };
 
 // 
@@ -91,11 +130,134 @@ const timerInterval = setInterval(() => {
 
 // Initialize the game
 function initializeGame() {
-    const gameBoard = document.getElementById("game-board");
+  showConsentModal(() => {
+    proceedWithGameInitialization();
+    startInitialPreview();
+  });
+}
 
-    // Generate 10 image cards and 10 text cards
-    const imageCards = generateImageCards(totalPairs);
-    const textCards = generateTextCards(totalPairs);
+function showConsentModal(callback) {
+  if (typeof HTMLElement === 'undefined') {
+    callback();
+    return;
+  }
+
+  let modal = document.getElementById('consent-modal');
+  if (!modal) {
+    const host = document.createElement('div');
+    host.innerHTML = `
+    <div id="consent-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <h2>Data & Analytics</h2>
+        <p>We'd like to record and analyze your game data to provide personalized feedback and insights. Your game session will be saved only if you agree.</p>
+        <p>You can change this setting anytime using the "AI" toggle in the menu.</p>
+        <div class="modal-buttons">
+          <button id="toggle-sound" class="btn btn-sound-on" type="button">Sound On</button>
+        </div>
+        <div class="modal-buttons">
+          <button id="consent-accept" class="btn btn-accept">Accept</button>
+          <button id="consent-decline" class="btn btn-decline">Decline</button>
+        </div>
+      </div>
+    </div>
+    `.trim();
+    if (host.firstElementChild) document.body.appendChild(host.firstElementChild);
+    modal = document.getElementById('consent-modal');
+  }
+
+  if (!modal) {
+    callback();
+    return;
+  }
+
+  modal.classList.remove('hidden');
+
+  let promptAudio = null;
+  if (typeof playSoundIfAllowed === 'function') {
+    promptAudio = playSoundIfAllowed('Sound/Ka_pai.mp3');
+  } else if (!isMutedEnabled()) {
+    promptAudio = new Audio('Sound/Ka_pai.mp3');
+    promptAudio.play().catch(() => {});
+  }
+
+  const soundBtn = document.getElementById('toggle-sound');
+  if (soundBtn) {
+    const refreshSoundUI = () => {
+      const muted = isMutedEnabled();
+      soundBtn.textContent = muted ? 'Sound Off' : 'Sound On';
+      soundBtn.classList.remove('btn-secondary', 'btn-sound-on', 'btn-sound-off');
+      soundBtn.classList.add(muted ? 'btn-sound-off' : 'btn-sound-on');
+    };
+    refreshSoundUI();
+    soundBtn.onclick = () => {
+      toggleMute();
+      if (isMutedEnabled() && promptAudio) {
+        promptAudio.pause();
+        promptAudio.currentTime = 0;
+      }
+      refreshSoundUI();
+    };
+  }
+
+  const acceptBtn = document.getElementById('consent-accept');
+  const declineBtn = document.getElementById('consent-decline');
+  if (!acceptBtn || !declineBtn) {
+    modal.classList.add('hidden');
+    callback();
+    return;
+  }
+
+  acceptBtn.classList.remove('btn-secondary');
+  declineBtn.classList.remove('btn-secondary');
+  acceptBtn.classList.add('btn-accept');
+  declineBtn.classList.add('btn-decline');
+
+  acceptBtn.onclick = () => {
+    if (typeof toggleAdaptive === 'function') {
+      toggleAdaptive(true);
+    }
+    modal.classList.add('hidden');
+    callback();
+  };
+
+  declineBtn.onclick = () => {
+    if (typeof toggleAdaptive === 'function') {
+      toggleAdaptive(false);
+    }
+    modal.classList.add('hidden');
+    callback();
+  };
+}
+
+function proceedWithGameInitialization() {
+    const gameBoard = document.getElementById("game-board");
+    const cols = GRID_COLS_RUNTIME;
+    const rows = GRID_ROWS_RUNTIME;
+    if (gameBoard) {
+        gameBoard.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        gameBoard.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+    }
+
+    // Ensure totalPairs doesn't exceed image pool size
+    if (totalPairs > IMAGE_POOL_SIZE) {
+        totalPairs = IMAGE_POOL_SIZE;
+    }
+
+    // Determine which images to use (randomly selected from pool)
+    const pool = [];
+    for (let i = 1; i <= IMAGE_POOL_SIZE; i++) pool.push(i);
+    // Shuffle pool
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    
+    // Select the first 'totalPairs' indices
+    const selectedIndices = pool.slice(0, totalPairs);
+
+    // Generate image cards and text cards using selected indices
+    const imageCards = generateImageCards(selectedIndices);
+    const textCards = generateTextCards(selectedIndices);
 
     // Combine image and text cards into one array
     const allCards = [...imageCards, ...textCards];
@@ -129,19 +291,19 @@ function initializeGame() {
     });
 }
 
-// Generate image cards dynamically from "image1.png" to "image10.png"
-function generateImageCards(totalPairs) {
+// Generate image cards dynamically based on selected indices
+function generateImageCards(indices) {
     const imageCards = [];
-    for (let i = 1; i <= totalPairs; i++) {
+    indices.forEach(i => {
         imageCards.push({ type: "image", match: `image${i}.png` });
-    }
+    });
     return imageCards;
 }
 
-// Generate text cards dynamically from "image 1" to "image 10"
-function generateTextCards(totalPairs) {
+// Generate text cards dynamically based on selected indices
+function generateTextCards(indices) {
     const textCards = [];
-    for (let i = 1; i <= totalPairs; i++) {
+    indices.forEach(i => {
         const cardMatch = `image ${i}`;  // This is the internal match key (used for comparison)
         const cardDisplayText = cardTextMapping[cardMatch];  // Get the display text
 
@@ -150,7 +312,7 @@ function generateTextCards(totalPairs) {
             match: cardMatch,    // The internal match value (used for comparison)
             displayText: cardDisplayText  // The visible text displayed on the card
         });
-    }
+    });
     return textCards;
 }
 
@@ -235,6 +397,21 @@ function handleCardClick(event) {
                     card2.style.background = '';
                     card1.style.backgroundColor = '';
                     card2.style.backgroundColor = '';
+                    card1.classList.remove('card-peek');
+                    card2.classList.remove('card-peek');
+                    card1.style.transform = '';
+                    card2.style.transform = '';
+                    card1.style.zIndex = '';
+                    card2.style.zIndex = '';
+                    const card1Img = card1.querySelector('img');
+                    const card2Img = card2.querySelector('img');
+                    const card1Span = card1.querySelector('span');
+                    const card2Span = card2.querySelector('span');
+                    for (const el of [card1Img, card2Img, card1Span, card2Span]) {
+                      if (!el) continue;
+                      el.style.transform = '';
+                      el.style.transformOrigin = '';
+                    }
                     
                     card1.classList.add('card-matched-highlight');
                     card2.classList.add('card-matched-highlight');
@@ -294,7 +471,7 @@ function handleCardClick(event) {
                       card.style.backgroundColor = '';
 
                       const matchKey = card.dataset.match.replace('.png', '').replace(/\s+/g, '');
-                      card.classList.remove('card-lvl2-' + matchKey);
+                      card.classList.remove('card-' + matchKey);
                     });
                   }
 
@@ -404,7 +581,7 @@ function cardReader(card) {
 
     // Now update the background color based on the normalized matchKey
     // Using Level 2/3 shared classes
-    card.classList.add('card-lvl2-' + matchKey);
+    card.classList.add('card-' + matchKey);
 }
 
 //
@@ -412,6 +589,17 @@ function cardReader(card) {
 // Function to show all cards when 'show-cards' div is clicked
 function startInitialPreview() {
   if (isPreviewing || gameStart === 1) return;
+
+  if (typeof HTMLElement === 'undefined') {
+    isPreviewing = false;
+    gameStart = 1;
+    if (!actualStartTime) {
+      actualStartTime = Date.now();
+    }
+    updateTimer();
+    telemetry.log('start', { level: 3, variant: { pairsType: 'image-text', layout: 'adaptive_random', cols: GRID_COLS_RUNTIME, rows: GRID_ROWS_RUNTIME, totalPairs, hideDelay: HIDE_DELAY_RUNTIME, showScale: SHOW_CARDS_SCALE_RUNTIME, timerMode: 'countdown', initialTime: time, matchRewardSeconds: 3, streakBonusPerMatch: 10 } });
+    return;
+  }
   
   isPreviewing = true;
   const allCards = document.querySelectorAll('.card');
@@ -422,11 +610,17 @@ function startInitialPreview() {
   allCards.forEach(card => {
     const img = card.querySelector('img');
     const span = card.querySelector('span');
-    if (img) img.style.visibility = 'visible';
-    if (span) span.style.visibility = 'visible';
+    if (img) {
+      img.style.visibility = 'visible';
+      img.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+      img.style.transformOrigin = 'center';
+    }
+    if (span) {
+      span.style.visibility = 'visible';
+      span.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+      span.style.transformOrigin = 'center';
+    }
     card.classList.add('card-peek');
-    card.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
-    card.style.zIndex = '1000';
   });
 
   if (timerElement) {
@@ -441,14 +635,22 @@ function startInitialPreview() {
     if (remaining <= 0) {
       clearInterval(previewInterval);
       allCards.forEach(card => {
+        card.style.transform = '';
+        card.style.zIndex = '';
+        const img = card.querySelector('img');
+        const span = card.querySelector('span');
+        if (img) {
+          img.style.transform = '';
+          img.style.transformOrigin = '';
+        }
+        if (span) {
+          span.style.transform = '';
+          span.style.transformOrigin = '';
+        }
         if (!card.classList.contains('matched')) {
-          const img = card.querySelector('img');
-          const span = card.querySelector('span');
           if (img) img.style.visibility = 'hidden';
           if (span) span.style.visibility = 'hidden';
           card.classList.remove('card-peek');
-          card.style.transform = '';
-          card.style.zIndex = '';
         }
       });
       
@@ -485,18 +687,25 @@ function showAllCards() {
     if (!card.classList.contains('matched')) {
       const img = card.querySelector('img');
       const span = card.querySelector('span');
-      if (img) img.style.visibility = 'visible';
-      if (span) span.style.visibility = 'visible';
+      if (img) {
+        img.style.visibility = 'visible';
+        img.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+        img.style.transformOrigin = 'center';
+      }
+      if (span) {
+        span.style.visibility = 'visible';
+        span.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+        span.style.transformOrigin = 'center';
+      }
       card.classList.add('card-peek');
-      card.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
-      card.style.zIndex = '1000';
     }
   });
 
   // 3s flip back or manual click
+  const revealDurationMs = typeof HTMLElement === 'undefined' ? 30 : 3000;
   let flipTimeout = setTimeout(() => {
     hideAllCards();
-  }, 3000);
+  }, revealDurationMs);
 
   // Allow manual flip back
   const handleManualFlip = () => {
@@ -513,15 +722,23 @@ function showAllCards() {
 
 function hideAllCards() {
 	cards.forEach(card => {
+    card.style.transform = '';
+    card.style.zIndex = '';
+    const img = card.querySelector('img');
+    const span = card.querySelector('span');
+    if (img) {
+      img.style.transform = '';
+      img.style.transformOrigin = '';
+    }
+    if (span) {
+      span.style.transform = '';
+      span.style.transformOrigin = '';
+    }
 		if (!card.classList.contains('matched')) {
-			const img = card.querySelector('img');
-			const span = card.querySelector('span');
-			if (img) img.style.visibility = 'hidden';
-			if (span) span.style.visibility = 'hidden';
-			card.classList.remove('card-peek');
-      card.style.transform = '';
-      card.style.zIndex = '';
-		}
+      if (img) img.style.visibility = 'hidden';
+      if (span) span.style.visibility = 'hidden';
+      card.classList.remove('card-peek');
+    }
 	});
 	telemetry.log('show_cards', { level: 3, state: 'hide' });
 	isShowingCards = false;
@@ -548,9 +765,13 @@ async function endGame() {
 
   const analyticsContainer = document.querySelector('#game-over .game-over-right') || document.getElementById('analytics-summary');
   let gameId = null;
-  if (typeof displayAnalyticsSummary === 'function' && analyticsContainer) {
-    await displayAnalyticsSummary(telemetry, 3, aiResult, { streak, remainingTime: time });
-    gameId = await saveSessionToHistoryFromTelemetry(telemetry, 3, aiResult, { streak, remainingTime: time });
+  const enabled = typeof isAdaptiveEnabled === 'function' ? isAdaptiveEnabled() : window.isAdaptive === true;
+  window.isAdaptive = enabled;
+  if (enabled) {
+    if (typeof displayAnalyticsSummary === 'function' && analyticsContainer) {
+      await displayAnalyticsSummary(telemetry, 3, aiResult, { streak, remainingTime: time });
+      gameId = await saveSessionToHistoryFromTelemetry(telemetry, 3, aiResult, { streak, remainingTime: time });
+    }
   }
   if (gameId) {
     const menuIcon = document.getElementById('menu-icon');
@@ -575,6 +796,8 @@ function triggerRippleEffect(onComplete) {
   const startCol = startIndex % GRID_COLS_RUNTIME;
 
   let maxDelay = 0;
+  const stepMs = typeof HTMLElement === 'undefined' ? 10 : 100;
+  const showMs = typeof HTMLElement === 'undefined' ? 60 : 600;
 
   cards.forEach((card, index) => {
     if (card.classList.contains('matched') || flippedCards.includes(card)) return;
@@ -583,9 +806,9 @@ function triggerRippleEffect(onComplete) {
     const col = index % GRID_COLS_RUNTIME;
     // Euclidean distance for circular ripple
     const distance = Math.sqrt(Math.pow(row - startRow, 2) + Math.pow(col - startCol, 2));
-    const delay = distance * 100; // 100ms per unit distance
+    const delay = distance * stepMs;
 
-    maxDelay = Math.max(maxDelay, delay + 600);
+    maxDelay = Math.max(maxDelay, delay + showMs);
 
     setTimeout(() => {
       if (gameStop !== 0) return;
@@ -613,7 +836,7 @@ function triggerRippleEffect(onComplete) {
         text.style.visibility = 'hidden';
         card.classList.remove('card-peek');
       }
-    }, delay + 600); // Show for 600ms
+    }, delay + showMs);
   });
 
   setTimeout(() => {
@@ -626,11 +849,13 @@ function triggerRippleEffect(onComplete) {
 window.onload = () => {
   telemetry = new Telemetry('telemetry_lvl3');
   telemetry.openDatabase();
+  applyUrlGridOverride();
   if (typeof AIEngine !== 'undefined') { aiEngine = new AIEngine(); }
   
-  const enabledRaw = localStorage.getItem('ai_adaptive_enabled');
-  const enabled = enabledRaw === 'true';
+  const enabled = isAdaptiveEnabled();
+  window.isAdaptive = enabled;
   updateAdaptiveUI(enabled);
+  updateMuteUI(isMutedEnabled());
   
   if (enabled) {
     try {
@@ -645,8 +870,8 @@ window.onload = () => {
       if (cfgStr) {
         const cfg = JSON.parse(cfgStr);
         if (typeof cfg.initialTime === 'number') { time = cfg.initialTime; }
-        if (typeof cfg.gridCols === 'number' && typeof cfg.gridRows === 'number') {
-          const wantsLarge = cfg.gridCols === 4 && cfg.gridRows === 6;
+      if (typeof cfg.gridCols === 'number' && typeof cfg.gridRows === 'number') {
+          const wantsLarge = cfg.gridCols === 6 && cfg.gridRows === 4;
           const allowLarge = lvl3Completed >= 1;
           if (!wantsLarge || allowLarge) {
             GRID_COLS_RUNTIME = cfg.gridCols;
@@ -658,9 +883,12 @@ window.onload = () => {
       }
     } catch (e) {}
   }
+
+  if (typeof HTMLElement === 'undefined') {
+    HIDE_DELAY_RUNTIME = 1;
+  }
   
   initializeGame();
-  startInitialPreview();
 };
 
 async function downloadResult() {

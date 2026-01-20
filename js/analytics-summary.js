@@ -34,15 +34,13 @@ function formatPercent(value) {
  */
 function getFlowInterpretation(flowIndex) {
   if (flowIndex >= 0.8) {
-    return { label: 'Excellent Flow', color: '#4CAF50' };
+    return { label: 'Excellent Flow', color: '#4CAF50', comment: 'Excellent' };
   } else if (flowIndex >= 0.6) {
-    return { label: 'Good Flow', color: '#8BC34A' };
+    return { label: 'Good Flow', color: '#8BC34A', comment: 'Good' };
   } else if (flowIndex >= 0.4) {
-    return { label: 'Moderate Challenge', color: '#FFC107' };
-  } else if (flowIndex >= 0.2) {
-    return { label: 'Too Hard', color: '#F44336' };
+    return { label: 'Moderate Challenge', color: '#FFC107', comment: 'Need more practice' };
   } else {
-    return { label: 'Very Hard', color: '#D32F2F' };
+    return { label: 'Very Hard', color: '#D32F2F', comment: 'Keep going' };
   }
 }
 
@@ -124,38 +122,51 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
 
     if (!metrics) {
       if (typeof aiWarn === 'function') aiWarn('Could not extract performance metrics and no mock data available, showing basic stats');
-      // Show basic stats even if metrics extraction fails, but with more information
-      let html = '<div class="analytics-header">Game Analytics</div>';
-      
-      // Session Results Section
-      html += '<div class="analytics-section session-results" data-section="results">';
-      html += '<div class="analytics-title">🏆 Results</div>';
+      const createTitle = (text) => `<div class="analytics-title">${text}</div>`;
+      const isStandalonePage = document.getElementById('title') && document.getElementById('title').textContent.trim() === 'Analytics';
+
+      let elapsed = null;
+      try {
+        const allEvents = telemetry ? await telemetry.exportAll() : [];
+        const sorted = (allEvents || []).slice().sort((a, b) => a.ts - b.ts);
+        let start = null;
+        let end = null;
+        for (let i = sorted.length - 1; i >= 0; i--) {
+          if (sorted[i].type === 'start' && sorted[i].data?.level === level) { start = sorted[i]; break; }
+        }
+        if (start) {
+          for (let i = sorted.length - 1; i >= 0; i--) {
+            if (sorted[i].type === 'end' && sorted[i].ts >= start.ts) { end = sorted[i]; break; }
+          }
+        }
+        if (start && end) elapsed = Math.max(0, Math.round((end.ts - start.ts) / 1000));
+      } catch (e) {}
+
+      const displayTime = elapsed !== null ? formatTime(elapsed) : (
+        gameStats.remainingTime !== undefined ? formatTime(Math.max(0, 300 - gameStats.remainingTime)) : 'N/A'
+      );
+
+      let html = '';
+      if (!isStandalonePage) html = '<div class="analytics-header">Game Analytics</div>';
+
+      html += '<div class="analytics-section" data-section="basic">';
+      html += createTitle('📌 Basics');
       html += '<div class="analytics-grid">';
-      html += `<div class="analytics-item"><span class="label">Level:</span><span class="value">${level}</span></div>`;
-      if (gameStats.streak !== undefined) {
-        html += `<div class="analytics-item streak-item"><span class="label">Streak:</span><span class="value streak-value">${gameStats.streak}</span></div>`;
-      }
-      if (gameStats.remainingTime !== undefined) {
-        html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${formatTime(metrics ? metrics.completionTime : (300 - gameStats.remainingTime))}</span></div>`;
-      }
+      html += `<div class="analytics-item"><span class="label">Time</span><span class="value">${displayTime}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Clicks</span><span class="value">N/A</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Success Rate</span><span class="value">N/A</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Accuracy</span><span class="value">N/A</span></div>`;
       html += '</div></div>';
-      
-      // Performance Overview Section (with limited data)
-      html += '<div class="analytics-section" data-section="performance">';
-      html += '<div class="analytics-title">📊 Performance</div>';
-      html += '<div class="analytics-grid">';
-      if (gameStats.remainingTime !== undefined) {
-        html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${formatTime(metrics ? metrics.completionTime : (300 - gameStats.remainingTime))}</span></div>`;
-      }
-      html += `<div class="analytics-item"><span class="label">Status:</span><span class="value">Limited data</span></div>`;
-      html += '</div></div>';
-      
-      // Note about data availability
+
+      html += '<details class="analytics-advanced">';
+      html += '<summary class="analytics-advanced-summary">Advanced Information for researchers</summary>';
+      html += '<div class="analytics-advanced-body">';
       html += '<div class="analytics-section" data-section="note">';
-      html += '<div class="analytics-title">ℹ️ Note</div>';
+      html += createTitle('ℹ️ Data Status');
       html += '<div class="analytics-grid">';
-      html += '<div class="analytics-item"><span class="label">Data Status:</span><span class="value">Telemetry data extraction failed.</span></div>';
+      html += `<div class="analytics-item"><span class="label">Note</span><span class="value">Telemetry extraction failed</span></div>`;
       html += '</div></div>';
+      html += '</div></details>';
       
       summaryContainer.innerHTML = html;
       summaryContainer.style.display = 'block';
@@ -287,66 +298,59 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     // Helper for section title
     const createTitle = (text) => `<div class="analytics-title">${text}</div>`;
 
-    html += '<div class="analytics-section session-results" data-section="results">';
-    html += createTitle('🏆 Results');
-    html += '<div class="analytics-grid">';
+    const displayTime = formatTime(metrics.completionTime);
+    const totalPairs = metrics.totalPairs || maxPossibleMatches || 10;
+    const successRatio = totalPairs > 0 ? Math.max(0, Math.min(1, successfulMatches / totalPairs)) : 0;
+    const errorRate = validatedTotalMatches > 0 ? validatedFailedMatches / validatedTotalMatches : 0;
 
-    // Flow Index as primary metric (if available)
+    html += '<div class="analytics-section" data-section="basic">';
+    html += createTitle('📌 Basics');
     if (flowIndex !== null) {
       const flowInfo = getFlowInterpretation(flowIndex);
-      // html += `<div class="analytics-item flow-index"><span class="label">Flow Index:</span><span class="value score-value" style="color: ${flowInfo.color}">${flowIndex.toFixed(4)}</span></div>`;
-
       const markerPosition = Math.min(Math.max(flowIndex * 100, 0), 100);
       html += `
       <div class="flow-meter-container">
-        <div class="flow-meter-labels">
-          <span>Hard</span>
-          <span>Balanced</span>
-          <span>Easy</span>
-        </div>
         <div class="flow-meter-bar">
           <div class="flow-meter-marker" style="left: ${markerPosition}%"></div>
         </div>
         <div class="flow-meter-value" style="color: ${flowInfo.color}">
-          ${flowInfo.label} <span style="margin-left: 8px; font-size: 0.9em; opacity: 0.9;">${flowIndex.toFixed(4)}</span>
+          ${flowInfo.comment}! Your Score is ${flowIndex.toFixed(4)}
         </div>
       </div>
       `;
-
-    } else {
-      // Fallback if Flow Index not available
-      html += `<div class="analytics-item"><span class="label">Flow Index:</span><span class="value">N/A</span></div>`;
     }
 
+    html += '<div class="analytics-grid">';
+    html += `<div class="analytics-item"><span class="label">Time</span><span class="value">${displayTime}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Flips</span><span class="value">${totalClicks}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Success Rate</span><span class="value">${formatPercent(successRatio)}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Accuracy</span><span class="value">${formatPercent(accuracy)}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Failures</span><span class="value">${validatedFailedMatches}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Error Rate</span><span class="value">${formatPercent(errorRate)}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Hints Used</span><span class="value">${cheatCount}</span></div>`;
     if (gameStats.streak !== undefined) {
-      html += `<div class="analytics-item streak-item"><span class="label">Streak:</span><span class="value streak-value">${gameStats.streak}</span></div>`;
+      html += `<div class="analytics-item streak-item"><span class="label">Streak</span><span class="value streak-value">${gameStats.streak}</span></div>`;
     }
-    html += `<div class="analytics-item"><span class="label">Level:</span><span class="value">${level}</span></div>`;
-    // Use actual completion time for display
-    const displayTime = formatTime(metrics.completionTime);
-    html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${displayTime}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Level</span><span class="value">${level}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Total Pairs</span><span class="value">${totalPairs}</span></div>`;
+    if (level === 2) {
+      if (typeof config.adjacentRate === 'number' && isFinite(config.adjacentRate)) {
+        html += `<div class="analytics-item"><span class="label">Adjacency Rate</span><span class="value">${formatPercent(config.adjacentRate)}</span></div>`;
+      }
+      if (typeof config.adjacentActual === 'number' && isFinite(config.adjacentActual) && typeof config.adjacentTarget === 'number' && isFinite(config.adjacentTarget)) {
+        html += `<div class="analytics-item"><span class="label">Adjacent Pairs</span><span class="value">${config.adjacentActual} / ${config.adjacentTarget}</span></div>`;
+      }
+    }
+
+    if (flowIndex === null) {
+      html += `<div class="analytics-item flow-index"><span class="label">Score</span><span class="value">N/A</span></div>`;
+    }
+
     html += '</div></div>';
 
-    html += '<div class="analytics-section" data-section="performance">';
-    html += createTitle('📊 Stats');
-    html += '<div class="analytics-grid">';
-    html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${displayTime}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Clicks:</span><span class="value">${totalClicks}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Total Pairs:</span><span class="value">${metrics.totalPairs}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Matches:</span><span class="value">${successfulMatches}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Failed:</span><span class="value">${validatedFailedMatches}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Accuracy:</span><span class="value">${formatPercent(accuracy)}</span></div>`;
-      html += '</div></div>';
-
-      html += '<div class="analytics-section" data-section="errors">';
-      html += createTitle('❌ Errors');
-      html += '<div class="analytics-grid">';
-      html += `<div class="analytics-item"><span class="label">Errors:</span><span class="value">${consecutiveErrors}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Max Errors:</span><span class="value">${maxConsecutiveErrors}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Failed:</span><span class="value">${validatedFailedMatches}</span></div>`;
-      const errorRate = validatedTotalMatches > 0 ? validatedFailedMatches / validatedTotalMatches : 0;
-      html += `<div class="analytics-item"><span class="label">Error Rate:</span><span class="value">${formatPercent(errorRate)}</span></div>`;
-      html += '</div></div>';
+    html += '<details class="analytics-advanced">';
+    html += '<summary class="analytics-advanced-summary">Advanced Information for researchers</summary>';
+    html += '<div class="analytics-advanced-body">';
 
     if (rawSuccessfulMatches > maxPossibleMatches * 1.5 || metrics.totalMatches > maxPossibleMatches * 5) {
       if (typeof aiWarn === 'function') aiWarn('Data validation: Detected unrealistic match counts', {
@@ -359,14 +363,14 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
 
     if (metrics.colorStats && Object.keys(metrics.colorStats).length > 0) {
       html += '<div class="analytics-section" data-section="color">';
-      html += createTitle('🎨 Color Confusion Analysis');
-      html += '<div class="analytics-grid">';
+      html += createTitle('🎨 Color Stats');
       const buckets = {
         blue: { attempts: 0, successes: 0, occurrences: 0 },
         red: { attempts: 0, successes: 0, occurrences: 0 },
         green: { attempts: 0, successes: 0, occurrences: 0 },
         yellow: { attempts: 0, successes: 0, occurrences: 0 },
-        black: { attempts: 0, successes: 0, occurrences: 0 }
+        black: { attempts: 0, successes: 0, occurrences: 0 },
+        unknown: { attempts: 0, successes: 0, occurrences: 0 }
       };
 
       const toBase = {
@@ -387,69 +391,81 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
         'orange-brown-dark': 'yellow',
         'gray-dark': 'black',
         'grey-dark': 'black',
-        unknown: 'black'
+        unknown: 'unknown'
       };
 
       Object.keys(metrics.colorStats).forEach(color => {
         const stat = metrics.colorStats[color] || {};
         const raw = (color || '').toString().trim().toLowerCase();
-        const base = toBase[raw] || 'black';
+        const base = toBase[raw] || 'unknown';
         buckets[base].occurrences += stat.occurrences || 0;
         buckets[base].attempts += stat.attempts || 0;
         buckets[base].successes += stat.successes || 0;
       });
 
-      const render = (label, stat) => {
-        const accuracy = stat.attempts > 0 ? stat.successes / stat.attempts : 0;
-        html += `<div class="analytics-item"><span class="label">${label}:</span><span class="value">Occurrences: ${stat.occurrences || 0}, Accuracy: ${formatPercent(accuracy)}</span></div>`;
-      };
+      const palette = [
+        { key: 'blue', label: 'Blue', color: '#2F80ED' },
+        { key: 'red', label: 'Red', color: '#EB5757' },
+        { key: 'green', label: 'Green', color: '#27AE60' },
+        { key: 'yellow', label: 'Yellow', color: '#F2C94C' },
+        { key: 'black', label: 'Black', color: '#111111' },
+        { key: 'unknown', label: 'Unknown', color: '#9CA3AF' }
+      ];
 
-      render('Blue', buckets.blue);
-      render('Red', buckets.red);
-      render('Green', buckets.green);
-      render('Yellow', buckets.yellow);
-      render('Black', buckets.black);
+      html += '<div class="analytics-color-chips">';
+      const visiblePalette = palette.filter(p => {
+        const stat = buckets[p.key];
+        return (stat.occurrences || 0) > 0 || (stat.attempts || 0) > 0;
+      });
+      (visiblePalette.length > 0 ? visiblePalette : palette).forEach(p => {
+        const stat = buckets[p.key];
+        const acc = stat.attempts > 0 ? stat.successes / stat.attempts : 0;
+        const occ = stat.occurrences || 0;
+        html += `
+          <div class="analytics-color-chip" style="--chip-color: ${p.color}">
+            <span class="chip-dot" aria-hidden="true"></span>
+            <span class="chip-label">${p.label}</span>
+            <span class="chip-metric">Total ${occ} · Accuracy ${formatPercent(acc)}</span>
+          </div>
+        `;
+      });
+      html += '</div></div>';
+    } else {
+      html += '<div class="analytics-section" data-section="color">';
+      html += createTitle('🎨 Color Stats');
+      html += '<div class="analytics-grid">';
+      html += `<div class="analytics-item"><span class="label">Status</span><span class="value">N/A</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Reason</span><span class="value">No flips/matches recorded</span></div>`;
       html += '</div></div>';
     }
 
-    html += '<div class="analytics-section" data-section="behavior">';
-    html += createTitle('🔍 Behavior');
-    html += '<div class="analytics-grid">';
-    html += `<div class="analytics-item"><span class="label">Speed:</span><span class="value">${avgFlipInterval.toFixed(0)}ms</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Stable:</span><span class="value">${cadenceVariance < 0.15 ? 'Yes' : 'No'}</span></div>`;
-    if (colorAccuracy !== null) {
-      html += `<div class="analytics-item"><span class="label">Color:</span><span class="value">${formatPercent(colorAccuracy)}</span></div>`;
-    }
-    html += `<div class="analytics-item"><span class="label">Hints:</span><span class="value">${cheatCount}</span></div>`;
-    html += '</div></div>';
-
     if (aiResult && aiResult.nextConfig) {
-      const config = aiResult.nextConfig;
+      const nextConfig = aiResult.nextConfig;
       html += '<div class="analytics-section" data-section="adaptive">';
-      html += createTitle('🤖 Suggestions');
+      html += createTitle('🤖 Recommendation (Next Round)');
 
       const currentGridCols = gameConfig.gridCols || gameConfig.cols || defaultConfig.cols;
       const currentGridRows = gameConfig.gridRows || gameConfig.rows || defaultConfig.rows;
-      const nextGridCols = config.gridCols || config.cols || currentGridCols;
-      const nextGridRows = config.gridRows || config.rows || currentGridRows;
-      const fromPairs = metrics.totalPairs || defaultConfig.totalPairs;
-      const toPairs = config.totalPairs || fromPairs;
+      const nextGridCols = nextConfig.gridCols || nextConfig.cols || currentGridCols;
+      const nextGridRows = nextConfig.gridRows || nextConfig.rows || currentGridRows;
+      const fromPairs = totalPairs || defaultConfig.totalPairs;
+      const toPairs = nextConfig.totalPairs || fromPairs;
       const fromTime = defaultConfig.initialTime;
-      const toTime = config.initialTime || fromTime;
+      const toTime = nextConfig.initialTime || fromTime;
       const fromHideDelay = defaultConfig.hideDelay;
-      const toHideDelay = config.hideDelay || fromHideDelay;
+      const toHideDelay = nextConfig.hideDelay || fromHideDelay;
       const fromAdjacent = typeof gameConfig.adjacentRate === 'number' ? gameConfig.adjacentRate : defaultConfig.adjacentRate;
-      const toAdjacent = typeof config.adjacentRate === 'number' ? config.adjacentRate : fromAdjacent;
+      const toAdjacent = typeof nextConfig.adjacentRate === 'number' ? nextConfig.adjacentRate : fromAdjacent;
 
       const formatChange = (from, to) => (from === to ? `${to}` : `${from} → ${to}`);
 
       html += '<div class="analytics-grid">';
-      html += `<div class="analytics-item"><span class="label">Grid:</span><span class="value">${formatChange(`${currentGridCols}×${currentGridRows}`, `${nextGridCols}×${nextGridRows}`)}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Pairs:</span><span class="value">${formatChange(String(fromPairs), String(toPairs))}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${formatChange(formatTime(fromTime), formatTime(toTime))}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Delay:</span><span class="value">${formatChange(`${fromHideDelay}ms`, `${toHideDelay}ms`)}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Grid</span><span class="value">${formatChange(`${currentGridCols}×${currentGridRows}`, `${nextGridCols}×${nextGridRows}`)}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Pairs</span><span class="value">${formatChange(String(fromPairs), String(toPairs))}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Time</span><span class="value">${formatChange(formatTime(fromTime), formatTime(toTime))}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Hide Delay</span><span class="value">${formatChange(`${fromHideDelay}ms`, `${toHideDelay}ms`)}</span></div>`;
       if (toAdjacent !== undefined && !isNaN(toAdjacent)) {
-        html += `<div class="analytics-item"><span class="label">Adj:</span><span class="value">${formatChange(formatPercent(fromAdjacent), formatPercent(toAdjacent))}</span></div>`;
+        html += `<div class="analytics-item"><span class="label">Adjacency Rate</span><span class="value">${formatChange(formatPercent(fromAdjacent), formatPercent(toAdjacent))}</span></div>`;
       }
       html += '</div>';
 
@@ -460,89 +476,39 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     html += createTitle('🎮 Config');
     html += '<div class="analytics-grid">';
 
-    // Matching Type
     const matchingType = level === 3 ? 'Img-Txt' : 'Img-Img';
-    html += `<div class="analytics-item"><span class="label">Type:</span><span class="value">${matchingType}</span></div>`;
-
-    // Grid Size
-    const gridCols = config.cols || config.gridCols || (level === 3 ? 4 : 5);
-    const gridRows = config.rows || config.gridRows || (level === 3 ? 6 : 4);
-    html += `<div class="analytics-item"><span class="label">Grid:</span><span class="value">${gridCols}×${gridRows}</span></div>`;
-
-    // Total Pairs
-    html += `<div class="analytics-item"><span class="label">Pairs:</span><span class="value">${metrics.totalPairs || config.totalPairs || 10}</span></div>`;
-
-    // Layout Type
-    const layoutType = level === 1 ? 'Fixed' : (level === 2 ? 'Adjacent' : 'Adaptive');
-    html += `<div class="analytics-item"><span class="label">Layout:</span><span class="value">${layoutType}</span></div>`;
-
-    // Initial Time
+    const gridCols = config.cols || config.gridCols || (level === 3 ? 6 : 5);
+    const gridRows = config.rows || config.gridRows || (level === 3 ? 4 : 4);
     const initialTime = config.initialTime || 300;
-    html += `<div class="analytics-item"><span class="label">Time:</span><span class="value">${formatTime(initialTime)}</span></div>`;
-
-    // Hide Delay
     const hideDelay = config.hideDelay || 400;
-    html += `<div class="analytics-item"><span class="label">Delay:</span><span class="value">${hideDelay}ms</span></div>`;
-
-    // Show Cards Scale
-    const showScale = config.showScale || 1.4;
-    html += `<div class="analytics-item"><span class="label">Scale:</span><span class="value">${showScale}x</span></div>`;
-
-    // Match Reward (if available)
-    if (config.matchRewardSeconds) {
-      html += `<div class="analytics-item"><span class="label">Reward:</span><span class="value">+${config.matchRewardSeconds}s</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Match Type</span><span class="value">${matchingType}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Grid</span><span class="value">${gridCols}×${gridRows}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Pairs</span><span class="value">${totalPairs}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Initial Time</span><span class="value">${formatTime(initialTime)}</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Hide Delay</span><span class="value">${hideDelay}ms</span></div>`;
+    if (metrics.colorStats && Object.keys(metrics.colorStats).length > 0) {
+      const colorsPresent = Array.from(new Set(Object.keys(metrics.colorStats).map(c => (c || '').toString().trim()).filter(Boolean)));
+      if (colorsPresent.length > 0) {
+        html += `<div class="analytics-item"><span class="label">Colors Present</span><span class="value">${colorsPresent.join(', ')}</span></div>`;
+      }
     }
 
-    // Streak Bonus (if available)
-    if (config.streakBonusPerMatch) {
-      html += `<div class="analytics-item"><span class="label">Bonus:</span><span class="value">+${config.streakBonusPerMatch}</span></div>`;
-    }
-
-    // Adjacent Rate (Level 2 only)
     if (level === 2) {
       if (config.adjacentRate !== undefined && !isNaN(config.adjacentRate) && config.adjacentRate !== null) {
-        html += `<div class="analytics-item"><span class="label">Adj Rate:</span><span class="value">${formatPercent(config.adjacentRate)}</span></div>`;
+        html += `<div class="analytics-item"><span class="label">Adjacency Rate</span><span class="value">${formatPercent(config.adjacentRate)}</span></div>`;
       }
       if (config.adjacentTarget !== undefined && config.adjacentActual !== undefined) {
-        html += `<div class="analytics-item"><span class="label">Adj Pairs:</span><span class="value">${config.adjacentActual} / ${config.adjacentTarget}</span></div>`;
+        html += `<div class="analytics-item"><span class="label">Adjacent Pairs</span><span class="value">${config.adjacentActual} / ${config.adjacentTarget}</span></div>`;
       }
     }
 
-    // Color Groups (if available in config)
     if (config.colorGroups) {
-      html += `<div class="analytics-item"><span class="label">Colors:</span><span class="value">${Array.isArray(config.colorGroups) ? config.colorGroups.join(', ') : config.colorGroups}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Color Groups</span><span class="value">${Array.isArray(config.colorGroups) ? config.colorGroups.join(', ') : config.colorGroups}</span></div>`;
     }
 
     html += '</div></div>';
 
-    if (typeof GameHistory !== 'undefined' && isStandalonePage) {
-      try {
-        const history = new GameHistory();
-        await history.openDatabase();
-        const sessions = await history.getSessionsByLevel(level, 30);
-        const withFlow = sessions.filter(s => s.summary && typeof s.summary.flowIndex === 'number');
-        if (withFlow.length > 1) {
-          const recent = withFlow.slice().reverse().slice(0, 20).reverse();
-          const maxFlow = recent.reduce((m, s) => Math.max(m, s.summary.flowIndex || 0), 0.01);
-          let timelineHtml = '<div class="analytics-section" data-section="timeline">';
-          timelineHtml += createTitle('📈 Flow Timeline');
-          timelineHtml += '<div class="timeline-chart">';
-          recent.forEach(s => {
-            const fi = s.summary.flowIndex || 0;
-            const height = Math.max(6, (fi / maxFlow) * 100);
-            const date = new Date(s.timestamp);
-            const label = `${date.toLocaleDateString()} ${date.toLocaleTimeString()} • ${fi.toFixed(3)}`;
-            timelineHtml += `<div class="timeline-point" style="height:${height}%" title="${label}"></div>`;
-          });
-          timelineHtml += '</div>';
-          timelineHtml += '<div class="timeline-legend">Recent games on this level, newest on the right.</div>';
-          timelineHtml += '</div>';
-          html += timelineHtml;
-        }
-      } catch (e) {
-        if (typeof aiWarn === 'function') aiWarn('Error building timeline analytics:', e);
-      }
-    }
+    html += '</div></details>';
 
     summaryContainer.innerHTML = html;
     summaryContainer.style.display = 'block';
@@ -665,6 +631,28 @@ function safeNumber(value) {
   return typeof value === 'number' && isFinite(value) ? value : null;
 }
 
+function getSessionFlowIndex(session) {
+  const fromSummary = safeNumber(session?.summary?.flowIndex);
+  if (fromSummary !== null) return fromSummary;
+  const fromDisplay = safeNumber(session?.aiResult?.flowIndexDisplay);
+  if (fromDisplay !== null) return fromDisplay;
+  const fromRaw = safeNumber(session?.aiResult?.flowIndex);
+  if (fromRaw !== null) return Math.max(0.3, fromRaw);
+  return null;
+}
+
+function getSessionAccuracy(session) {
+  const fromSummary = safeNumber(session?.summary?.accuracy);
+  if (fromSummary !== null) return fromSummary;
+  const totalMatches = safeNumber(session?.metrics?.totalMatches);
+  if (totalMatches === null || totalMatches <= 0) return null;
+  const failedMatches = safeNumber(session?.metrics?.failedMatches) ?? 0;
+  const successful = totalMatches - failedMatches;
+  if (!isFinite(successful)) return null;
+  const clampedSuccessful = Math.max(0, Math.min(successful, totalMatches));
+  return clampedSuccessful / totalMatches;
+}
+
 function kmeans(points, k, maxIters = 25) {
   const n = points.length;
   const dim = points[0]?.length || 0;
@@ -758,11 +746,26 @@ function renderKMeansOverallEvaluation(container, sessions) {
   if (!container) return;
   const all = Array.isArray(sessions) ? sessions : [];
   const recent = all.slice(0, 60);
-  const usableRaw = recent.filter(s => safeNumber(s?.summary?.flowIndex) !== null && safeNumber(s?.summary?.accuracy) !== null);
+  const usableRaw = recent
+    .map(s => ({
+      session: s,
+      timestamp: safeNumber(s?.timestamp) ?? 0,
+      flowIndex: getSessionFlowIndex(s),
+      accuracy: getSessionAccuracy(s)
+    }))
+    .filter(s => s.flowIndex !== null && s.accuracy !== null);
 
   if (usableRaw.length < 6) {
-    container.innerHTML = '';
-    container.classList.add('hidden');
+    const missing = Math.max(0, 6 - usableRaw.length);
+    container.innerHTML = `
+      <div class="kmeans-card">
+        <div class="kmeans-head">
+          <div class="kmeans-title">K-Means Overall Review</div>
+        </div>
+        <div class="kmeans-subtitle">Need at least 6 games with valid analytics. ${missing ? `Play ${missing} more to unlock.` : ''} Sample: ${usableRaw.length}</div>
+      </div>
+    `;
+    container.classList.remove('hidden');
     return;
   }
 
@@ -772,8 +775,8 @@ function renderKMeansOverallEvaluation(container, sessions) {
 
   const timeCandidates = usable
     .map(s => {
-      const ct = safeNumber(s?.metrics?.completionTime);
-      const pairs = safeNumber(s?.metrics?.totalPairs) ?? safeNumber(s?.summary?.totalPairs) ?? 10;
+      const ct = safeNumber(s?.session?.metrics?.completionTime);
+      const pairs = safeNumber(s?.session?.metrics?.totalPairs) ?? safeNumber(s?.session?.summary?.totalPairs) ?? 10;
       if (ct === null) return null;
       if (!isFinite(pairs) || pairs <= 0) return null;
       return ct / pairs;
@@ -783,13 +786,13 @@ function renderKMeansOverallEvaluation(container, sessions) {
   const useTime = timeCandidates.length >= Math.ceil(usable.length * 0.7);
   const dim = useTime ? 3 : 2;
 
-  const flows = usable.map(s => clamp01(s.summary.flowIndex));
-  const accs = usable.map(s => clamp01(s.summary.accuracy));
+  const flows = usable.map(s => clamp01(s.flowIndex));
+  const accs = usable.map(s => clamp01(s.accuracy));
 
   const timePerPair = useTime
     ? usable.map(s => {
-        const ct = safeNumber(s?.metrics?.completionTime);
-        const pairs = safeNumber(s?.metrics?.totalPairs) ?? safeNumber(s?.summary?.totalPairs) ?? 10;
+        const ct = safeNumber(s?.session?.metrics?.completionTime);
+        const pairs = safeNumber(s?.session?.metrics?.totalPairs) ?? safeNumber(s?.session?.summary?.totalPairs) ?? 10;
         const v = ct !== null && isFinite(pairs) && pairs > 0 ? ct / pairs : null;
         return v;
       })
@@ -852,17 +855,19 @@ function renderKMeansOverallEvaluation(container, sessions) {
   const counts = new Array(centroids.length).fill(0);
   assignments.forEach(a => { counts[a] += 1; });
 
-  const lastN = Math.min(10, assignments.length);
-  const recentAssign = assignments.slice(-lastN);
+  const recentN = Math.min(10, assignments.length);
+  const recentAssign = assignments.slice(-recentN);
   const recentCounts = new Array(centroids.length).fill(0);
   recentAssign.forEach(a => { recentCounts[a] += 1; });
+  const overallCounts = new Array(centroids.length).fill(0);
+  assignments.forEach(a => { overallCounts[a] += 1; });
   let overallCluster = 0;
-  for (let i = 1; i < recentCounts.length; i++) {
-    if (recentCounts[i] > recentCounts[overallCluster]) overallCluster = i;
+  for (let i = 1; i < overallCounts.length; i++) {
+    if (overallCounts[i] > overallCounts[overallCluster]) overallCluster = i;
   }
 
   const overallMeta = clusterMeta[overallCluster] || rankToLabel[1];
-  const overallPct = assignments.length ? Math.round((recentCounts[overallCluster] / lastN) * 100) : 0;
+  const overallPct = assignments.length ? Math.round((overallCounts[overallCluster] / assignments.length) * 100) : 0;
 
   const mean = (arr) => {
     const vals = arr.filter(v => typeof v === 'number' && isFinite(v));
@@ -913,7 +918,6 @@ function renderKMeansOverallEvaluation(container, sessions) {
       const aStd = std(s.acc);
       const tppMean = useTime ? mean(s.tpp) : null;
       const tppStd = useTime ? std(s.tpp) : null;
-      const tag = idx === overallCluster ? 'Dominant' : '';
       const speedCell = useTime ? `<div class="kmeans-cell">${formatSec(tppMean)} <span class="kmeans-subval">±${formatSec(tppStd)}</span></div>` : '';
 
       return `
@@ -921,7 +925,6 @@ function renderKMeansOverallEvaluation(container, sessions) {
           <div class="kmeans-cell kmeans-cluster">
             <span class="kmeans-dot" style="background:${meta.color}"></span>
             <span class="kmeans-cluster-name">${meta.title}</span>
-            ${tag ? `<span class="kmeans-tag" style="border-color:${meta.color};color:${meta.color}">${tag}</span>` : ''}
           </div>
           <div class="kmeans-cell kmeans-mono">${n} <span class="kmeans-subval">(${pct}%)</span></div>
           <div class="kmeans-cell">${formatNum(fMean)} <span class="kmeans-subval">±${formatNum(fStd)}</span></div>
@@ -936,18 +939,27 @@ function renderKMeansOverallEvaluation(container, sessions) {
   const globalSpeed = useTime ? `<div class="kmeans-metric"><span class="kmeans-metric-label">Avg time/pair</span><span class="kmeans-metric-value">${formatSec(globalTppMean)}</span></div>` : '';
 
   const trendBars = assignments
-    .slice(-lastN)
+    .slice(-recentN)
     .map((c) => {
       const meta = clusterMeta[c] || { color: '#999' };
       return `<span class="kmeans-trend-dot" style="background:${meta.color}"></span>`;
     })
     .join('');
 
-  const w = 240;
-  const h = 140;
-  const pad = 14;
+  const w = 360;
+  const h = 210;
+  const pad = 20;
   const mapX = (v) => pad + clamp01(v) * (w - pad * 2);
   const mapY = (v) => h - pad - clamp01(v) * (h - pad * 2);
+
+  const gridLines = [0.25, 0.5, 0.75].map((t) => {
+    const x = mapX(t);
+    const y = mapY(t);
+    return `
+      <path d="M ${x} ${pad} L ${x} ${h - pad}" stroke="rgba(255,255,255,0.08)" stroke-width="1"></path>
+      <path d="M ${pad} ${y} L ${w - pad} ${y}" stroke="rgba(255,255,255,0.08)" stroke-width="1"></path>
+    `;
+  }).join('');
 
   const pointSvg = usable.map((s, i) => {
     const x = mapX(flows[i]);
@@ -955,23 +967,15 @@ function renderKMeansOverallEvaluation(container, sessions) {
     const meta = clusterMeta[assignments[i]] || { color: '#999' };
     const date = new Date(s.timestamp || 0);
     const title = `${date.toLocaleDateString()} ${date.toLocaleTimeString()} • Flow ${flows[i].toFixed(3)} • Acc ${(accs[i] * 100).toFixed(1)}%`;
-    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${meta.color}" fill-opacity="0.85"><title>${title}</title></circle>`;
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.2" fill="${meta.color}" fill-opacity="0.85"><title>${title}</title></circle>`;
   }).join('');
 
   const centroidSvg = centroids.map((c, idx) => {
     const cx = mapX(clamp01(c[0]));
     const cy = mapY(clamp01(c[1]));
     const meta = clusterMeta[idx] || { color: '#fff' };
-    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="6.2" fill="none" stroke="${meta.color}" stroke-width="2.2"></circle>`;
+    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="8.2" fill="none" stroke="${meta.color}" stroke-width="2.4"></circle>`;
   }).join('');
-
-  const distHtml = counts
-    .map((n, idx) => {
-      const meta = clusterMeta[idx] || { title: `Cluster ${idx + 1}`, color: '#999' };
-      const pct = Math.round((n / assignments.length) * 100);
-      return `<div class="kmeans-legend-item"><span class="kmeans-dot" style="background:${meta.color}"></span><span class="kmeans-legend-text">${meta.title}</span><span class="kmeans-legend-pct">${pct}%</span></div>`;
-    })
-    .join('');
 
   const subtitle = useTime ? 'Features: Flow Index, Accuracy, Speed' : 'Features: Flow Index, Accuracy';
   const tableClass = useTime ? 'kmeans-table' : 'kmeans-table kmeans-table-2d';
@@ -980,9 +984,9 @@ function renderKMeansOverallEvaluation(container, sessions) {
     <div class="kmeans-card">
       <div class="kmeans-head">
         <div class="kmeans-title">K-Means Overall Review</div>
-        <div class="kmeans-badge" style="border-color:${overallMeta.color}; color:${overallMeta.color}">${overallMeta.title} (${overallPct}% of last ${lastN})</div>
+        <div class="kmeans-badge" style="border-color:${overallMeta.color}; color:${overallMeta.color}">${overallMeta.title} (${overallPct}% of all)</div>
       </div>
-      <div class="kmeans-subtitle">${subtitle} · Sample: last ${usable.length} games · K=${model.k} · Dim=${dim}</div>
+      <div class="kmeans-subtitle">${subtitle} · Sample: ${usable.length} games · K=${model.k} · Dim=${dim}</div>
       <div class="kmeans-metrics">
         <div class="kmeans-metric"><span class="kmeans-metric-label">Avg flow</span><span class="kmeans-metric-value">${formatNum(globalFlowMean)}</span></div>
         <div class="kmeans-metric"><span class="kmeans-metric-label">Avg accuracy</span><span class="kmeans-metric-value">${formatPct(globalAccMean)}</span></div>
@@ -995,6 +999,7 @@ function renderKMeansOverallEvaluation(container, sessions) {
             <rect x="0" y="0" width="${w}" height="${h}" fill="rgba(0,0,0,0.18)" rx="10" ry="10"></rect>
             <path d="M ${pad} ${h - pad} L ${w - pad} ${h - pad}" stroke="rgba(255,255,255,0.18)" stroke-width="1"></path>
             <path d="M ${pad} ${pad} L ${pad} ${h - pad}" stroke="rgba(255,255,255,0.18)" stroke-width="1"></path>
+            ${gridLines}
             ${pointSvg}
             ${centroidSvg}
           </svg>
@@ -1003,17 +1008,18 @@ function renderKMeansOverallEvaluation(container, sessions) {
             <span>Accuracy (y)</span>
           </div>
         </div>
-        <div class="kmeans-legend">${distHtml}</div>
-      </div>
-      <div class="${tableClass}">
-        <div class="kmeans-table-header">
-          <div class="kmeans-table-head">Cluster</div>
-          <div class="kmeans-table-head">Count</div>
-          <div class="kmeans-table-head">Flow</div>
-          <div class="kmeans-table-head">Accuracy</div>
-          ${headerSpeed}
+        <div class="kmeans-legend">
+          <div class="${tableClass}">
+            <div class="kmeans-table-header">
+              <div class="kmeans-table-head">Cluster</div>
+              <div class="kmeans-table-head">Count</div>
+              <div class="kmeans-table-head">Flow</div>
+              <div class="kmeans-table-head">Accuracy</div>
+              ${headerSpeed}
+            </div>
+            ${clusterRowsHtml}
+          </div>
         </div>
-        ${clusterRowsHtml}
       </div>
     </div>
   `;

@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>He Maumahara</title>
 <link rel="shortcut icon" type="image/x-icon" href="images/icon.ico">
-<link rel="stylesheet" href="css/analytics.css?v=2">
+<link rel="stylesheet" href="css/analytics.css?v=7">
 <link rel="stylesheet" href="css/roboto.css?v=2">
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script>
 (function(){
   var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -43,6 +44,8 @@
   <div class="mode-selector">
     <button class="mode-btn active" onclick="window.showHistoryList()">History</button>
     <button class="mode-btn" onclick="window.showDemoMode()">Demo</button>
+    <button class="mode-btn" onclick="window.downloadAnalyticsJson()">Export Data</button>
+    <button class="mode-btn" onclick="window.downloadAnalyticsScreenshot()">Screenshot</button>
   </div>
   
   <div class="level-selector hidden" id="level-selector">
@@ -57,12 +60,12 @@
 </div>
 </div>
 
-<script src="js/game-core.js?v=2"></script>
-<script src="js/ai-engine.js?v=2"></script>
+<script src="js/game-core.js?v=4"></script>
+<script src="js/ai-engine.js?v=3"></script>
 <script src="js/ai-helper.js?v=2"></script>
 <script src="js/game-history.js?v=2"></script>
 <script src="js/mock-data.js?v=2"></script>
-<script src="js/analytics-summary.js?v=2"></script>
+<script src="js/analytics-summary.js?v=5"></script>
 <script>
   let currentLevel = 1;
   let currentMode = 'history'; // 'history' or 'demo'
@@ -70,6 +73,7 @@
   // Show history list
   async function showHistoryList() {
     currentMode = 'history';
+    window.currentAnalyticsExport = null;
     document.getElementById('level-selector').classList.add('hidden');
     document.getElementById('analytics-display').classList.add('hidden');
     document.getElementById('history-list').classList.remove('hidden');
@@ -121,9 +125,20 @@
         
         byLevel[level].forEach(session => {
           const date = new Date(session.timestamp);
-          const flowIndexValue = typeof session.summary.flowIndex === 'number' ? session.summary.flowIndex : null;
-          const displayFlowIndex = flowIndexValue !== null ? flowIndexValue.toFixed(4) : 'N/A';
-          const accuracy = (session.summary.accuracy * 100).toFixed(1);
+          const clicks = (session.summary && typeof session.summary.totalClicks === 'number') ? session.summary.totalClicks : (session.metrics && typeof session.metrics.totalClicks === 'number' ? session.metrics.totalClicks : 0);
+          const totalPairs = (session.summary && typeof session.summary.totalPairs === 'number') ? session.summary.totalPairs : (session.metrics && typeof session.metrics.totalPairs === 'number' ? session.metrics.totalPairs : 0);
+          const totalMatches = (session.metrics && typeof session.metrics.totalMatches === 'number') ? session.metrics.totalMatches : null;
+          const failedMatches = (session.metrics && typeof session.metrics.failedMatches === 'number') ? session.metrics.failedMatches : 0;
+          let successRatio = null;
+          if (totalPairs > 0 && typeof totalMatches === 'number') {
+            const successfulMatches = Math.max(0, totalMatches - Math.max(0, Math.min(failedMatches, totalMatches)));
+            successRatio = Math.max(0, Math.min(1, Math.min(successfulMatches, totalPairs) / totalPairs));
+          }
+          const rawFlowIndex = (session.aiResult && (session.aiResult.flowIndexDisplay ?? session.aiResult.flowIndex)) ??
+            (session.summary && session.summary.flowIndex) ??
+            (session.aiResult && session.aiResult.flowIndexDisplay) ??
+            null;
+          const flowIndexText = (typeof rawFlowIndex === 'number' && isFinite(rawFlowIndex)) ? rawFlowIndex.toFixed(3) : 'N/A';
           // Use actual completion time if available, otherwise fallback to remaining time logic (or calculate it)
           let displayTime = 'N/A';
           if (session.metrics && typeof session.metrics.completionTime === 'number') {
@@ -136,8 +151,12 @@
           html += `
             <div class="history-item" onclick="window.loadHistorySession('${session.gameId}')">
               <div class="history-item-date">${date.toLocaleDateString()} ${date.toLocaleTimeString()}</div>
-              <div class="history-item-main">Flow Index: <strong>${displayFlowIndex}</strong></div>
-              <div class="history-item-sub">Accuracy: ${accuracy}% | Time: ${displayTime} | Pairs: ${session.summary.totalPairs}</div>
+              <div class="history-item-main">Time: <strong>${displayTime}</strong></div>
+              <div class="history-item-sub">
+                <div>Flow Index: ${flowIndexText}</div>
+                <div>Clicks: ${clicks}</div>
+                <div>Success Rate: ${successRatio === null ? 'N/A' : (successRatio * 100).toFixed(1) + '%'}</div>
+              </div>
             </div>
           `;
         });
@@ -181,24 +200,49 @@
       // Create a mock telemetry object from session data
       const mockTelemetry = {
         exportAll: async function() {
-          // Return minimal events for display
-          return [
-            { 
-              type: 'start', 
-              ts: session.timestamp, 
-              data: { level: session.level, variant: session.config } 
-            },
-            { 
-              type: 'end', 
-              ts: session.timestamp + (session.metrics.completionTime || 0) * 1000, 
-              data: { 
-                pairs: session.metrics.totalPairs, 
-                streak: session.gameStats.streak 
-              } 
+          const startTs = session.timestamp;
+          const completionTime = (session.metrics && typeof session.metrics.completionTime === 'number') ? session.metrics.completionTime : 0;
+          const endTs = startTs + completionTime * 1000;
+          const totalClicks = (session.metrics && typeof session.metrics.totalClicks === 'number') ? session.metrics.totalClicks : (session.summary && typeof session.summary.totalClicks === 'number' ? session.summary.totalClicks : 0);
+          const totalPairs = (session.metrics && typeof session.metrics.totalPairs === 'number') ? session.metrics.totalPairs : (session.summary && typeof session.summary.totalPairs === 'number' ? session.summary.totalPairs : 10);
+          const totalMatches = (session.metrics && typeof session.metrics.totalMatches === 'number') ? session.metrics.totalMatches : 0;
+          const failedMatches = (session.metrics && typeof session.metrics.failedMatches === 'number') ? session.metrics.failedMatches : 0;
+
+          const events = [];
+          events.push({ type: 'start', ts: startTs, data: { level: session.level, variant: session.config } });
+          events.push({ type: 'end', ts: endTs, data: { pairs: totalPairs, streak: session.gameStats.streak } });
+
+          const span = Math.max(1, endTs - startTs);
+          for (let i = 0; i < totalClicks; i++) {
+            const ts = startTs + Math.floor(((i + 1) / (totalClicks + 1)) * span);
+            const imageId = (i % 24) + 1;
+            events.push({ type: 'flip', ts, data: { image: `image${imageId}.png` } });
+          }
+
+          const boundedFailed = Math.max(0, Math.min(failedMatches, totalMatches));
+          for (let i = 0; i < totalMatches; i++) {
+            const ts = startTs + Math.floor(((i + 1) / (totalMatches + 1)) * span);
+            const imageId = (i % 24) + 1;
+            if (i < boundedFailed) {
+              const otherId = ((i + 5) % 24) + 1;
+              events.push({ type: 'match', ts, data: { result: 'fail', images: [`image${imageId}.png`, `image${otherId}.png`] } });
+            } else {
+              events.push({ type: 'match', ts, data: { result: 'success', image: `image${imageId}.png` } });
             }
-          ];
+          }
+
+          events.sort((a, b) => a.ts - b.ts);
+          return events;
         },
         log: async function() { return Promise.resolve(); }
+      };
+      window.currentAnalyticsExport = {
+        telemetry: mockTelemetry,
+        level: session.level,
+        aiResult: session.aiResult || {},
+        gameStats: session.gameStats || {},
+        config: session.config || {},
+        session
       };
       
       // Display analytics from session data
@@ -296,6 +340,14 @@
     
     // Create mock telemetry
     const mockTelemetry = createMockTelemetry();
+    window.currentAnalyticsExport = {
+      telemetry: mockTelemetry,
+      level,
+      aiResult: mockData.aiResult || {},
+      gameStats: mockData.gameStats || {},
+      config: mockData.config || {},
+      session: null
+    };
     
     // Display analytics
     const container = document.getElementById('analytics-display');
@@ -333,7 +385,48 @@
   
   // Make loadMockData available globally
   window.loadMockData = loadMockData;
-  
+  async function downloadAnalyticsJson() {
+    const payload = window.currentAnalyticsExport;
+    if (!payload || !payload.telemetry || typeof payload.telemetry.exportAll !== 'function') {
+      alert('请先打开一条记录再导出');
+      return;
+    }
+    try {
+      const events = await payload.telemetry.exportAll();
+      const date = new Date().toISOString().replace(/[:.]/g, '-');
+      const exportData = {
+        metadata: {
+          timestamp: new Date().toISOString(),
+          source: 'analytics',
+          level: payload.level
+        },
+        aiAnalysis: payload.aiResult || {},
+        gameStats: payload.gameStats || {},
+        config: payload.config || {},
+        session: payload.session || null,
+        telemetry: events
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const jsonLink = document.createElement('a');
+      jsonLink.download = `MemoryGame_Analytics_Level${payload.level || 'X'}_${date}.json`;
+      jsonLink.href = URL.createObjectURL(blob);
+      document.body.appendChild(jsonLink);
+      jsonLink.click();
+      document.body.removeChild(jsonLink);
+      setTimeout(() => URL.revokeObjectURL(jsonLink.href), 1000);
+    } catch (e) {
+      alert('导出失败，请重试');
+    }
+  }
+
+  async function downloadAnalyticsScreenshot() {
+    const date = new Date().toISOString().replace(/[:.]/g, '-');
+    await generateScreenshot('Analytics', date);
+  }
+
+  window.downloadAnalyticsJson = downloadAnalyticsJson;
+  window.downloadAnalyticsScreenshot = downloadAnalyticsScreenshot;
+
   function getQueryParam(name) {
     const params = new URLSearchParams(window.location.search);
     return params.get(name);

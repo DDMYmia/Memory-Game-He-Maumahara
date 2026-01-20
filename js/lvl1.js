@@ -52,7 +52,10 @@ const cardTextMapping = {
   "image7": "Kōwhai",
   "image8": "Koru",
   "image9": "Hei Matau",
-  "image10": "Pikorua"
+  "image10": "Pikorua (double twist)",
+  "image11": "paua",
+  "image12": "kete",
+  "image13": "Pikorua (single twist)"
 };
 
 function scheduleFrame(fn) {
@@ -88,11 +91,105 @@ const timerInterval = setInterval(() => {
   }
 }, 1000);
 
-// Initialize the game
 function initializeGame() {
+  showConsentModal(() => {
+    proceedWithGameInitialization();
+    startInitialPreview();
+  });
+}
+
+function showConsentModal(callback) {
+  let modal = document.getElementById('consent-modal');
+  if (!modal) {
+    const host = document.createElement('div');
+    host.innerHTML = `
+    <div id="consent-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <h2>Data & Analytics</h2>
+        <p>We'd like to record and analyze your game data to provide personalized feedback and insights. Your game session will be saved only if you agree.</p>
+        <p>You can change this setting anytime using the "AI" toggle in the menu.</p>
+        <div class="modal-buttons">
+          <button id="toggle-sound" class="btn btn-sound-on" type="button">Sound On</button>
+        </div>
+        <div class="modal-buttons">
+          <button id="consent-accept" class="btn btn-accept">Accept</button>
+          <button id="consent-decline" class="btn btn-decline">Decline</button>
+        </div>
+      </div>
+    </div>
+    `.trim();
+    if (host.firstElementChild) document.body.appendChild(host.firstElementChild);
+    modal = document.getElementById('consent-modal');
+  }
+
+  if (!modal) {
+    callback();
+    return;
+  }
+
+  modal.classList.remove('hidden');
+
+  let promptAudio = null;
+  if (typeof playSoundIfAllowed === 'function') {
+    promptAudio = playSoundIfAllowed('Sound/Ka_pai.mp3');
+  } else if (typeof isMutedEnabled === 'function' && !isMutedEnabled()) {
+    promptAudio = new Audio('Sound/Ka_pai.mp3');
+    promptAudio.play().catch(() => {});
+  }
+
+  const soundBtn = document.getElementById('toggle-sound');
+  if (soundBtn) {
+    const refreshSoundUI = () => {
+      const muted = typeof isMutedEnabled === 'function' ? isMutedEnabled() : false;
+      soundBtn.textContent = muted ? 'Sound Off' : 'Sound On';
+      soundBtn.classList.remove('btn-secondary', 'btn-sound-on', 'btn-sound-off');
+      soundBtn.classList.add(muted ? 'btn-sound-off' : 'btn-sound-on');
+    };
+    refreshSoundUI();
+    soundBtn.onclick = () => {
+      if (typeof toggleMute === 'function') toggleMute();
+      if (typeof isMutedEnabled === 'function' && isMutedEnabled() && promptAudio) {
+        promptAudio.pause();
+        promptAudio.currentTime = 0;
+      }
+      refreshSoundUI();
+    };
+  }
+
+  const acceptBtn = document.getElementById('consent-accept');
+  const declineBtn = document.getElementById('consent-decline');
+  if (!acceptBtn || !declineBtn || acceptBtn.tagName !== 'BUTTON' || declineBtn.tagName !== 'BUTTON') {
+    modal.classList.add('hidden');
+    callback();
+    return;
+  }
+
+  acceptBtn.classList.remove('btn-secondary');
+  declineBtn.classList.remove('btn-secondary');
+  acceptBtn.classList.add('btn-accept');
+  declineBtn.classList.add('btn-decline');
+
+  acceptBtn.onclick = () => {
+    if (typeof setAdaptiveEnabled === 'function') setAdaptiveEnabled(true);
+    else if (typeof toggleAdaptive === 'function') toggleAdaptive(true);
+    modal.classList.add('hidden');
+    callback();
+  };
+
+  declineBtn.onclick = () => {
+    if (typeof setAdaptiveEnabled === 'function') setAdaptiveEnabled(false);
+    else if (typeof toggleAdaptive === 'function') toggleAdaptive(false);
+    modal.classList.add('hidden');
+    callback();
+  };
+}
+
+// Initialize the game
+function proceedWithGameInitialization() {
   const gameBoard = document.getElementById("game-board");
 
   const cardImages = FIXED_CARD_ORDER.map(num => ({ id: num, match: `image${num}.png`, src: resolveImageSrc(num) }));
+
 
   // Create and render cards with images
   for (let i = 0; i < cardImages.length; i++) {
@@ -159,6 +256,22 @@ function handleCardClick(event) {
         card2.style.background = '';
         card1.style.backgroundColor = '';
         card2.style.backgroundColor = '';
+        card1.classList.remove('card-peek');
+        card2.classList.remove('card-peek');
+        card1.style.transform = '';
+        card2.style.transform = '';
+        card1.style.zIndex = '';
+        card2.style.zIndex = '';
+        const card1Img = card1.querySelector('img');
+        const card2Img = card2.querySelector('img');
+        if (card1Img) {
+          card1Img.style.transform = '';
+          card1Img.style.transformOrigin = '';
+        }
+        if (card2Img) {
+          card2Img.style.transform = '';
+          card2Img.style.transformOrigin = '';
+        }
         matchedPairs++;
           streak++;
           time += 3;
@@ -212,7 +325,7 @@ function handleCardClick(event) {
             }
 
             const imgKey = card.dataset.image.replace('.png', '');
-            card.classList.remove('card-lvl1-' + imgKey);
+            card.classList.remove('card-' + imgKey);
           });
 
           flippedCards = [];
@@ -307,7 +420,7 @@ function cardReader(card) {
   const cookieCutterTxt = document.getElementById("cookie-txt");
   const imgKey = card.dataset.image.replace('.png', '');
   
-  card.classList.add('card-lvl1-' + imgKey);
+  card.classList.add('card-' + imgKey);
   cookieCutterTxt.innerHTML = cardTextMapping[imgKey] || '';
 }
 
@@ -322,7 +435,11 @@ function startInitialPreview() {
   // Show all cards
   allCards.forEach(card => {
     const img = card.querySelector('img');
-    if (img) img.style.visibility = 'visible';
+    if (img) {
+      img.style.visibility = 'visible';
+      img.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+      img.style.transformOrigin = 'center';
+    }
     card.classList.add('card-peek');
   });
 
@@ -338,8 +455,12 @@ function startInitialPreview() {
     if (remaining <= 0) {
       clearInterval(previewInterval);
       allCards.forEach(card => {
+        const img = card.querySelector('img');
+        if (img) {
+          img.style.transform = '';
+          img.style.transformOrigin = '';
+        }
         if (!card.classList.contains('matched')) {
-          const img = card.querySelector('img');
           if (img) img.style.visibility = 'hidden';
           card.classList.remove('card-peek');
         }
@@ -378,10 +499,12 @@ function showAllCards() {
   cards.forEach(card => {
     if (!card.classList.contains('matched')) {
       const img = card.querySelector('img');
-      if (img) img.style.visibility = 'visible';
+      if (img) {
+        img.style.visibility = 'visible';
+        img.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+        img.style.transformOrigin = 'center';
+      }
       card.classList.add('card-peek');
-      card.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
-      card.style.zIndex = '1000';
     }
   });
 
@@ -405,13 +528,17 @@ function showAllCards() {
 
 function hideAllCards() {
 	cards.forEach(card => {
+    card.style.transform = '';
+    card.style.zIndex = '';
+    const img = card.querySelector('img');
+    if (img) {
+      img.style.transform = '';
+      img.style.transformOrigin = '';
+    }
 		if (!card.classList.contains('matched')) {
-			const img = card.querySelector('img');
-			if (img) img.style.visibility = 'hidden';
-			card.classList.remove('card-peek');
-      card.style.transform = '';
-      card.style.zIndex = '';
-		}
+      if (img) img.style.visibility = 'hidden';
+      card.classList.remove('card-peek');
+    }
 	});
   isShowingCards = false;
 	telemetry.log('show_cards', { level: 1, state: 'hide' });
@@ -437,11 +564,15 @@ async function endGame() {
   
   await telemetry.log('end', { level: 1, flowIndex: aiResult?.flowIndexDisplay ?? aiResult?.flowIndex, pairs: matchedPairs, streak: streak });
 
+  const enabled = typeof isAdaptiveEnabled === 'function' ? isAdaptiveEnabled() : window.isAdaptive === true;
+  window.isAdaptive = enabled;
   const analyticsContainer = document.querySelector('#game-over .game-over-right') || document.getElementById('analytics-summary');
   let gameId = null;
-  if (typeof displayAnalyticsSummary === 'function' && analyticsContainer) {
-    await displayAnalyticsSummary(telemetry, 1, aiResult, { streak, remainingTime: time });
-    gameId = await saveSessionToHistoryFromTelemetry(telemetry, 1, aiResult, { streak, remainingTime: time });
+  if (enabled) {
+    if (typeof displayAnalyticsSummary === 'function' && analyticsContainer) {
+      await displayAnalyticsSummary(telemetry, 1, aiResult, { streak, remainingTime: time });
+      gameId = await saveSessionToHistoryFromTelemetry(telemetry, 1, aiResult, { streak, remainingTime: time });
+    }
   }
   if (gameId) {
     const menuIcon = document.getElementById('menu-icon');
@@ -509,6 +640,7 @@ window.onload = () => {
 	telemetry.openDatabase();
 	const enabled = isAdaptiveEnabled();
 	updateAdaptiveUI(enabled);
+  updateMuteUI(isMutedEnabled());
 	if (typeof AIEngine !== 'undefined') {
 		aiEngine = new AIEngine();
 	}
@@ -529,7 +661,6 @@ window.onload = () => {
   }
 
 	initializeGame();
-	startInitialPreview();
 };
 
 async function downloadResult() {

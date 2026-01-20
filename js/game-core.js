@@ -157,18 +157,107 @@ function isAdaptiveEnabled() {
 function updateAdaptiveUI(enabled) {
   const btn = document.getElementById('toggle-adaptive');
   if (btn) {
-    btn.textContent = enabled ? 'Adapt: ON' : 'Adapt: OFF';
+    btn.textContent = enabled ? 'AI: ON' : 'AI: OFF';
     btn.classList.remove('adaptive-on', 'adaptive-off');
     btn.classList.add(enabled ? 'adaptive-on' : 'adaptive-off');
   }
 }
 
-function toggleAdaptive() {
-  const currentlyEnabled = isAdaptiveEnabled();
-  const newState = !currentlyEnabled;
-  localStorage.setItem('ai_adaptive_enabled', newState.toString());
-  updateAdaptiveUI(newState);
+function setAdaptiveEnabled(enabled) {
+  const next = enabled === true;
+  localStorage.setItem('ai_adaptive_enabled', next.toString());
+  window.isAdaptive = next;
+  updateAdaptiveUI(next);
 }
+
+function toggleAdaptive(forceState) {
+  const currentlyEnabled = isAdaptiveEnabled();
+  const newState = typeof forceState === 'boolean' ? forceState : !currentlyEnabled;
+  setAdaptiveEnabled(newState);
+}
+
+function isMutedEnabled() {
+  const raw = localStorage.getItem('game_muted');
+  return raw === 'true' || raw === '1';
+}
+
+const activeAudioInstances = new Set();
+
+function createManagedAudio(src) {
+  const audio = new Audio(src);
+  activeAudioInstances.add(audio);
+  const cleanup = () => {
+    activeAudioInstances.delete(audio);
+    audio.removeEventListener('ended', cleanup);
+    audio.removeEventListener('pause', cleanup);
+    audio.removeEventListener('error', cleanup);
+  };
+  audio.addEventListener('ended', cleanup);
+  audio.addEventListener('pause', cleanup);
+  audio.addEventListener('error', cleanup);
+  return audio;
+}
+
+function stopAllAudio() {
+  const instances = Array.from(activeAudioInstances);
+  instances.forEach(audio => {
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+    } catch (e) {}
+  });
+  activeAudioInstances.clear();
+}
+
+function playSoundIfAllowed(src) {
+  if (isMutedEnabled()) return null;
+  const audio = createManagedAudio(src);
+  audio.play().catch(e => {
+    if (typeof aiLog === 'function') aiLog('Audio play failed', e);
+  });
+  return audio;
+}
+
+function updateMuteUI(muted) {
+  const btn = document.getElementById('toggle-mute');
+  if (btn) {
+    btn.textContent = muted ? 'Sound Off' : 'Sound On';
+    btn.classList.remove('mute-on', 'mute-off');
+    btn.classList.add(muted ? 'mute-on' : 'mute-off');
+  }
+  const iconBtn = document.getElementById('mute-btn');
+  if (iconBtn) {
+    iconBtn.classList.toggle('muted', muted);
+  }
+}
+
+function toggleMute() {
+  const currentlyMuted = isMutedEnabled();
+  const newState = !currentlyMuted;
+  localStorage.setItem('game_muted', newState.toString());
+  if (newState) {
+    stopAllAudio();
+  }
+  updateMuteUI(newState);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const muteBtn = document.getElementById('toggle-mute');
+  if (muteBtn) {
+    muteBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleMute();
+    });
+    updateMuteUI(isMutedEnabled());
+  }
+
+  const adaptiveBtn = document.getElementById('toggle-adaptive');
+  if (adaptiveBtn) {
+    const enabled = isAdaptiveEnabled();
+    window.isAdaptive = enabled;
+    updateAdaptiveUI(enabled);
+  }
+});
 
 let instructionInterval;
 let currentInIndex = 0;
@@ -243,7 +332,7 @@ function injectInstructionModal() {
         <img src="images/cards-shown.png" />
         <br>
         <b>Adaptive Difficulty</b><br>
-        Toggle the <b>Adapt</b> button to enable AI-driven difficulty. The game will adjust parameters like time and grid size based on your performance.
+        Toggle the <b>AI</b> button to enable AI-driven difficulty. The game will adjust parameters like time and grid size based on your performance.
         <br><br>
         The game ends when all pairs have been found. Have fun!
       </div>
@@ -331,29 +420,44 @@ function showComboText(text) {
 }
 
 function playComboSound(streak) {
+  if (typeof isMutedEnabled === 'function' && isMutedEnabled()) {
+    let comboText = '';
+    if (streak === 2) {
+      comboText = 'Tino pai';
+    } else if (streak === 3) {
+      comboText = 'Ka pai';
+    } else if (streak === 4) {
+      comboText = 'Rawe';
+    } else if (streak === 5) {
+      comboText = 'Tau kē';
+    } else if (streak >= 6) {
+      comboText = 'Mīharo';
+    }
+    if (comboText) {
+      showComboText(comboText);
+    }
+    return;
+  }
   let soundFile = '';
   let comboText = '';
   if (streak === 2) {
-    soundFile = 'Sound/nice.mp3';
-    comboText = 'NICE!';
+    soundFile = 'Sound/Tino_pai.mp3';
+    comboText = 'Tino pai';
   } else if (streak === 3) {
-    soundFile = 'Sound/great.mp3';
-    comboText = 'GREAT!';
+    soundFile = 'Sound/Ka_pai.mp3';
+    comboText = 'Ka pai';
   } else if (streak === 4) {
-    soundFile = 'Sound/Amazing.mp3';
-    comboText = 'AMAZING!';
+    soundFile = 'Sound/Rawe.mp3';
+    comboText = 'Rawe';
   } else if (streak === 5) {
-    soundFile = 'Sound/excellent.mp3';
-    comboText = 'EXCELLENT!';
+    soundFile = 'Sound/Tau_ke.mp3';
+    comboText = 'Tau kē';
   } else if (streak >= 6) {
-    soundFile = 'Sound/Unbelievable.mp3';
-    comboText = 'UNBELIEVABLE!';
+    soundFile = 'Sound/Miharo.mp3';
+    comboText = 'Mīharo';
   }
   if (soundFile) {
-    const audio = new Audio(soundFile);
-    audio.play().catch(e => {
-      if (typeof aiLog === 'function') aiLog('Audio play failed', e);
-    });
+    playSoundIfAllowed(soundFile);
   }
   if (comboText) {
     showComboText(comboText);

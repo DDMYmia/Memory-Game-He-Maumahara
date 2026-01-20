@@ -31,6 +31,14 @@ This document describes the implemented frontend design system for the current H
   - ON: #4CAF50
   - OFF: #808080
 
+#### RGByB Color System (Card Backgrounds)
+Used for AI analytics and visual consistency across levels:
+- **Red**: image2, image6, image12
+- **Green**: image4, image5, image8, image13
+- **Blue**: image1, image9, image10, image11
+- **Yellow**: image7
+- **Black**: image3
+
 ### 2.3 Layout and Spacing
 
 - Global minimum width: 800px

@@ -49,7 +49,19 @@ const cardTextMapping = {
   "image9": "Hei Matau",
   "image10": "Pikorua",
   "image11": "Image 11",
-  "image12": "Image 12"
+  "image12": "Image 12",
+  "image13": "Image 13",
+  "image14": "Image 14",
+  "image15": "Image 15",
+  "image16": "Image 16",
+  "image17": "Image 17",
+  "image18": "Image 18",
+  "image19": "Image 19",
+  "image20": "Image 20",
+  "image21": "Image 21",
+  "image22": "Image 22",
+  "image23": "Image 23",
+  "image24": "Image 24"
 };
 
 function generateAdjacentLayout(totalPairs, cols, rows, target) {
@@ -136,11 +148,52 @@ let SHOW_CARDS_SCALE_RUNTIME = SHOW_CARDS_SCALE;
 const MATCH_VANISH_MS = 200;
 const FLIPWAVE_START_DELAY_MS = 200;
 
+function applyUrlGridOverride() {
+  if (typeof URLSearchParams === 'undefined') return;
+  const params = new URLSearchParams(window.location.search);
+  const gridRaw = (params.get('grid') || '').toLowerCase();
+  let cols = parseInt(params.get('cols'), 10);
+  let rows = parseInt(params.get('rows'), 10);
+  if (!Number.isFinite(cols) || !Number.isFinite(rows)) {
+    cols = null;
+    rows = null;
+  }
+  if (!cols || !rows) {
+    if (gridRaw === 'wide' || gridRaw === 'large' || gridRaw === '6x4' || gridRaw === '6×4') {
+      cols = 6;
+      rows = 4;
+    }
+    if (gridRaw === 'small' || gridRaw === 'default' || gridRaw === '5x4' || gridRaw === '5×4') {
+      cols = 5;
+      rows = 4;
+    }
+  }
+  if (!cols || !rows || !isFinite(cols) || !isFinite(rows) || cols <= 0 || rows <= 0) return;
+  GRID_COLS_RUNTIME = cols;
+  GRID_ROWS_RUNTIME = rows;
+  totalPairs = pairsForGrid(cols, rows);
+  ADJACENT_TARGET_RUNTIME = Math.floor(totalPairs * ADJACENT_RATE_RUNTIME);
+  ADJACENT_TARGET_RUNTIME = Math.max(0, Math.min(totalPairs, ADJACENT_TARGET_RUNTIME));
+  try {
+    localStorage.setItem('ai_adaptive_enabled', 'true');
+    localStorage.setItem('ai_lvl2_completed_count', '1');
+    localStorage.setItem('ai_level2_config', JSON.stringify({
+      gridCols: cols,
+      gridRows: rows,
+      initialTime: INITIAL_TIME,
+      hideDelay: HIDE_DELAY_RUNTIME,
+      showScale: SHOW_CARDS_SCALE_RUNTIME,
+      adjacentRate: ADJACENT_RATE_RUNTIME,
+      adjacentTarget: ADJACENT_TARGET_RUNTIME
+    }));
+  } catch (e) {}
+}
+
 function scheduleFrame(fn) {
   if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(fn);
   return setTimeout(fn, 0);
 }
-let IMAGE_POOL_MAX = 24;
+let IMAGE_POOL_MAX = 13;
 let IMAGE_SELECTION = (() => {
   const arr = Array.from({ length: IMAGE_POOL_MAX }, (_, i) => i + 1);
   for (let i = arr.length - 1; i > 0; i--) {
@@ -153,6 +206,11 @@ let IMAGE_SELECTION = (() => {
 function resolveImageSrc(num) {
   const mapped = IMAGE_SELECTION[num - 1];
   return `images/image${mapped}.png`;
+}
+
+function resolveImageMatch(num) {
+  const mapped = IMAGE_SELECTION[num - 1];
+  return `image${mapped}.png`;
 }
 
 function updateTimer() {
@@ -178,6 +236,99 @@ const timerInterval = setInterval(() => {
 }, 1000);
 
 function initializeGame() {
+  showConsentModal(() => {
+    proceedWithGameInitialization();
+    startInitialPreview();
+  });
+}
+
+function showConsentModal(callback) {
+  let modal = document.getElementById('consent-modal');
+  if (!modal) {
+    const host = document.createElement('div');
+    host.innerHTML = `
+    <div id="consent-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <h2>Data & Analytics</h2>
+        <p>We'd like to record and analyze your game data to provide personalized feedback and insights. Your game session will be saved only if you agree.</p>
+        <p>You can change this setting anytime using the "AI" toggle in the menu.</p>
+        <div class="modal-buttons">
+          <button id="toggle-sound" class="btn btn-sound-on" type="button">Sound On</button>
+        </div>
+        <div class="modal-buttons">
+          <button id="consent-accept" class="btn btn-accept">Accept</button>
+          <button id="consent-decline" class="btn btn-decline">Decline</button>
+        </div>
+      </div>
+    </div>
+    `.trim();
+    if (host.firstElementChild) document.body.appendChild(host.firstElementChild);
+    modal = document.getElementById('consent-modal');
+  }
+
+  if (!modal) {
+    callback();
+    return;
+  }
+
+  modal.classList.remove('hidden');
+
+  let promptAudio = null;
+  if (typeof playSoundIfAllowed === 'function') {
+    promptAudio = playSoundIfAllowed('Sound/Ka_pai.mp3');
+  } else if (typeof isMutedEnabled === 'function' && !isMutedEnabled()) {
+    promptAudio = new Audio('Sound/Ka_pai.mp3');
+    promptAudio.play().catch(() => {});
+  }
+
+  const soundBtn = document.getElementById('toggle-sound');
+  if (soundBtn) {
+    const refreshSoundUI = () => {
+      const muted = typeof isMutedEnabled === 'function' ? isMutedEnabled() : false;
+      soundBtn.textContent = muted ? 'Sound Off' : 'Sound On';
+      soundBtn.classList.remove('btn-secondary', 'btn-sound-on', 'btn-sound-off');
+      soundBtn.classList.add(muted ? 'btn-sound-off' : 'btn-sound-on');
+    };
+    refreshSoundUI();
+    soundBtn.onclick = () => {
+      if (typeof toggleMute === 'function') toggleMute();
+      if (typeof isMutedEnabled === 'function' && isMutedEnabled() && promptAudio) {
+        promptAudio.pause();
+        promptAudio.currentTime = 0;
+      }
+      refreshSoundUI();
+    };
+  }
+
+  const acceptBtn = document.getElementById('consent-accept');
+  const declineBtn = document.getElementById('consent-decline');
+  if (!acceptBtn || !declineBtn || acceptBtn.tagName !== 'BUTTON' || declineBtn.tagName !== 'BUTTON') {
+    modal.classList.add('hidden');
+    callback();
+    return;
+  }
+
+  acceptBtn.classList.remove('btn-secondary');
+  declineBtn.classList.remove('btn-secondary');
+  acceptBtn.classList.add('btn-accept');
+  declineBtn.classList.add('btn-decline');
+
+  acceptBtn.onclick = () => {
+    if (typeof setAdaptiveEnabled === 'function') setAdaptiveEnabled(true);
+    else if (typeof toggleAdaptive === 'function') toggleAdaptive(true);
+    modal.classList.add('hidden');
+    callback();
+  };
+
+  declineBtn.onclick = () => {
+    if (typeof setAdaptiveEnabled === 'function') setAdaptiveEnabled(false);
+    else if (typeof toggleAdaptive === 'function') toggleAdaptive(false);
+    modal.classList.add('hidden');
+    callback();
+  };
+}
+
+function proceedWithGameInitialization() {
   const arr = Array.from({ length: IMAGE_POOL_MAX }, (_, i) => i + 1);
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -196,7 +347,7 @@ function initializeGame() {
   gameBoard.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   gameBoard.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
-  const cardImages = CARD_ORDER.filter(Boolean).map(num => ({ id: num, match: `image${num}.png`, src: resolveImageSrc(num) }));
+  const cardImages = CARD_ORDER.filter(Boolean).map(num => ({ id: num, match: resolveImageMatch(num), src: resolveImageSrc(num) }));
 
   for (let i = 0; i < cardImages.length; i++) {
     const card = document.createElement("div");
@@ -249,6 +400,22 @@ function handleCardClick(event) {
         card2.style.background = '';
         card1.style.backgroundColor = '';
         card2.style.backgroundColor = '';
+        card1.classList.remove('card-peek');
+        card2.classList.remove('card-peek');
+        card1.style.transform = '';
+        card2.style.transform = '';
+        card1.style.zIndex = '';
+        card2.style.zIndex = '';
+        const card1Img = card1.querySelector('img');
+        const card2Img = card2.querySelector('img');
+        if (card1Img) {
+          card1Img.style.transform = '';
+          card1Img.style.transformOrigin = '';
+        }
+        if (card2Img) {
+          card2Img.style.transform = '';
+          card2Img.style.transformOrigin = '';
+        }
         matchedPairs++;
             streak++;
             time += 3;
@@ -297,7 +464,7 @@ function handleCardClick(event) {
               card.style.backgroundColor = '';
 
               const imgKey = card.dataset.image.replace('.png', '');
-              card.classList.remove('card-lvl2-' + imgKey);
+              card.classList.remove('card-' + imgKey);
 
               const imageElement2 = card.querySelector("img");
               if (imageElement2) {
@@ -348,7 +515,7 @@ const LVL2_GRAY_LOW = 0.68;
 const LVL2_GRAY_HIGH = 0.72;
 
 function isLargeGrid() {
-  return GRID_COLS_RUNTIME === 4 && GRID_ROWS_RUNTIME === 6;
+  return GRID_COLS_RUNTIME === 6 && GRID_ROWS_RUNTIME === 4;
 }
 
 function buildCurrentConfig() {
@@ -417,7 +584,7 @@ function cardReader(card) {
   const cookieCutterTxt = document.getElementById("cookie-txt");
   const imgKey = card.dataset.image.replace('.png', '');
   
-  card.classList.add('card-lvl2-' + imgKey);
+  card.classList.add('card-' + imgKey);
   cookieCutterTxt.innerHTML = cardTextMapping[imgKey] || '';
 }
 
@@ -432,10 +599,12 @@ function startInitialPreview() {
   // Show all cards
   allCards.forEach(card => {
     const img = card.querySelector('img');
-    if (img) img.style.visibility = 'visible';
+    if (img) {
+      img.style.visibility = 'visible';
+      img.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+      img.style.transformOrigin = 'center';
+    }
     card.classList.add('card-peek');
-    card.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
-    card.style.zIndex = '1000';
   });
 
   if (timerElement) {
@@ -450,12 +619,16 @@ function startInitialPreview() {
     if (remaining <= 0) {
       clearInterval(previewInterval);
       allCards.forEach(card => {
+        card.style.transform = '';
+        card.style.zIndex = '';
+        const img = card.querySelector('img');
+        if (img) {
+          img.style.transform = '';
+          img.style.transformOrigin = '';
+        }
         if (!card.classList.contains('matched')) {
-          const img = card.querySelector('img');
           if (img) img.style.visibility = 'hidden';
           card.classList.remove('card-peek');
-          card.style.transform = '';
-          card.style.zIndex = '';
         }
       });
       
@@ -491,10 +664,12 @@ function showAllCards() {
   cards.forEach(card => {
     if (!card.classList.contains('matched')) {
       const img = card.querySelector('img');
-      if (img) img.style.visibility = 'visible';
+      if (img) {
+        img.style.visibility = 'visible';
+        img.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
+        img.style.transformOrigin = 'center';
+      }
       card.classList.add('card-peek');
-      card.style.transform = `scale(${SHOW_CARDS_SCALE_RUNTIME})`;
-      card.style.zIndex = '1000';
     }
   });
 
@@ -518,13 +693,17 @@ function showAllCards() {
 
 function hideAllCards() {
 	cards.forEach(card => {
+    card.style.transform = '';
+    card.style.zIndex = '';
+    const img = card.querySelector('img');
+    if (img) {
+      img.style.transform = '';
+      img.style.transformOrigin = '';
+    }
 		if (!card.classList.contains('matched')) {
-			const img = card.querySelector('img');
-			if (img) img.style.visibility = 'hidden';
-			card.classList.remove('card-peek');
-      card.style.transform = '';
-      card.style.zIndex = '';
-		}
+      if (img) img.style.visibility = 'hidden';
+      card.classList.remove('card-peek');
+    }
 	});
   isShowingCards = false;
 	telemetry.log('show_cards', { level: 2, state: 'hide' });
@@ -582,7 +761,7 @@ async function endGame() {
         if (large) {
           writeLvl2NextAction('goto_lvl3', null, { flowIndex, large, confirmed: confirmationActive });
         } else {
-          const cfg = { ...baseConfig, gridCols: 4, gridRows: 6 };
+          const cfg = { ...baseConfig, gridCols: 6, gridRows: 4 };
           cfg.totalPairs = pairsForGrid(cfg.gridCols, cfg.gridRows);
           writeLvl2NextAction('upgrade_large', cfg, { flowIndex, large, confirmed: confirmationActive });
         }
@@ -602,9 +781,11 @@ async function endGame() {
 
   const analyticsContainer = document.querySelector('#game-over .game-over-right') || document.getElementById('analytics-summary');
   let gameId = null;
-  if (typeof displayAnalyticsSummary === 'function' && analyticsContainer) {
-    await displayAnalyticsSummary(telemetry, 2, aiResult, { streak, remainingTime: time });
-    gameId = await saveSessionToHistoryFromTelemetry(telemetry, 2, aiResult, { streak, remainingTime: time });
+  if (window.isAdaptive) {
+    if (typeof displayAnalyticsSummary === 'function' && analyticsContainer) {
+      await displayAnalyticsSummary(telemetry, 2, aiResult, { streak, remainingTime: time });
+      gameId = await saveSessionToHistoryFromTelemetry(telemetry, 2, aiResult, { streak, remainingTime: time });
+    }
   }
   if (gameId) {
     const menuIcon = document.getElementById('menu-icon');
@@ -676,8 +857,10 @@ function triggerRippleEffect(onComplete) {
 window.onload = () => {
 	telemetry = new Telemetry('telemetry_lvl2');
 	telemetry.openDatabase();
+	applyUrlGridOverride();
 	const enabled = isAdaptiveEnabled();
 	updateAdaptiveUI(enabled);
+  updateMuteUI(isMutedEnabled());
 	if (typeof AIEngine !== 'undefined') {
 		aiEngine = new AIEngine();
 	}
@@ -696,21 +879,20 @@ window.onload = () => {
 			if (typeof cfg.hideDelay === 'number') { HIDE_DELAY_RUNTIME = cfg.hideDelay; }
 			if (typeof cfg.showScale === 'number') { SHOW_CARDS_SCALE_RUNTIME = cfg.showScale; }
 			if (typeof cfg.adjacentTarget === 'number') { ADJACENT_TARGET_RUNTIME = Math.floor(cfg.adjacentTarget); }
-			if (typeof cfg.adjacentRate === 'number') { ADJACENT_RATE_RUNTIME = Math.max(0.1, Math.min(0.6, cfg.adjacentRate)); }
+			if (typeof cfg.adjacentRate === 'number') { ADJACENT_RATE_RUNTIME = Math.max(0.2, Math.min(0.6, cfg.adjacentRate)); }
 			if (typeof cfg.gridCols === 'number' && typeof cfg.gridRows === 'number') {
-				const wantsLarge = cfg.gridCols === 4 && cfg.gridRows === 6;
+				const wantsLarge = cfg.gridCols === 6 && cfg.gridRows === 4;
 				const allowLarge = lvl2Completed >= 1;
 				if (!wantsLarge || allowLarge) {
 					GRID_COLS_RUNTIME = cfg.gridCols;
 					GRID_ROWS_RUNTIME = cfg.gridRows;
-					IMAGE_POOL_MAX = GRID_COLS_RUNTIME * GRID_ROWS_RUNTIME;
+					IMAGE_POOL_MAX = Math.min(13, GRID_COLS_RUNTIME * GRID_ROWS_RUNTIME);
 					totalPairs = pairsForGrid(GRID_COLS_RUNTIME, GRID_ROWS_RUNTIME);
 				}
 			}
 		}
 	} catch (e) {}
 	initializeGame();
-	startInitialPreview();
 };
 
 async function downloadResult() {

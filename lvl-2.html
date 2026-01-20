@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>He Maumahara</title>
 <link rel="shortcut icon" type="image/x-icon" href="images/icon.ico">
-<link rel="stylesheet" href="css/style.css?v=2">
+<link rel="stylesheet" href="css/style.css?v=5">
 <link rel="stylesheet" href="css/roboto.css?v=2">
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script>
@@ -36,13 +36,13 @@
   </a>
 
   <div id="instruction-btn" onclick="toggleInstructions()" aria-label="Show Instructions">?</div>
+  <div id="mute-btn" onclick="toggleMute()" aria-label="Toggle Mute"></div>
 
   <div id="menu-icon">
 <a href="play.html" class="menu-txt" aria-label="Return to Menu">Menu</a>
 <a href="#" class="menu-txt" onclick="showAllCards()" id="show-cards" aria-label="Show All Cards">Show</a>
-<a href="#" class="menu-txt" onclick="exportTelemetry()" id="export-telemetry" aria-label="Export Data">Export</a>
-<a href="#" class="menu-txt" onclick="toggleAdaptive()" id="toggle-adaptive" aria-label="Toggle Adaptive Mode">Adapt</a>
-<a href="#" class="menu-txt" onclick="resetData()" id="reset-data" aria-label="Reset Data">Reset</a>
+<a href="#" class="menu-txt" onclick="toggleAdaptive()" id="toggle-adaptive" aria-label="Toggle AI-powered adaptive features">AI</a>
+<a href="#" id="toggle-mute" class="menu-txt" aria-label="Toggle Mute">Mute</a>
 </div>
 
   <div id="cookie-txt">Click a card</div>
@@ -55,21 +55,35 @@
 <div class="game-over-left">
         <div id="well-done-etc"><span id="current-score">0:00</span>! Well Done!</div>
         <div class="button-row">
-        <button id="download-btn" onclick="downloadResult()" aria-label="Download Result">Download</button>
-        <button id="screenshot-btn" onclick="downloadScreenshotOnly()" aria-label="Download Screenshot">Screenshot</button>
-        <button id="next-game-btn" onclick="startNextGame()" aria-label="Next Game">Next Game</button>
+          <button id="next-game-btn" onclick="startNextGame()" aria-label="Next Game">Next Game</button>
         </div>
 </div>
-<div class="game-over-right" id="analytics-summary"></div>
-</div>
+<div class="game-over-right" id="analytics-summary">
+    </div>
+  </div>
 
-<script src="js/game-core.js?v=2"></script>
-<script src="js/ai-engine.js?v=2"></script>
+<script src="js/game-core.js?v=8"></script>
+<script src="js/ai-engine.js?v=4"></script>
 <script src="js/ai-helper.js?v=2"></script>
 <script src="js/game-history.js?v=2"></script>
-<script src="js/analytics-summary.js?v=2"></script>
-<script src="js/lvl2.js?v=2"></script>
+<script src="js/analytics-summary.js?v=5"></script>
+<script src="js/lvl2.js?v=9"></script>
 <!-- AutoPilot removed for production -->
+
+<div id="consent-modal" class="modal-overlay hidden">
+  <div class="modal-content">
+    <h2>Data & Analytics</h2>
+    <p>We'd like to record and analyze your game data to provide personalized feedback and insights. Your game session will be saved only if you agree.</p>
+    <p>You can change this setting anytime using the "AI" toggle in the menu.</p>
+    <div class="modal-buttons">
+      <button id="toggle-sound" class="btn btn-sound-on" type="button">Sound: ON</button>
+    </div>
+    <div class="modal-buttons">
+      <button id="consent-accept" class="btn btn-accept">Accept</button>
+      <button id="consent-decline" class="btn btn-decline">Decline</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
