@@ -154,6 +154,33 @@ function isAdaptiveEnabled() {
   return raw === null ? true : raw === 'true';
 }
 
+function isMuted() {
+  return localStorage.getItem('audio_muted') === 'true';
+}
+
+function toggleMute() {
+  const currentlyMuted = isMuted();
+  const newState = !currentlyMuted;
+  localStorage.setItem('audio_muted', newState.toString());
+  updateMuteUI(newState);
+}
+
+function updateMuteUI(muted) {
+  const btn = document.getElementById('mute-btn');
+  if (btn) {
+    if (muted) {
+      btn.classList.add('muted');
+    } else {
+      btn.classList.remove('muted');
+    }
+  }
+}
+
+// Initialize mute button state on page load
+document.addEventListener('DOMContentLoaded', () => {
+  updateMuteUI(isMuted());
+});
+
 function updateAdaptiveUI(enabled) {
   const btn = document.getElementById('toggle-adaptive');
   if (btn) {
@@ -349,7 +376,7 @@ function playComboSound(streak) {
     soundFile = 'Sound/Unbelievable.mp3';
     comboText = 'UNBELIEVABLE!';
   }
-  if (soundFile) {
+  if (soundFile && !isMuted()) {
     const audio = new Audio(soundFile);
     audio.play().catch(e => {
       if (typeof aiLog === 'function') aiLog('Audio play failed', e);

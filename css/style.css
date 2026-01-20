@@ -798,6 +798,38 @@ body:has(#game-over.show) #glass-fx {
   transition: 0.3s;
 }
 
+#mute-btn {
+  position: absolute;
+  top: 60px;
+  left: 20px;
+  width: 30px;
+  height: 30px;
+  background: #fff3;
+  color: #fff;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 1001;
+  font-size: 16px;
+  transition: 0.3s;
+}
+
+#mute-btn::before {
+  content: '🔊';
+  font-style: normal;
+}
+
+#mute-btn.muted::before {
+  content: '🔇';
+}
+
+#mute-btn:hover {
+  background: rgba(0, 147, 255, 0.4);
+}
+
 #instruction-modal {
   display: none;
   position: fixed;
@@ -1513,6 +1545,11 @@ textarea:focus {
 
   #instruction-btn {
     top: 10px;
+    left: 10px;
+  }
+
+  #mute-btn {
+    top: 50px;
     left: 10px;
   }
 
