@@ -361,20 +361,20 @@ function playComboSound(streak) {
   let soundFile = '';
   let comboText = '';
   if (streak === 2) {
-    soundFile = 'Sound/nice.mp3';
-    comboText = 'NICE!';
+    soundFile = 'Sound/Tino_pai.mp3';
+    comboText = 'Tino pai';
   } else if (streak === 3) {
-    soundFile = 'Sound/great.mp3';
-    comboText = 'GREAT!';
+    soundFile = 'Sound/Ka_pai.mp3';
+    comboText = 'Ka pai';
   } else if (streak === 4) {
-    soundFile = 'Sound/Amazing.mp3';
-    comboText = 'AMAZING!';
+    soundFile = 'Sound/Rawe.mp3';
+    comboText = 'Rawe';
   } else if (streak === 5) {
-    soundFile = 'Sound/excellent.mp3';
-    comboText = 'EXCELLENT!';
+    soundFile = 'Sound/Tau_ke.mp3';
+    comboText = 'Tau kē';
   } else if (streak >= 6) {
-    soundFile = 'Sound/Unbelievable.mp3';
-    comboText = 'UNBELIEVABLE!';
+    soundFile = 'Sound/Miharo.mp3';
+    comboText = 'Mīharo';
   }
   if (soundFile && !isMuted()) {
     const audio = new Audio(soundFile);
