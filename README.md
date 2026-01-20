@@ -4,108 +4,79 @@
 
 The game features a **pure frontend AI** that personalizes difficulty in real-time, keeping cognitive load in the optimal "Flow Zone" (where challenge matches skill).
 
-Version: v3.0.0
+**Version**: v4.0.0  
+**Last Updated**: 2026-01-21
 
 ## Quick Start
 
-1. **Start a local server**
+1. **Clone the repository**
    ```bash
-   # Python
+   git clone https://github.com/DDMYmia/Memory-Game-He-Maumahara.git
+   cd Memory-Game-He-Maumahara
+   ```
+
+2. **Start a local server**
+   ```bash
    python3 -m http.server 8010
-   # Node.js
+   # OR
    npx http-server -p 8010
    ```
 
-2. **Open**
-   - Home: `http://localhost:8010/index.html`
-   - Analytics: `http://localhost:8010/analytics.html`
+3. **Open in browser**: `http://localhost:8010/index.html`
 
-## Game Concept & Structure
+## Game Overview
 
-He Maumahara is based on traditional "match and recall" formats. Players must remember card locations and identities to retrieve matching pairs under varying demands. The game evolves from simple visual matching to complex language-based challenges (introducing *kupu* or words).
+He Maumahara is a memory card matching game with three levels:
+- **Level 1**: Beginner - Fixed layout with image matching
+- **Level 2**: Adaptive Challenge - Variable grid with AI-adjusted difficulty
+- **Level 3**: Mastery - Image-to-text matching with Māori words (kupu)
 
-The visual content is culturally grounded, incorporating unique Māori designs (patented by Rauawaawa) to ensure the game is culturally safe, relevant, and engaging for its audience.
-
-### Targeted Cognitive Processes
-
-- **Enhance working and episodic memory**: Holding card positions and images in mind engages short-term maintenance and event-based recall.
-- **Promote visual recognition**: Rapidly discriminating and tracking patterns across the board.
-- **Stimulate brain activity**:
-  - **Frontal Lobe**: Attention control, strategy, and decision-making.
-  - **Temporal Lobe**: Memory encoding/retrieval and language processing.
-  - **Occipital Lobe**: Visual processing and object recognition.
-- **Cognitive Resilience**: Sustained attention and incremental challenges help maintain cognitive function.
-
-### Evidence Base
-Studies suggest that consistent play of memory card games can improve memory retention and help slow cognitive decline (Samonte et al., 2024; Mansoor & Katz, 2024). Regular engagement is key to these benefits.
-
-## Gameplay Mechanics
-
-| Level | Description | Special Rules |
-|-------|-------------|---------------|
-| **1** | **Beginner**: Fixed 5×4 grid | Simple image matching. Gentle introduction. |
-| **2** | **Adaptive Challenge**: Variable grid | AI adjusts grid size and layout based on performance. Focus on adjacency. |
-| **3** | **Mastery**: Image–Text pairs | Matches images with *kupu* (words). Highest cognitive load. |
-
-## AI & Analytics
-
-### Flow Index
-He Maumahara calculates a **Flow Index** (0.0 to 1.0) at the end of each game.
-- The **game-over screen** shows **elapsed time** for that run (mm:ss).
-- The AI uses Flow Index (plus layout factors like adjacency) to adjust the next round.
-
-### Analytics Dashboard
-The Analytics dashboard provides a practical view of progress over time:
-- Session history with Flow Index and key performance metrics.
-- A **K-Means Overall Review** that clusters recent games using Flow/Accuracy/Speed to surface dominant patterns and short-term trend.
+The game adapts to player performance using AI algorithms that calculate a Flow Index and adjust difficulty accordingly.
 
 ## Key Features
 
-- **Adaptive AI**: Uses Fuzzy Logic and Contextual Bandits to tune grid size, timer, and hints to your skill level.
-- **Privacy First**: **No data leaves your device.** All game history and profiles are stored locally in your browser (IndexedDB).
-- **Detailed Analytics**: View performance history, error patterns, behavioral metrics, and a lightweight K-Means clustering summary.
-- **Lightweight**: Pure HTML/JS/CSS. No backend server required.
+- **Adaptive AI**: Uses Fuzzy Logic and Contextual Bandits (LinUCB) to personalize difficulty
+- **Privacy First**: All data stored locally in browser (IndexedDB). No server required.
+- **Analytics Dashboard**: View performance history and patterns with K-Means clustering
+- **Cultural Integration**: Features Māori language and culturally safe imagery
+- **Accessibility**: High contrast design, large touch targets for senior-friendly gameplay
+
+## Technology
+
+- Pure HTML/CSS/JavaScript (no build step required)
+- IndexedDB for local data storage
+- Custom AI algorithms (Fuzzy Logic, LinUCB Bandit, K-Means)
+- No external dependencies for core gameplay
 
 ## Documentation
-This repository is intentionally lightweight (pure HTML/JS/CSS), but includes developer-facing technical documentation in [docs/](docs/).
 
-- **System Whitepaper**: [docs/SYSTEM_OVERVIEW.md](docs/SYSTEM_OVERVIEW.md) - **Start Here** for a comprehensive overview of philosophy, features, and AI.
-- **Technical Reference**: [docs/TECHNICAL_REFERENCE.md](docs/TECHNICAL_REFERENCE.md) - Deep dive into Architecture, Analytics, and Scoring logic.
-- **System Diagrams**: [docs/SYSTEM_DIAGRAMS.md](docs/SYSTEM_DIAGRAMS.md) - Visual charts of architecture and algorithms.
-- UI styling conventions: [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)
-- Change history: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+Comprehensive technical documentation is available in the [`docs/`](docs/) directory:
 
-## Project Pages
-- `index.html`: Main menu
-- `play.html`: Level selection
-- `lvl-1.html`, `lvl-2.html`, `lvl-3.html`: Play levels
-- `analytics.html`: Analytics dashboard (history + overall review)
-- `instructions.html`: Instructions
-- `credits.html`: Credits
+- **[Complete Technical Documentation](docs/COMPLETE_TECHNICAL_DOCUMENTATION.md)** - Full system reference
+- **[System Diagrams](docs/SYSTEM_DIAGRAMS.md)** - Architecture and flow charts
+- **[Testing Framework](docs/TESTING_FRAMEWORK.md)** - Automated testing guide
+- **[Design System](docs/DESIGN_SYSTEM.md)** - UI/UX guidelines
+- **[Changelog](docs/CHANGELOG.md)** - Version history
 
-### Testing
-- Automated simulation suite:
-  ```bash
-  node tests/run-suite.js
-  ```
+## Testing
 
-### Release Checklist
-- Open all levels in a browser and verify:
-  - Match success: image/text fades in ~0.2s while card frame remains
-  - Match failure: both stay open, then flipwave starts after ~0.2s, then close together
-  - Game-over screen shows elapsed time (mm:ss)
-  - Analytics Suggestions/Config show Adjacent Pairs clearly (e.g., 6 / 10)
+Run the automated test suite:
+```bash
+node tests/run-suite.js
+```
 
-## Core Roles & Responsibilities
+## Team & Credits
 
+### Development Team
 - **AI & Data Analyst**: Chandra, Aman — ac942@students.waikato.ac.nz
 - **AI & Algorithm Researcher**: LIU, Yang — yl1014@students.waikato.ac.nz
 - **Front-End Engineer**: Wang, Xiaoyang — xw316@students.waikato.ac.nz
 - **Front-End & QA Engineer**: HALAI, SHVET — shh30@students.waikato.ac.nz
 
-## License & Contact
-
-Project homepage: https://github.com/DDMYmia/Memory-Game-He-Maumahara
+### Acknowledgments
+- **Rauawaawa Kaumātua Charitable Trust** - Cultural design elements and project partnership
+- Māori design patterns and imagery are used with permission
 
 ---
-**He Maumahara** - Memory & Cognitive Training Game
+
+**Project Repository**: https://github.com/DDMYmia/Memory-Game-He-Maumahara
