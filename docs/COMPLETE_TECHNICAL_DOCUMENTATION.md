@@ -1,6 +1,6 @@
 # He Maumahara - Complete Technical Documentation
 
-**Version**: v4.0.0  
+**Version**: v4.0.2  
 **Date**: 2026-01-21  
 **Status**: Comprehensive Technical Reference
 
@@ -318,74 +318,105 @@ const isMatch = match1.toLowerCase() === match2.toLowerCase();
 
 ### 5.1 Philosophy
 
-The AI aims to maximize "Flow" - the state where skill matches challenge. It avoids simply making the game "harder" indefinitely; instead, it tunes parameters to keep the player engaged.
+The AI aims to maximize "Flow" - the state where skill matches challenge. It avoids simply making the game "harder" indefinitely; instead, it tunes parameters to keep the player engaged. The system uses a **Contextual Bandit** approach, treating difficulty selection as a reinforcement learning problem where the "reward" is the calculated Flow Index.
 
-### 5.2 Flow Index Calculation (Fuzzy Logic)
+### 5.2 Flow Index Algorithm (Detailed)
 
-**File**: `js/ai-engine.js` - `FuzzyLogicSystem`
+The Flow Index (0.00-10.00) is a composite metric measuring the quality of the player's experience. It is calculated via a multi-stage pipeline:
 
-The Flow Index is calculated using a **Three-Layer Scoring System**:
-`Final Flow Index = Base Flow Index × Error Penalty × Cheat Penalty`
+#### 5.2.1 Stage 1: Metric Extraction & Normalization
+Raw telemetry data is converted into normalized [0, 1] inputs:
 
-#### 5.2.1 Base Flow Index (Simplified Fuzzy Rules)
-Derived from **Speed and Cadence Stability only**. **Errors and accuracy are excluded** to avoid double-penalization (errors are handled separately via error penalty mechanism).
+1.  **Time Normalization**:
+    -   Baselines (Expected Time per Pair):
+        -   Level 1: 10s (Total 100s for 10 pairs)
+        -   Level 2: 15s (Total 150s for 10 pairs)
+        -   Level 3: 20s (Total 200s for 10 pairs)
+    -   Formula: `NormalizedTime = min(1.0, ActualTime / ExpectedTotalTime)`
+    -   Result: 0.0 = Very Fast (Good), 1.0 = Very Slow (Bad).
 
-**Fuzzy Rules (6 Rules with Weights):**
-1. **R1 (1.0)**: Fast + Stable - Optimal performance
-2. **R2 (1.0)**: Medium Speed + Stable - Good performance
-3. **R3 (0.80)**: Fast + Unstable - Fast but unstable
-4. **R4 (0.75)**: Slow + Stable - Slow but consistent
-5. **R5 (0.70)**: Medium Speed + Unstable - Moderate, unstable
-6. **R6 (0.60)**: Slow + Unstable - Poor performance (minimum base score)
+2.  **Cadence Stability**:
+    -   Calculated as the Coefficient of Variation (CV) of flip intervals.
+    -   Formula: `CV = StdDev(FlipIntervals) / Mean(FlipIntervals)`
+    -   Result: Lower is more stable (better rhythmic flow).
 
-#### 5.2.2 Error Penalty Mechanism
-Errors are penalized independently using an **additive** (not multiplicative) approach.
+#### 5.2.2 Stage 2: Fuzzy Logic System
+The normalized inputs are processed through a Fuzzy Logic Inference System:
 
-- **Base Error Penalty**: `min(failedMatches, 6) × 5%` (Max 30% deduction for 6+ failed matches)
-  - One match = one attempt to pair two cards (flipping two cards)
-  - 5% deduction per failed match, capped at 6 matches (30%)
-- **Consecutive Error Penalty**: Starts from 3rd consecutive error
-  - 3 consecutive errors = 3% deduction
-  - 4 consecutive errors = 6% deduction
-  - 5 consecutive errors = 9% deduction
-  - 6 consecutive errors = 12% deduction
-  - 7 consecutive errors = 15% deduction
-  - 8+ consecutive errors = 15% deduction (capped)
-  - Formula: `(maxConsecutiveErrors - 2) × 3%`, max 15%
-- **Combined Error Penalty**: `Base Deduction + Consecutive Deduction` (Max 45% total deduction)
-  - Additive calculation: `1.0 - (baseErrorDeduction + consecutiveErrorDeduction)`
+1.  **Fuzzification**: Inputs are mapped to linguistic variables using Triangular Membership Functions.
+    -   **Time**: Fast (Peak 0.0), Medium (Peak 0.5), Slow (Peak 1.0)
+    -   **Cadence**: Stable (Peak 0.0), Variable (Peak 1.0)
 
-#### 5.2.3 Cheat Penalty Mechanism
-Hint usage ("Show" button) reduces the score to discourage reliance on external help.
+2.  **Rule Evaluation** (Simplified Rule Base):
+    -   IF Time is Fast AND Cadence is Stable THEN Flow is High
+    -   IF Time is Medium AND Cadence is Stable THEN Flow is High
+    -   IF Time is Fast AND Cadence is Variable THEN Flow is Medium
+    -   IF Time is Slow THEN Flow is Low (Time Deduction Mechanism)
 
-- **Formula**: `1.0 - min(0.15, cheatCount × 0.03)`
-- **Penalty Schedule**:
-  - 1 hint = 3% deduction
-  - 2 hints = 6% deduction
-  - 3 hints = 9% deduction
-  - 4 hints = 12% deduction
-  - 5+ hints = 15% deduction (capped)
-- **Maximum Deduction**: 15% (5 uses)
+3.  **Defuzzification**: Center of Gravity (Centroid) method is used to combine rule outputs into a crisp `BaseFlowIndex` [0, 1].
 
-### 5.3 Contextual Bandit (LinUCB)
+#### 5.2.3 Stage 3: Penalties & Overrides
+The `BaseFlowIndex` is adjusted based on specific gameplay events:
 
-**File**: `js/ai-engine.js` - `ContextualBandit`
+1.  **Error Penalty** (Additive):
+    -   Deducts points based on `ErrorRate` (Failed Matches / Total Matches).
+    -   Max Penalty: 0.45 (at 100% error rate).
+    -   Formula: `BaseFlowIndex = BaseFlowIndex - (ErrorRate * 0.45)`
 
-Selects the best configuration "Arm" to maximize Flow Index.
+2.  **Cheat Penalty** (Multiplicative):
+    -   Deducts points based on `CheatCount` (Hint usage).
+    -   Max Penalty: 15% reduction.
+    -   Formula: `BaseFlowIndex = BaseFlowIndex * (1 - min(0.15, CheatCount * 0.05))`
 
-**Arms** (Difficulty Levels):
-- **Arm 0 (Easy)**: Smaller grid (5×4), higher adjacency rate (Level 2: 0.6), longer hide delay
-- **Arm 1 (Standard)**: Baseline grid (5×4), moderate adjacency rate (Level 2: 0.4), standard hide delay
-- **Arm 2 (Challenge)**: Larger grid (6×4 for Level 2/3), lower adjacency rate (Level 2: 0.2), shorter hide delay
+3.  **Speed Bonus Override (The "20-Second Rule")**:
+    -   **Rule**: If the player completes the level in **≤ 20 seconds**, all penalties are bypassed.
+    -   **Result**: `FlowIndex = 1.0` (Perfect Score).
 
-**Note**: All arms use fixed 300 seconds initial time. Grid selection is further refined by `shouldUseLargeGrid()` logic based on player performance (Flow Index >= 0.7).
+#### 5.2.4 Final Scoring
+The internal 0-1 Flow Index is scaled for display:
+-   **Display Score**: `FlowIndex * 10`
+-   **Format**: "8.50/10"
 
-**Process**:
-1. Observe Context (Current Level, recent performance)
-2. Predict Reward (Flow Index) for each Arm
-3. Select Arm (Exploration vs. Exploitation via UCB)
-4. Observe Outcome (Actual Flow Index)
-5. Update Model (Ridge Regression)
+### 5.3 Contextual Bandit (LinUCB) (Detailed)
+
+The difficulty selection engine uses the **LinUCB (Linear Upper Confidence Bound)** algorithm with Disjoint Linear Models.
+
+**File**: `js/ai-engine.js` - `ContextualBandit` class
+
+#### 5.3.1 Algorithm Components
+-   **Arms (Actions)**: 3 difficulty configurations (Easy, Standard, Challenge).
+-   **Context (State)**: A 7-dimensional vector ($d=7$) representing the game state:
+    1.  Bias term (1.0)
+    2.  Level (normalized)
+    3.  Recent Flow Index
+    4.  Recent Error Rate
+    5.  Recent Cadence
+    6.  Recent Cheat Count
+    7.  Previous Difficulty Level
+
+#### 5.3.2 Model Parameters
+For each Arm $a$, the algorithm maintains:
+-   $A_a$: A $d \times d$ matrix (inverse covariance), initialized to Identity $I_d$.
+-   $b_a$: A $d$-dimensional vector (reward history), initialized to $0$.
+
+#### 5.3.3 Selection Strategy (UCB)
+To select an arm for the next game:
+1.  Calculate estimated reward $\hat{\theta}_a$ for each arm:
+    $$\hat{\theta}_a = A_a^{-1} b_a$$
+2.  Calculate Upper Confidence Bound (UCB) for the current context $x_t$:
+    $$p_{t,a} = x_t^T \hat{\theta}_a + \alpha \sqrt{x_t^T A_a^{-1} x_t}$$
+    Where $\alpha$ (alpha) controls the exploration-exploitation trade-off.
+3.  Select arm with maximum $p_{t,a}$:
+    $$a_t = \text{argmax}_a (p_{t,a})$$
+
+#### 5.3.4 Model Update (Ridge Regression)
+After the game, when reward $r_t$ (Flow Index) is observed:
+1.  Update matrix $A_{a_t}$:
+    $$A_{a_t} \leftarrow A_{a_t} + x_t x_t^T$$
+2.  Update vector $b_{a_t}$:
+    $$b_{a_t} \leftarrow b_{a_t} + r_t x_t$$
+
+This allows the AI to learn a linear mapping between game context and expected player satisfaction (Flow) for each difficulty level, adapting to individual player styles over time.
 
 ### 5.4 Configuration Generation
 
@@ -570,19 +601,40 @@ Custom-built simulation framework running in Node.js. It mocks the browser envir
    - Includes session history
    - Includes AI configurations
 
-### 8.2 K-Means Clustering
+### 8.2 K-Means Clustering (Detailed)
 
-**File**: `js/analytics-summary.js`
+**File**: `js/analytics-summary.js` - `kmeans` function
 
-**Purpose**: Identify patterns in game performance
+The system uses an unsupervised learning approach to categorize player performance sessions into meaningful clusters (e.g., "Fast & Accurate", "Slow & Steady", "Struggling").
 
-**Features**:
-- 3-dimensional clustering: Flow Index, Accuracy, Speed
-- Automatic cluster count determination
-- Visualization of cluster centers
-- Trend analysis (improving/declining)
+#### 8.2.1 Feature Vector
+Each game session is represented as a 3-dimensional vector:
+1.  **Flow Index**: [0, 1] (Primary metric of success)
+2.  **Accuracy**: [0, 1] (Calculated from error rate)
+3.  **Speed**: [0, 1] (Inverted normalized time, where 1 = fast)
 
-**Algorithm**: Standard K-Means with Euclidean distance
+#### 8.2.2 Algorithm Steps
+1.  **Initialization (k-means++)**:
+    -   Choose first centroid $c_1$ uniformly at random from data points.
+    -   For each subsequent centroid $c_i$, choose with probability proportional to $D(x)^2$ (squared distance to nearest existing centroid).
+    -   This ensures centroids are well-spread, improving convergence.
+
+2.  **Assignment Step**:
+    -   Assign each data point $x_j$ to the nearest centroid $c_i$ based on Euclidean distance:
+        $$S_i = \{x_j : ||x_j - c_i||^2 \le ||x_j - c_k||^2 \forall k\}$$
+
+3.  **Update Step**:
+    -   Recalculate centroids as the mean of all points assigned to them:
+        $$c_i = \frac{1}{|S_i|} \sum_{x_j \in S_i} x_j$$
+
+4.  **Convergence**:
+    -   Repeat Assignment and Update steps until centroids do not change or max iterations (25) are reached.
+
+#### 8.2.3 Cluster Interpretation
+The resulting clusters are analyzed to provide insights:
+-   **High Flow, High Accuracy, High Speed**: "Mastery"
+-   **High Flow, Low Speed**: "Deliberate"
+-   **Low Flow, High Error**: "Needs Support"
 
 ### 8.3 Post-Game Summary
 

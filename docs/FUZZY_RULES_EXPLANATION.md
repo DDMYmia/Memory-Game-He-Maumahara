@@ -1,6 +1,6 @@
 # Fuzzy Rules Decision Process - Detailed Explanation
 
-**Version**: v4.0.0  
+**Version**: v4.0.2  
 **Date**: 2026-01-21  
 **Status**: Comprehensive Guide to Fuzzy Logic Rule Evaluation
 
@@ -64,9 +64,9 @@ Raw data must be converted to normalized values (0-1 range) for fuzzy evaluation
 ```javascript
 // Calculate expected time based on level
 const expectedTimePerPair = {
-  1: 20,  // Level 1: 200s / 10 pairs = 20s per pair
+  1: 10,  // Level 1: 100s / 10 pairs = 10s per pair
   2: 15,  // Level 2: 150s / 10 pairs = 15s per pair
-  3: 12   // Level 3: 120s / 10 pairs = 12s per pair
+  3: 20   // Level 3: 200s / 10 pairs = 20s per pair
 };
 
 const expectedTotal = expectedTimePerPair[level] * totalPairs;
@@ -76,9 +76,9 @@ const normalizedTime = Math.min(1, completionTime / expectedTotal);
 **Explanation**:
 - `normalizedTime = 0` means **very fast** (good performance)
 - `normalizedTime = 1` means **very slow** (poor performance)
-- Example: Level 1, 10 pairs, completion time 120 seconds
-  - `expectedTotal = 20 × 10 = 200 seconds`
-  - `normalizedTime = 120 / 200 = 0.6` (medium-fast)
+- Example: Level 1, 10 pairs, completion time 50 seconds
+  - `expectedTotal = 10 × 10 = 100 seconds`
+  - `normalizedTime = 50 / 100 = 0.5` (medium speed)
 
 #### 2.2.2 Cadence Stability (cadenceVariance)
 

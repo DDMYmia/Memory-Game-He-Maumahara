@@ -1,6 +1,6 @@
 # Automated Testing Framework Documentation
 
-**Version**: v4.0.0  
+**Version**: v4.0.2  
 **Date**: 2026-01-21  
 **Status**: Comprehensive Testing Framework Reference
 

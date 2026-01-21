@@ -1,5 +1,22 @@
 # Changelog
 
+Version: v4.1.0 (2026-01-21)
+
+## Score System Updates
+- **10-Point Scale Conversion**: Changed game end score display from 0-1 range to a more user-friendly 10-point scale (e.g., 8.50/10).
+- **Speed Bonus Rule**: Added a special rule where completing a level in **20 seconds or less** automatically awards a **perfect score (10/10)** regardless of errors or hint usage.
+- **Expected Time Calibration**: Updated expected completion time baselines to better reflect difficulty differences:
+  - Level 1: 10s per pair (was 20s)
+  - Level 2: 15s per pair (unchanged)
+  - Level 3: 20s per pair (was 12s)
+
+## Documentation Updates
+- **FLOW_INDEX_SCORING.md**: Updated to reflect the new 10-point scale, speed bonus rule, and revised expected time parameters.
+- **FUZZY_RULES_EXPLANATION.md**: Updated time normalization examples and parameters.
+- **COMPLETE_TECHNICAL_DOCUMENTATION.md**: Updated Flow Index algorithm section.
+
+---
+
 Version: v4.0.1 (2026-01-21)
 
 ## Documentation Updates

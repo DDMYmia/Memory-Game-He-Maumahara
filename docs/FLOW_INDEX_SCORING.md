@@ -1,6 +1,6 @@
 # Flow Index Scoring System - Detailed Documentation
 
-**Version**: v4.0.1  
+**Version**: v4.0.2  
 **Date**: 2026-01-21  
 **Status**: Comprehensive Scoring Algorithm Reference
 
@@ -22,16 +22,19 @@
 
 ## 1. Overview
 
-The Flow Index is a composite score (0.0 to 1.0) that measures player performance and engagement quality. It uses a **three-layer multiplicative scoring system**:
+The Flow Index is a composite score (0.00 to 10.00) that measures player performance and engagement quality. It uses a **three-layer multiplicative scoring system**:
 
 ```
-Final Flow Index = Base Flow Index × Error Penalty × Cheat Penalty
+Final Flow Index = (Base Flow Index × Error Penalty × Cheat Penalty) × 10
 ```
 
 This design separates concerns:
 - **Base Flow Index**: Measures core performance (speed, cadence, accuracy) without error bias
 - **Error Penalty**: Applies independent penalty for mistakes
 - **Cheat Penalty**: Applies independent penalty for hint usage
+- **10-Point Scale**: Converts the 0-1 internal index to a user-friendly 0-10 score
+
+**Special Rule**: If a player completes the level in **20 seconds or less**, they automatically receive a **perfect score (10/10)** regardless of errors or cheats. This rewards exceptional speed.
 
 ---
 
@@ -43,6 +46,7 @@ The scoring system uses **multiplicative penalties** rather than additive deduct
 - Fair combined penalties (multiplicative prevents over-penalization)
 - Independent evaluation of different performance aspects
 - Clear separation between skill (base) and behavior (penalties)
+- **Special Speed Bonus**: Overrides all penalties for super-fast completions (≤ 20s)
 
 ### 2.2 Layer Breakdown
 
@@ -51,7 +55,8 @@ The scoring system uses **multiplicative penalties** rather than additive deduct
 | **Base Flow Index** | Core performance assessment | 0.6 - 1.0 | Fuzzy Logic (6 rules, 0.05 increments) |
 | **Error Penalty** | Mistake penalty | 0.55 - 1.0 | Additive (max 45% deduction) |
 | **Cheat Penalty** | Hint usage penalty | 0.85 - 1.0 | Linear (max 15% deduction) |
-| **Final Flow Index** | Combined score | 0.0 - 1.0 | `base × error × cheat` |
+| **Speed Bonus** | Reward for ≤ 20s completion | 1.0 (Fixed) | Conditional Override |
+| **Final Score** | User-facing score | 0.00 - 10.00 | `(base × error × cheat) × 10` |
 
 ---
 
@@ -64,6 +69,10 @@ The base Flow Index considers three primary performance dimensions:
 1. **Speed (Normalized Time)**
    - Completion time normalized by level and total pairs
    - Range: 0.0 (very fast) to 1.0 (very slow)
+   - **Expected Time Per Pair**:
+     - Level 1: 10 seconds/pair (Total 100s for 10 pairs)
+     - Level 2: 15 seconds/pair (Total 150s for 10 pairs)
+     - Level 3: 20 seconds/pair (Total 200s for 10 pairs)
 
 2. **Cadence Stability**
    - Coefficient of variation of flip intervals
@@ -293,27 +302,24 @@ displayFlowIndex = max(0.3, trueFlowIndex)
 
 ### 7.1 Time Normalization
 
-Time is normalized by level and total pairs:
+Time is normalized based on level difficulty to ensure fair comparison across different grid sizes.
 
 ```javascript
-normalizeTime(completionTime, level, totalPairs)
+normalizedTime = Math.min(1, Math.max(0, completionTime / expectedTotalTime))
 ```
 
-**Level-specific baselines** (for time normalization - used to calculate speed):
-- Level 1: 20 seconds per pair (10 pairs = 200s baseline for normalization)
-- Level 2: 15 seconds per pair (10 pairs = 150s baseline for normalization)
-- Level 3: 12 seconds per pair (10 pairs = 120s baseline for normalization)
+**Expected Time Calculation**:
+- **Level 1**: 10s per pair
+- **Level 2**: 15s per pair
+- **Level 3**: 20s per pair
 
-**Note**: The game timer is fixed at 300 seconds (5 minutes) for all levels, but time normalization uses level-specific baselines to differentiate performance across difficulty levels.
+**Example (Level 1, 10 pairs)**:
+- Expected Total: 100s
+- Actual 50s: `50/100 = 0.5` (Medium speed)
+- Actual 20s: `20/100 = 0.2` (Fast speed)
+- Actual 100s+: `100/100 = 1.0` (Slow speed)
 
-**Normalization formula**:
-```
-expectedTotal = expectedTimePerPair[level] × totalPairs
-normalizedTime = completionTime / expectedTotal
-normalizedTime = clamp(normalizedTime, 0.0, 1.0)
-```
-
-### 7.2 Cadence Variance Calculation
+### 7.2 Cadence Normalization
 
 Coefficient of variation of flip intervals:
 

@@ -2,7 +2,7 @@
 
 This document contains visual representations of the He Maumahara system architecture, gameplay lifecycle, AI workflow, analytics pipeline, and local persistence model. All diagrams are written in Mermaid.js syntax.
 
-**Version**: v4.0.1  
+**Version**: v4.0.2  
 **Date**: 2026-01-21
 
 ---

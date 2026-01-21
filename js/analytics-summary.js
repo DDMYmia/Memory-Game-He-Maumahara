@@ -312,7 +312,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
           <div class="flow-meter-marker" style="left: ${markerPosition}%"></div>
         </div>
         <div class="flow-meter-value" style="color: ${flowInfo.color}">
-          ${flowInfo.comment}! Your Score is ${flowIndex.toFixed(4)}
+          ${flowInfo.comment}! Your Score is ${(flowIndex * 10).toFixed(2)}/10
         </div>
       </div>
       `;

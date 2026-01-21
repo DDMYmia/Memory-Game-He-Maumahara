@@ -148,9 +148,9 @@ class FuzzyLogicSystem {
     // Expected time per pair - all levels now use 300s total time
     // Reduced significantly to create better differentiation between fast/slow players
     const expectedTimePerPair = {
-      1: 20,  // Level 1: 200s / 10 pairs
+      1: 10,  // Level 1: 100s / 10 pairs
       2: 15,  // Level 2: 150s / 10 pairs
-      3: 12   // Level 3: 120s / 10 pairs
+      3: 20   // Level 3: 200s / 10 pairs
     };
     
     const expectedTotal = expectedTimePerPair[level] * totalPairs;
@@ -516,7 +516,14 @@ class FuzzyLogicSystem {
     baseFlowIndex = Math.round(baseFlowIndex * 20) / 20;
 
     // Apply error penalty and cheat penalty multiplicatively
-    const flowIndexRaw = baseFlowIndex * errorPenalty * cheatPenalty;
+    let flowIndexRaw = baseFlowIndex * errorPenalty * cheatPenalty;
+
+    // Special rule: if completed in 20 seconds or less, force max score
+    if (completionTime !== undefined && completionTime <= 20) {
+      aiLog('Perfect speed bonus applied (<= 20s)');
+      flowIndexRaw = 1.0;
+    }
+
     const trueFlowIndex = Math.max(0, Math.min(1, flowIndexRaw));
     const displayFlowIndex = Math.max(0.3, trueFlowIndex);
 
