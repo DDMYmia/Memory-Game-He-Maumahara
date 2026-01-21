@@ -150,11 +150,10 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       if (!isStandalonePage) html = '<div class="analytics-header">Game Analytics</div>';
 
       html += '<div class="analytics-section" data-section="basic">';
-      html += createTitle('📌 Basics');
+      html += createTitle('Basics');
       html += '<div class="analytics-grid">';
       html += `<div class="analytics-item"><span class="label">Time</span><span class="value">${displayTime}</span></div>`;
       html += `<div class="analytics-item"><span class="label">Clicks</span><span class="value">N/A</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Success Rate</span><span class="value">N/A</span></div>`;
       html += `<div class="analytics-item"><span class="label">Accuracy</span><span class="value">N/A</span></div>`;
       html += '</div></div>';
 
@@ -162,7 +161,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       html += '<summary class="analytics-advanced-summary">Advanced Information for researchers</summary>';
       html += '<div class="analytics-advanced-body">';
       html += '<div class="analytics-section" data-section="note">';
-      html += createTitle('ℹ️ Data Status');
+      html += createTitle('Data Status');
       html += '<div class="analytics-grid">';
       html += `<div class="analytics-item"><span class="label">Note</span><span class="value">Telemetry extraction failed</span></div>`;
       html += '</div></div>';
@@ -300,11 +299,10 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
 
     const displayTime = formatTime(metrics.completionTime);
     const totalPairs = metrics.totalPairs || maxPossibleMatches || 10;
-    const successRatio = totalPairs > 0 ? Math.max(0, Math.min(1, successfulMatches / totalPairs)) : 0;
     const errorRate = validatedTotalMatches > 0 ? validatedFailedMatches / validatedTotalMatches : 0;
 
     html += '<div class="analytics-section" data-section="basic">';
-    html += createTitle('📌 Basics');
+    html += createTitle('Basics');
     if (flowIndex !== null) {
       const flowInfo = getFlowInterpretation(flowIndex);
       const markerPosition = Math.min(Math.max(flowIndex * 100, 0), 100);
@@ -323,7 +321,6 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     html += '<div class="analytics-grid">';
     html += `<div class="analytics-item"><span class="label">Time</span><span class="value">${displayTime}</span></div>`;
     html += `<div class="analytics-item"><span class="label">Flips</span><span class="value">${totalClicks}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Success Rate</span><span class="value">${formatPercent(successRatio)}</span></div>`;
     html += `<div class="analytics-item"><span class="label">Accuracy</span><span class="value">${formatPercent(accuracy)}</span></div>`;
     html += `<div class="analytics-item"><span class="label">Failures</span><span class="value">${validatedFailedMatches}</span></div>`;
     html += `<div class="analytics-item"><span class="label">Error Rate</span><span class="value">${formatPercent(errorRate)}</span></div>`;
@@ -332,15 +329,6 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       html += `<div class="analytics-item streak-item"><span class="label">Streak</span><span class="value streak-value">${gameStats.streak}</span></div>`;
     }
     html += `<div class="analytics-item"><span class="label">Level</span><span class="value">${level}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Total Pairs</span><span class="value">${totalPairs}</span></div>`;
-    if (level === 2) {
-      if (typeof config.adjacentRate === 'number' && isFinite(config.adjacentRate)) {
-        html += `<div class="analytics-item"><span class="label">Adjacency Rate</span><span class="value">${formatPercent(config.adjacentRate)}</span></div>`;
-      }
-      if (typeof config.adjacentActual === 'number' && isFinite(config.adjacentActual) && typeof config.adjacentTarget === 'number' && isFinite(config.adjacentTarget)) {
-        html += `<div class="analytics-item"><span class="label">Adjacent Pairs</span><span class="value">${config.adjacentActual} / ${config.adjacentTarget}</span></div>`;
-      }
-    }
 
     if (flowIndex === null) {
       html += `<div class="analytics-item flow-index"><span class="label">Score</span><span class="value">N/A</span></div>`;
@@ -363,7 +351,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
 
     if (metrics.colorStats && Object.keys(metrics.colorStats).length > 0) {
       html += '<div class="analytics-section" data-section="color">';
-      html += createTitle('🎨 Color Stats');
+      html += createTitle('Color Stats');
       const buckets = {
         blue: { attempts: 0, successes: 0, occurrences: 0 },
         red: { attempts: 0, successes: 0, occurrences: 0 },
@@ -432,7 +420,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       html += '</div></div>';
     } else {
       html += '<div class="analytics-section" data-section="color">';
-      html += createTitle('🎨 Color Stats');
+      html += createTitle('Color Stats');
       html += '<div class="analytics-grid">';
       html += `<div class="analytics-item"><span class="label">Status</span><span class="value">N/A</span></div>`;
       html += `<div class="analytics-item"><span class="label">Reason</span><span class="value">No flips/matches recorded</span></div>`;
@@ -442,7 +430,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     if (aiResult && aiResult.nextConfig) {
       const nextConfig = aiResult.nextConfig;
       html += '<div class="analytics-section" data-section="adaptive">';
-      html += createTitle('🤖 Recommendation (Next Round)');
+      html += createTitle('Recommendation (Next Round)');
 
       const currentGridCols = gameConfig.gridCols || gameConfig.cols || defaultConfig.cols;
       const currentGridRows = gameConfig.gridRows || gameConfig.rows || defaultConfig.rows;
@@ -459,11 +447,13 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
 
       const formatChange = (from, to) => (from === to ? `${to}` : `${from} → ${to}`);
 
+      const rippleDelayMap = { 1: 1000, 2: 800, 3: 600 };
+      const currentRipple = rippleDelayMap[level] || 1000;
+      
       html += '<div class="analytics-grid">';
       html += `<div class="analytics-item"><span class="label">Grid</span><span class="value">${formatChange(`${currentGridCols}×${currentGridRows}`, `${nextGridCols}×${nextGridRows}`)}</span></div>`;
       html += `<div class="analytics-item"><span class="label">Pairs</span><span class="value">${formatChange(String(fromPairs), String(toPairs))}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Time</span><span class="value">${formatChange(formatTime(fromTime), formatTime(toTime))}</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Hide Delay</span><span class="value">${formatChange(`${fromHideDelay}ms`, `${toHideDelay}ms`)}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Ripple Delay</span><span class="value">${currentRipple}ms</span></div>`;
       if (toAdjacent !== undefined && !isNaN(toAdjacent)) {
         html += `<div class="analytics-item"><span class="label">Adjacency Rate</span><span class="value">${formatChange(formatPercent(fromAdjacent), formatPercent(toAdjacent))}</span></div>`;
       }
@@ -473,7 +463,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     }
 
     html += '<div class="analytics-section" data-section="config">';
-    html += createTitle('🎮 Config');
+    html += createTitle('Config');
     html += '<div class="analytics-grid">';
 
     const matchingType = level === 3 ? 'Img-Txt' : 'Img-Img';
@@ -481,24 +471,23 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
     const gridRows = config.rows || config.gridRows || (level === 3 ? 4 : 4);
     const initialTime = config.initialTime || 300;
     const hideDelay = config.hideDelay || 400;
+    const rippleDelayMap = { 1: 1000, 2: 800, 3: 600 };
+    const currentRipple = rippleDelayMap[level] || 1000;
+
     html += `<div class="analytics-item"><span class="label">Match Type</span><span class="value">${matchingType}</span></div>`;
     html += `<div class="analytics-item"><span class="label">Grid</span><span class="value">${gridCols}×${gridRows}</span></div>`;
     html += `<div class="analytics-item"><span class="label">Pairs</span><span class="value">${totalPairs}</span></div>`;
+    if (level === 2) {
+      if (typeof config.adjacentActual === 'number' && isFinite(config.adjacentActual) && typeof config.adjacentRate === 'number' && isFinite(config.adjacentRate)) {
+        html += `<div class="analytics-item"><span class="label">Adjacent Pairs</span><span class="value">${config.adjacentActual} / ${formatPercent(config.adjacentRate)}</span></div>`;
+      }
+    }
     html += `<div class="analytics-item"><span class="label">Initial Time</span><span class="value">${formatTime(initialTime)}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Hide Delay</span><span class="value">${hideDelay}ms</span></div>`;
+    html += `<div class="analytics-item"><span class="label">Ripple Delay</span><span class="value">${currentRipple}ms</span></div>`;
     if (metrics.colorStats && Object.keys(metrics.colorStats).length > 0) {
       const colorsPresent = Array.from(new Set(Object.keys(metrics.colorStats).map(c => (c || '').toString().trim()).filter(Boolean)));
       if (colorsPresent.length > 0) {
         html += `<div class="analytics-item"><span class="label">Colors Present</span><span class="value">${colorsPresent.join(', ')}</span></div>`;
-      }
-    }
-
-    if (level === 2) {
-      if (config.adjacentRate !== undefined && !isNaN(config.adjacentRate) && config.adjacentRate !== null) {
-        html += `<div class="analytics-item"><span class="label">Adjacency Rate</span><span class="value">${formatPercent(config.adjacentRate)}</span></div>`;
-      }
-      if (config.adjacentTarget !== undefined && config.adjacentActual !== undefined) {
-        html += `<div class="analytics-item"><span class="label">Adjacent Pairs</span><span class="value">${config.adjacentActual} / ${config.adjacentTarget}</span></div>`;
       }
     }
 

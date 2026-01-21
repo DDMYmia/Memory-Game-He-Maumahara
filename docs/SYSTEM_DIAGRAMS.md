@@ -2,8 +2,8 @@
 
 This document contains visual representations of the He Maumahara system architecture, gameplay lifecycle, AI workflow, analytics pipeline, and local persistence model. All diagrams are written in Mermaid.js syntax.
 
-**Version**: v3.0.1  
-**Date**: 2026-01-15
+**Version**: v4.0.0  
+**Date**: 2026-01-21
 
 ## 1. High-Level System Architecture
 
@@ -139,7 +139,7 @@ flowchart TD
     subgraph "Adaptation - Contextual Bandit"
         Ctx["Context vector<br/>(profile + recent rounds)"]
         Arm{"Select arm<br/>(0/1/2)"}
-        Cfg["Generate next config<br/>(grid, reveal, adjacency)"]
+        Cfg["Generate next config<br/>(grid, ripple delay, adjacency)"]
     end
 
     Evt --> M

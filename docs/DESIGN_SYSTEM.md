@@ -1,7 +1,7 @@
 # He Maumahara Design System
 
-**Version**: v3.0.1  
-**Date**: 2026-01-15
+**Version**: v4.0.0  
+**Date**: 2026-01-21
 
 This document describes the implemented frontend design system for the current He Maumahara web build. It includes design goals, global tokens, layout rules, component patterns, and key accessibility constraints.
 

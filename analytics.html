@@ -127,13 +127,6 @@
           const date = new Date(session.timestamp);
           const clicks = (session.summary && typeof session.summary.totalClicks === 'number') ? session.summary.totalClicks : (session.metrics && typeof session.metrics.totalClicks === 'number' ? session.metrics.totalClicks : 0);
           const totalPairs = (session.summary && typeof session.summary.totalPairs === 'number') ? session.summary.totalPairs : (session.metrics && typeof session.metrics.totalPairs === 'number' ? session.metrics.totalPairs : 0);
-          const totalMatches = (session.metrics && typeof session.metrics.totalMatches === 'number') ? session.metrics.totalMatches : null;
-          const failedMatches = (session.metrics && typeof session.metrics.failedMatches === 'number') ? session.metrics.failedMatches : 0;
-          let successRatio = null;
-          if (totalPairs > 0 && typeof totalMatches === 'number') {
-            const successfulMatches = Math.max(0, totalMatches - Math.max(0, Math.min(failedMatches, totalMatches)));
-            successRatio = Math.max(0, Math.min(1, Math.min(successfulMatches, totalPairs) / totalPairs));
-          }
           const rawFlowIndex = (session.aiResult && (session.aiResult.flowIndexDisplay ?? session.aiResult.flowIndex)) ??
             (session.summary && session.summary.flowIndex) ??
             (session.aiResult && session.aiResult.flowIndexDisplay) ??
@@ -155,7 +148,6 @@
               <div class="history-item-sub">
                 <div>Flow Index: ${flowIndexText}</div>
                 <div>Clicks: ${clicks}</div>
-                <div>Success Rate: ${successRatio === null ? 'N/A' : (successRatio * 100).toFixed(1) + '%'}</div>
               </div>
             </div>
           `;

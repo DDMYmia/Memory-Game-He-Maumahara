@@ -1,5 +1,45 @@
 # Changelog
 
+Version: v4.0.0 (2026-01-21)
+
+## Flow Index Refactoring
+- **Simplified Fuzzy Rules**: Reduced from 16 rules → 8 rules → **6 rules**, removing all error rate and accuracy dependencies from base Flow Index calculation
+- **Removed Accuracy from Rules**: Click accuracy removed from fuzzy rules to avoid double-penalization (errors already handled via error penalty mechanism)
+- **Base Flow Index Range**: Adjusted to [0.6, 1.0] with 0.05 increments, ensuring minimum base score of 0.6
+- **Rule Weights Updated**: R1 and R2 both set to 1.0 (optimal/good performance), R6 set to 0.6 (minimum)
+- **New 6-Rule System**: Focuses purely on speed and cadence stability
+- **Error Penalty Mechanism**: Changed to additive calculation (not multiplicative)
+  - Base error penalty: 5% per failed match, maximum 30% (6 failed matches)
+  - Consecutive error penalty: Starts from 3rd consecutive error, 3% per additional error, maximum 15% (8+ consecutive errors)
+  - Combined error penalty: Additive (base + consecutive), maximum 45% total deduction
+- **Cheat Penalty Mechanism**: Simplified to linear deduction
+  - 3% per hint use, maximum 15% (5 uses)
+  - Previous: Ratio-based with 50% maximum
+- **Three-Layer Scoring**: Flow Index calculated as `baseFlowIndex × errorPenalty × cheatPenalty`
+- **Improved Calculation Logic**: Base Flow Index focuses purely on speed and cadence stability (errors and accuracy handled separately via penalties)
+
+## UI Improvements
+- **Emoji Removal**: Removed all emojis from analytics pages for cleaner interface
+  - Removed: 📌 Basics, 🎨 Color Stats, 🤖 Recommendation, 🎮 Config, ℹ️ Data Status
+
+## Documentation
+- **New Documentation**: Created `FLOW_INDEX_SCORING.md` - Comprehensive guide to Flow Index calculation methodology
+- **Documentation Updates**: All documentation updated to v4.0.0
+  - `DESIGN_SYSTEM.md`: v3.1.0 → v4.0.0
+  - `TESTING_FRAMEWORK.md`: v3.1.0 → v4.0.0
+  - `SYSTEM_DIAGRAMS.md`: v3.0.1 → v4.0.0
+  - `COMPLETE_TECHNICAL_DOCUMENTATION.md`: Updated AI system section with latest Flow Index design
+  - `FLOW_INDEX_SCORING.md`: Updated with latest error/cheat penalty mechanisms and base Flow Index range
+- **Documentation Cleanup**: Removed obsolete documentation files (SYSTEM_OVERVIEW.md, TECHNICAL_REFERENCE.md, Group_Meeting_Explainer.md, References.md)
+- **README Simplification**: Streamlined README.md to broad overview format
+- **Comprehensive Documentation Review**: All documentation synchronized with latest system design (2026-01-21)
+
+## Testing
+- **Comprehensive Testing**: All automated tests pass successfully (144 tests: 12 profiles × 3 levels × 4 runs each)
+- **Flow Index Validation**: Verified correct calculation across all player profiles and difficulty levels
+
+---
+
 Version: v3.0.1 (2026-01-15)
 
 ## Documentation

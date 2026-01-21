@@ -81,22 +81,22 @@ class FuzzyLogicSystem {
       'image10.png': { 
         color: 'blue',
         baseColor: 'blue',
-        name: 'Pikorua' 
+        name: 'Pikorua (double twist)' 
       },
       'image11.png': {
         color: 'blue',
         baseColor: 'blue',
-        name: 'Image 11'
+        name: 'paua'
       },
       'image12.png': {
         color: 'red',
         baseColor: 'red',
-        name: 'Image 12'
+        name: 'kete'
       },
       'image13.png': {
         color: 'green',
         baseColor: 'green',
-        name: 'Image 13'
+        name: 'Pikorua (single twist)'
       }
     };
 
@@ -108,32 +108,14 @@ class FuzzyLogicSystem {
       timeMedium: { min: 0.2, max: 0.8, peak: 0.5 },
       timeSlow: { min: 0.5, max: 1.0, peak: 1.0 },
       
-      // Error rate: low (0-0.7), medium (0.5-0.9), high (0.8-1.0)
-      // Updated to peak at 0 for zero errors
-      errorLow: { min: 0, max: 0.6, peak: 0 },
-      errorMedium: { min: 0.3, max: 0.9, peak: 0.6 },
-      errorHigh: { min: 0.6, max: 1.0, peak: 1.0 },
-      
       // Cadence stability: variance threshold
       // Relaxed from 0.15 to 0.5 to accommodate natural variation
       cadenceStable: { maxVariance: 0.5 },
       cadenceVariable: { minVariance: 0.5 },
       
-      // Click accuracy: high (0.8-1.0), medium (0.6-0.9), low (0-0.7)
-      // Updated to peak at 1.0 for perfect accuracy
-      accuracyHigh: { min: 0.7, max: 1.0, peak: 1.0 },
-      accuracyMedium: { min: 0.4, max: 0.9, peak: 0.65 },
-      accuracyLow: { min: 0, max: 0.6, peak: 0.3 },
-      
-      // Color classification accuracy: high (0.8-1.0), medium (0.6-0.9), low (0-0.7)
-      colorHigh: { min: 0.7, max: 1.0, peak: 1.0 },
-      colorMedium: { min: 0.4, max: 0.9, peak: 0.65 },
-      colorLow: { min: 0, max: 0.6, peak: 0.3 },
-      
-      // Shape/image classification accuracy: high (0.8-1.0), medium (0.6-0.9), low (0-0.7)
-      shapeHigh: { min: 0.7, max: 1.0, peak: 1.0 },
-      shapeMedium: { min: 0.4, max: 0.9, peak: 0.65 },
-      shapeLow: { min: 0, max: 0.6, peak: 0.3 }
+      // Note: Click accuracy is no longer used in fuzzy rules
+      // Errors are handled separately via error penalty mechanism
+      // Color/Shape accuracy are calculated and logged for analytics but not used in fuzzy rules
     };
   }
 
@@ -355,21 +337,45 @@ class FuzzyLogicSystem {
   }
 
   /**
+   * Calculate error penalty separately from base Flow Index
+   * @param {number} failedMatches - Number of failed match attempts (one match = two cards flipped)
+   * @param {number} totalMatches - Total match attempts
+   * @param {number} maxConsecutiveErrors - Maximum consecutive errors
+   * @param {number} totalPairs - Total pairs in the game
+   * @returns {number} Penalty factor [0, 1], where 1 = no penalty, 0 = maximum penalty
+   */
+  calculateErrorPenalty(failedMatches, totalMatches, maxConsecutiveErrors, totalPairs) {
+    // Base error penalty: 5% per failed match, max 30% (6 failed matches)
+    // One match = one attempt to pair two cards
+    const baseErrorDeduction = Math.min(failedMatches, 6) * 0.05;
+
+    // Consecutive error penalty: starts from 3rd consecutive error
+    // 3rd = 3%, 4th = 6%, 5th = 9%, 6th = 12%, 7th = 15%, 8th+ = 15% (capped)
+    let consecutiveErrorDeduction = 0;
+    if (maxConsecutiveErrors > 2) {
+      consecutiveErrorDeduction = Math.min(0.15, (maxConsecutiveErrors - 2) * 0.03);
+    }
+
+    // Total error deduction: additive (base + consecutive), max 45% total
+    const totalErrorDeduction = Math.min(0.45, baseErrorDeduction + consecutiveErrorDeduction);
+
+    return 1.0 - totalErrorDeduction;
+  }
+
+  /**
    * Calculate cheat penalty based on show_cards usage
    * @param {number} cheatCount - Number of times show_cards was used
    * @param {number} totalPairs - Total pairs in the game
-   * @returns {number} Penalty factor [0, 1], where 1 = no penalty, 0 = maximum penalty
+   * @returns {number} Penalty factor [0, 1], where 1 = no penalty, 0 = maximum penalty (15%)
    */
   calculateCheatPenalty(cheatCount, totalPairs) {
     if (cheatCount === 0) return 1.0; // No penalty
     
-    // Penalty increases with cheat usage relative to game size
-    const cheatRatio = cheatCount / totalPairs;
+    // Cheat penalty: 3% per use, max 15% (5 uses)
+    // 1st use = 3%, 2nd = 6%, 3rd = 9%, 4th = 12%, 5th+ = 15% (capped)
+    const cheatDeduction = Math.min(0.15, cheatCount * 0.03);
     
-    // Linear penalty: 1 cheat = -0.1, 2 cheats = -0.2, etc., capped at -0.5
-    const penalty = Math.min(0.5, cheatRatio * 0.5);
-    
-    return 1.0 - penalty;
+    return 1.0 - cheatDeduction;
   }
 
   /**
@@ -439,6 +445,9 @@ class FuzzyLogicSystem {
     // Calculate color sensitivity by base color family
     const colorSensitivity = this.calculateColorSensitivity(colorStats);
     
+    // Calculate error penalty (separate from base Flow Index)
+    const errorPenalty = this.calculateErrorPenalty(failedMatches, totalMatches, maxConsecutiveErrors, totalPairs);
+    
     // Calculate cheat penalty
     const cheatPenalty = this.calculateCheatPenalty(cheatCount, totalPairs);
 
@@ -447,62 +456,33 @@ class FuzzyLogicSystem {
     const timeMedium = this.triangularMembership(normalizedTime, this.config.timeMedium);
     const timeSlow = this.triangularMembership(normalizedTime, this.config.timeSlow);
 
-    // Compute membership values for error rate
-    const errorLow = this.triangularMembership(errorRate, this.config.errorLow);
-    const errorMedium = this.triangularMembership(errorRate, this.config.errorMedium);
-    const errorHigh = this.triangularMembership(errorRate, this.config.errorHigh);
-
     // Compute membership values for cadence
     const cadenceStable = cadenceVariance < this.config.cadenceStable.maxVariance ? 1 : 0;
     const cadenceVariable = cadenceVariance >= this.config.cadenceVariable.minVariance ? 1 : 0;
 
-    // Compute membership values for click accuracy
-    const accuracyHigh = this.triangularMembership(clickAccuracy, this.config.accuracyHigh);
-    const accuracyLow = this.triangularMembership(clickAccuracy, this.config.accuracyLow);
+    // Simplified fuzzy rules (6 rules, no error rate or accuracy in rules)
+    // Errors are handled separately via error penalty mechanism
+    // R1: Fast + Stable - Optimal performance
+    const rule1 = Math.min(timeFast, cadenceStable);
+    // R2: Medium + Stable - Good performance
+    const rule2 = Math.min(timeMedium, cadenceStable);
+    // R3: Fast but Unstable
+    const rule3 = Math.min(timeFast, cadenceVariable);
+    // R4: Slow but Stable
+    const rule4 = Math.min(timeSlow, cadenceStable);
+    // R5: Medium + Unstable
+    const rule5 = Math.min(timeMedium, cadenceVariable);
+    // R6: Slow + Unstable - Poor performance (minimum base score)
+    const rule6 = Math.min(timeSlow, cadenceVariable);
 
-    // Compute membership values for color accuracy
-    const colorHigh = this.triangularMembership(colorAccuracy, this.config.colorHigh);
-    const colorLow = this.triangularMembership(colorAccuracy, this.config.colorLow);
-
-    // Compute membership values for shape accuracy
-    const shapeHigh = this.triangularMembership(shapeAccuracy, this.config.shapeHigh);
-    const shapeLow = this.triangularMembership(shapeAccuracy, this.config.shapeLow);
-
-    const rule1 = Math.min(timeMedium, errorLow, cadenceStable);
-    const rule2 = Math.min(timeFast, errorLow, cadenceStable);
-    const rule3 = Math.min(timeMedium, errorMedium, cadenceStable);
-    const rule4 = Math.min(timeSlow, errorLow);
-    const rule5 = Math.min(timeFast, errorHigh);
-    const rule6 = Math.min(timeSlow, errorHigh);
-    const rule7 = Math.min(errorHigh, cadenceVariable);
-    const rule8 = Math.min(timeMedium, errorLow, colorHigh, shapeHigh);
-    const rule9 = Math.min(timeMedium, Math.max(colorLow, shapeLow));
-    const rule10 = Math.min(accuracyHigh, cadenceStable);
-    const rule11 = Math.min(accuracyLow, colorLow);
-    const rule12 = Math.min(timeFast, errorMedium);
-    const rule13 = Math.min(timeFast, errorLow);
-    const rule14 = Math.min(timeFast, errorLow, accuracyHigh);
-    const rule15 = Math.min(timeFast, errorLow, cadenceVariable);
-    const rule16 = Math.min(timeMedium, errorLow);
-
-    const rules = [rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12, rule13, rule14, rule15, rule16];
+    const rules = [rule1, rule2, rule3, rule4, rule5, rule6];
     const weights = [
-      0.90,
-      failedMatches === 0 ? 1.0 : 0.95,
-      0.60,
-      0.60,
-      0.30,
-      0.10,
-      0.20,
-      0.98,
-      0.35,
-      0.95,
-      0.20,
-      0.85,
-      0.97,
-      1.0,
-      0.95,
-      0.80
+      1.0,   // R1: Fast + Stable - Optimal
+      1.0,   // R2: Medium + Stable - Good
+      0.80,  // R3: Fast but Unstable
+      0.75,  // R4: Slow but Stable
+      0.70,  // R5: Medium + Unstable
+      0.60   // R6: Slow + Unstable (minimum base score)
     ];
     
     let numerator = 0;
@@ -517,27 +497,32 @@ class FuzzyLogicSystem {
 
     let baseFlowIndex = denominator > 0
       ? numerator / denominator
-      : (0.45 * (1 - normalizedTime) + 0.35 * (1 - errorRate) + 0.2 * clickAccuracy);
+      : 0.6; // Default fallback (minimum base score)
 
     if (denominator === 0) {
-      aiWarn('Flow Index: denominator is 0, using default 0.5');
+      aiWarn('Flow Index: denominator is 0, using default 0.6');
     } else {
       aiLog('Flow Index calculation:', {
         numerator,
         denominator,
-        rawFlowIndex: baseFlowIndex,
+        baseFlowIndex,
         activeRules: rules.filter(r => r > 0).length
       });
     }
 
-    baseFlowIndex = Math.max(0, Math.min(1, baseFlowIndex));
+    // Ensure base Flow Index is in range [0.6, 1.0] with 0.05 increments
+    baseFlowIndex = Math.max(0.6, Math.min(1.0, baseFlowIndex));
+    // Round to nearest 0.05 increment (0.60, 0.65, 0.70, ..., 0.95, 1.00)
+    baseFlowIndex = Math.round(baseFlowIndex * 20) / 20;
 
-    const flowIndexRaw = baseFlowIndex * cheatPenalty;
+    // Apply error penalty and cheat penalty multiplicatively
+    const flowIndexRaw = baseFlowIndex * errorPenalty * cheatPenalty;
     const trueFlowIndex = Math.max(0, Math.min(1, flowIndexRaw));
     const displayFlowIndex = Math.max(0.3, trueFlowIndex);
 
     context.colorSensitivity = colorSensitivity;
     context.cheatCount = cheatCount;
+    context.errorPenalty = errorPenalty;
     context.cheatPenalty = cheatPenalty;
     context.baseFlowIndex = baseFlowIndex;
     context.flowIndexRaw = trueFlowIndex;
@@ -545,6 +530,7 @@ class FuzzyLogicSystem {
 
     aiLog('Final Flow Index:', {
       baseFlowIndex,
+      errorPenalty,
       cheatPenalty,
       finalFlowIndex: displayFlowIndex
     });

@@ -47,10 +47,10 @@ const cardTextMapping = {
   "image7": "Kōwhai",
   "image8": "Koru",
   "image9": "Hei Matau",
-  "image10": "Pikorua",
-  "image11": "Image 11",
-  "image12": "Image 12",
-  "image13": "Image 13",
+  "image10": "Pikorua (double twist)",
+  "image11": "paua",
+  "image12": "kete",
+  "image13": "Pikorua (single twist)",
   "image14": "Image 14",
   "image15": "Image 15",
   "image16": "Image 16",
@@ -83,6 +83,13 @@ function generateAdjacentLayout(totalPairs, cols, rows, target) {
     if (r < rows - 1 && c < cols - 1) neighbors.push(i + cols + 1);
     neighbors.forEach(j => { if (i < j) edges.push([i, j]); });
   }
+
+  function isNeighbor(p, q) {
+    const pr = Math.floor(p / cols), pc = p % cols;
+    const qr = Math.floor(q / cols), qc = q % cols;
+    return (p !== q) && Math.abs(pr - qr) <= 1 && Math.abs(pc - qc) <= 1;
+  }
+
   for (let i = edges.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [edges[i], edges[j]] = [edges[j], edges[i]]; }
   const pairIds = Array.from({ length: totalPairs }, (_, k) => k + 1);
   for (let i = pairIds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pairIds[i], pairIds[j]] = [pairIds[j], pairIds[i]]; }
@@ -97,19 +104,72 @@ function generateAdjacentLayout(totalPairs, cols, rows, target) {
     used.add(b);
     placedAdj++;
   }
-  const remainingIds = [];
+  
+  // Fill remaining pairs, trying to avoid accidental adjacency
+  const remainingIdsUnique = [];
   for (let id = 1; id <= totalPairs; id++) {
-    if (!layout.includes(id)) { remainingIds.push(id, id); }
+    if (!layout.includes(id)) { remainingIdsUnique.push(id); }
   }
-  const freePositions = [];
-  for (let i = 0; i < n; i++) if (!used.has(i)) freePositions.push(i);
-  for (let i = freePositions.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [freePositions[i], freePositions[j]] = [freePositions[j], freePositions[i]]; }
-  for (let k = 0; k < remainingIds.length && k < freePositions.length; k++) {
-    layout[freePositions[k]] = remainingIds[k];
+  
+  const availableSlots = [];
+  for(let i=0; i<n; i++) if(!used.has(i)) availableSlots.push(i);
+
+  let success = false;
+  // Try up to 50 times to find a layout where remaining pairs are NOT adjacent
+  for(let attempt = 0; attempt < 50; attempt++) {
+      const currentSlots = [...availableSlots];
+      // Shuffle slots
+      for (let i = currentSlots.length - 1; i > 0; i--) { 
+          const j = Math.floor(Math.random() * (i + 1)); 
+          [currentSlots[i], currentSlots[j]] = [currentSlots[j], currentSlots[i]]; 
+      }
+
+      let validAttempt = true;
+      const pairAssignments = [];
+
+      for(let i = 0; i < remainingIdsUnique.length; i++) {
+          if ((i*2 + 1) >= currentSlots.length) break; // Should not happen if counts are correct
+          const slot1 = currentSlots[i*2];
+          const slot2 = currentSlots[i*2+1];
+          
+          if (isNeighbor(slot1, slot2)) {
+              validAttempt = false;
+              break;
+          }
+          pairAssignments.push({id: remainingIdsUnique[i], slots: [slot1, slot2]});
+      }
+
+      if (validAttempt && pairAssignments.length === remainingIdsUnique.length) {
+          pairAssignments.forEach(p => {
+              layout[p.slots[0]] = p.id;
+              layout[p.slots[1]] = p.id;
+          });
+          success = true;
+          break;
+      }
   }
-  for (let k = remainingIds.length; k < freePositions.length; k++) {
-    layout[freePositions[k]] = 0;
+
+  // Fallback: If strict avoidance failed, just fill randomly (accepting accidental adjacency)
+  if (!success) {
+      const currentSlots = [...availableSlots];
+      for (let i = currentSlots.length - 1; i > 0; i--) { 
+          const j = Math.floor(Math.random() * (i + 1)); 
+          [currentSlots[i], currentSlots[j]] = [currentSlots[j], currentSlots[i]]; 
+      }
+      for(let i = 0; i < remainingIdsUnique.length; i++) {
+          const id = remainingIdsUnique[i];
+          if ((i*2 + 1) < currentSlots.length) {
+              layout[currentSlots[i*2]] = id;
+              layout[currentSlots[i*2+1]] = id;
+          }
+      }
   }
+
+  // Fill any remaining empty spots with 0 (should not happen in standard game)
+  for (let i = 0; i < n; i++) {
+      if (layout[i] === null) layout[i] = 0;
+  }
+
   const mode = Math.floor(Math.random() * 4);
   if (mode !== 0) {
     const res = new Array(n);

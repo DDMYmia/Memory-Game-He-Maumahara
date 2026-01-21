@@ -7,7 +7,16 @@ The game features a **pure frontend AI** that personalizes difficulty in real-ti
 **Version**: v4.0.0  
 **Last Updated**: 2026-01-21
 
+---
+
 ## Quick Start
+
+### Prerequisites
+
+- A modern web browser with JavaScript enabled
+- A local web server (required due to CORS restrictions for IndexedDB)
+
+### Installation & Running
 
 1. **Clone the repository**
    ```bash
@@ -17,66 +26,86 @@ The game features a **pure frontend AI** that personalizes difficulty in real-ti
 
 2. **Start a local server**
    ```bash
+   # Option 1: Python (built-in)
    python3 -m http.server 8010
-   # OR
+   
+   # Option 2: Node.js http-server
    npx http-server -p 8010
    ```
 
-3. **Open in browser**: `http://localhost:8010/index.html`
+3. **Open in browser**
+   - Home: `http://localhost:8010/index.html`
+   - Analytics: `http://localhost:8010/analytics.html`
+
+---
 
 ## Game Overview
 
-He Maumahara is a memory card matching game with three levels:
+He Maumahara is a memory card matching game with three progressive levels:
+
 - **Level 1**: Beginner - Fixed layout with image matching
-- **Level 2**: Adaptive Challenge - Variable grid with AI-adjusted difficulty
+- **Level 2**: Adaptive Challenge - Variable grid size with adjacency-based placement
 - **Level 3**: Mastery - Image-to-text matching with Māori words (kupu)
 
-The game adapts to player performance using AI algorithms that calculate a Flow Index and adjust difficulty accordingly.
+The game adapts difficulty based on your performance, using an AI system that calculates a "Flow Index" to keep the challenge appropriate for your skill level.
 
-## Key Features
+### Key Features
 
-- **Adaptive AI**: Uses Fuzzy Logic and Contextual Bandits (LinUCB) to personalize difficulty
-- **Privacy First**: All data stored locally in browser (IndexedDB). No server required.
-- **Analytics Dashboard**: View performance history and patterns with K-Means clustering
-- **Cultural Integration**: Features Māori language and culturally safe imagery
-- **Accessibility**: High contrast design, large touch targets for senior-friendly gameplay
+- **Adaptive AI**: Automatically adjusts difficulty to match your skill level
+- **Privacy First**: All data stored locally in your browser - no data leaves your device
+- **Cultural Integration**: Features Māori language (te reo Māori) and culturally safe imagery
+- **Accessibility**: High contrast design, large touch targets, senior-friendly interface
+- **Analytics Dashboard**: Track your progress and view performance patterns over time
 
-## Technology
+---
 
-- Pure HTML/CSS/JavaScript (no build step required)
-- IndexedDB for local data storage
-- Custom AI algorithms (Fuzzy Logic, LinUCB Bandit, K-Means)
-- No external dependencies for core gameplay
+## Technology Stack
 
-## Documentation
+- **Frontend**: Pure HTML5, CSS3, Vanilla JavaScript (ES6+)
+- **Storage**: IndexedDB (game data), localStorage (settings)
+- **AI**: Custom Fuzzy Logic and Contextual Bandit algorithms
+- **Dependencies**: None (fully self-contained)
 
-Comprehensive technical documentation is available in the [`docs/`](docs/) directory:
+---
 
-- **[Complete Technical Documentation](docs/COMPLETE_TECHNICAL_DOCUMENTATION.md)** - Full system reference
-- **[System Diagrams](docs/SYSTEM_DIAGRAMS.md)** - Architecture and flow charts
-- **[Testing Framework](docs/TESTING_FRAMEWORK.md)** - Automated testing guide
-- **[Design System](docs/DESIGN_SYSTEM.md)** - UI/UX guidelines
-- **[Changelog](docs/CHANGELOG.md)** - Version history
+## Browser Compatibility
 
-## Testing
+Tested and supported in:
+- Chrome/Edge (Chromium-based) - Recommended
+- Safari - Full support
+- Mobile browsers - Responsive design supported
 
-Run the automated test suite:
-```bash
-node tests/run-suite.js
-```
+**Note**: IndexedDB support is required.
+
+---
+
+## Privacy & Data
+
+- **All data stored locally**: Game history and profiles stored in your browser
+- **No server communication**: Core gameplay requires no network connection
+- **Export capability**: Users can export their data from the Analytics dashboard
+- **Google Analytics**: Only active in production (disabled on localhost)
+
+---
 
 ## Team & Credits
 
 ### Development Team
+
 - **AI & Data Analyst**: Chandra, Aman — ac942@students.waikato.ac.nz
 - **AI & Algorithm Researcher**: LIU, Yang — yl1014@students.waikato.ac.nz
 - **Front-End Engineer**: Wang, Xiaoyang — xw316@students.waikato.ac.nz
 - **Front-End & QA Engineer**: HALAI, SHVET — shh30@students.waikato.ac.nz
 
 ### Acknowledgments
+
 - **Rauawaawa Kaumātua Charitable Trust** - Cultural design elements and project partnership
 - Māori design patterns and imagery are used with permission
+- Sound files include Māori encouragement phrases (Ka pai, Miharo, Rawe, Tau ke, Tino pai)
 
 ---
 
-**Project Repository**: https://github.com/DDMYmia/Memory-Game-He-Maumahara
+## License & Contact
+
+- **Project Repository**: https://github.com/DDMYmia/Memory-Game-He-Maumahara
+- **Project Status**: Stable Release (v4.0.0)

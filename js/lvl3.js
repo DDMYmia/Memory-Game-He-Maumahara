@@ -95,10 +95,10 @@ const cardTextMapping = {
     "image 7": "Kōwhai",
     "image 8": "Koru",
     "image 9": "Hei Matau",
-    "image 10": "Pikorua",
-    "image 11": "Image 11",
-    "image 12": "Image 12",
-    "image 13": "Image 13"
+    "image 10": "Pikorua (double twist)",
+    "image 11": "paua",
+    "image 12": "kete",
+    "image 13": "Pikorua (single twist)"
 };
 
 // 

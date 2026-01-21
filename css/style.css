@@ -344,6 +344,15 @@ body:has(#game-over.show) #glass-fx {
   transition: 0.2s;
 }
 
+.card span {
+  word-wrap: break-word;
+  white-space: normal;
+  max-width: 90%;
+  font-size: 16px;
+  line-height: 1.2;
+  text-align: center;
+}
+
 .card:hover {
   z-index: 1000;
 }
