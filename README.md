@@ -4,7 +4,7 @@
 
 The game features a **pure frontend AI** that personalizes difficulty in real-time, keeping cognitive load in the optimal "Flow Zone" (where challenge matches skill).
 
-**Version**: v4.0.0  
+**Version**: v4.0.1  
 **Last Updated**: 2026-01-21
 
 ---
