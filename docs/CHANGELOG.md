@@ -1,5 +1,22 @@
 # Changelog
 
+Version: v4.0.1 (2026-01-21)
+
+## Documentation Updates
+- **SYSTEM_DIAGRAMS.md**: Comprehensive update of all Mermaid diagrams
+  - Added detailed Flow Index calculation flow (three-layer system)
+  - Added grid selection logic diagram
+  - Updated AI algorithm flow to reflect 6-rule system
+  - Updated class structure diagrams
+  - Enhanced game lifecycle sequence diagrams
+  - Updated data entity relationship diagrams
+- **FLOW_INDEX_SCORING.md**: Fixed documentation inconsistencies
+  - Corrected rule reference (R8 → R6)
+  - Clarified time baseline explanation (game time vs normalization baseline)
+  - Removed duplicate content
+
+---
+
 Version: v4.0.0 (2026-01-21)
 
 ## Flow Index Refactoring

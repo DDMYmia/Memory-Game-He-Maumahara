@@ -2,8 +2,10 @@
 
 This document contains visual representations of the He Maumahara system architecture, gameplay lifecycle, AI workflow, analytics pipeline, and local persistence model. All diagrams are written in Mermaid.js syntax.
 
-**Version**: v4.0.0  
+**Version**: v4.0.1  
 **Date**: 2026-01-21
+
+---
 
 ## 1. High-Level System Architecture
 
@@ -24,28 +26,28 @@ flowchart TD
 
     subgraph "AI Core - Local Inference"
         Engine[AI Engine]
-        Fuzzy[Fuzzy Logic System]
-        Bandit["Contextual Bandit: LinUCB"]
+        Fuzzy[Fuzzy Logic System<br/>6 Rules]
+        Bandit["Contextual Bandit: LinUCB<br/>3 Arms"]
         DT["Decision Tree: Onboarding"]
     end
 
     subgraph "Persistence Layer - IndexedDB and LocalStorage"
-        TelDB[(Telemetry Store)]
-        HistDB[(Game History)]
-        ProfileDB[(AI Profile)]
-        Config[Next AI Config]
-        Flags[Settings Flags]
+        TelDB[("Telemetry Store<br/>telemetry_lvl1/2/3")]
+        HistDB[("Game History<br/>game_history")]
+        ProfileDB[("AI Profile<br/>ai_player_profile")]
+        Config[Next AI Config<br/>localStorage]
+        Flags[Settings Flags<br/>localStorage]
     end
 
-    UI -- "Events/Updates" --> Levels
-    Levels -- "Events/Updates" --> UI
+    UI -->|"Events/Updates"| Levels
+    Levels -->|"Events/Updates"| UI
     Levels -->|Raw Events| Core
     Core -->|Write Events| TelDB
 
     TelDB -->|Read Session Events| Helper
     Helper -->|Extract Metrics| Engine
 
-    Engine -->|Compute Flow| Fuzzy
+    Engine -->|Compute Flow Index| Fuzzy
     Engine -->|Select Strategy| Bandit
     Engine -->|Initial Placement| DT
 
@@ -80,7 +82,7 @@ sequenceDiagram
     User->>Page: Open level page
     Page->>LS: Read ai_adaptive_enabled
     Page->>LS: Read ai_levelX_config if present
-    Page->>Lvl: Initialize board + preview
+    Page->>Lvl: Initialize board + preview (5s)
     Lvl->>Core: telemetry.log(start, variant)
     Core->>Tel: Write event
 
@@ -89,9 +91,9 @@ sequenceDiagram
       Lvl->>Core: telemetry.log(flip)
       Core->>Tel: Write event
       User->>Lvl: Attempt match
-      Lvl->>Core: telemetry.log(match)
+      Lvl->>Core: telemetry.log(match, result)
       Core->>Tel: Write event
-      opt Show hint
+      opt Show hint (with cooldown)
         User->>Lvl: Press Show
         Lvl->>Core: telemetry.log(show_cards)
         Core->>Tel: Write event
@@ -101,15 +103,19 @@ sequenceDiagram
     alt Win or time-out
       Lvl->>Core: telemetry.log(end)
       Core->>Tel: Write event
-      Lvl->>Helper: processGameEndWithAI(telemetry, level)
+      Lvl->>Helper: runAdaptiveGameEnd(telemetry, level, aiEngine)
       Helper->>Tel: Read events for current session
+      Helper->>Helper: extractPerformanceMetrics()
       Helper->>Engine: processGameEnd(metrics)
-      Engine->>Engine: Compute Flow Index + update internal state
+      Engine->>Engine: Compute Flow Index (Fuzzy Logic)
+      Engine->>Engine: Update player profile
       Engine->>Profile: Persist AI profile and bandit state
       Helper->>Engine: decideNextConfig(level)
+      Engine->>Engine: Select arm (LinUCB)
+      Engine->>Engine: Generate config (grid, hideDelay, etc.)
       Engine-->>Helper: nextConfig
       Helper->>LS: Write ai_levelX_config
-      Helper->>Core: telemetry.log(flow_index / ai_suggestion)
+      Helper->>Core: telemetry.log(flow_index)
       Core->>Tel: Write events
       Helper->>Hist: Save session summary
       Lvl->>Page: Render game-over analytics summary
@@ -118,75 +124,157 @@ sequenceDiagram
 
 ---
 
-## 3. AI Algorithm Flow (Assessment + Adaptation)
+## 3. Flow Index Calculation Flow (Three-Layer System)
+
+```mermaid
+flowchart TD
+    subgraph "Input: Game Performance Metrics"
+        Time[Completion Time]
+        Intervals[Flip Intervals]
+        Matches[Match Attempts<br/>Failed/Successful]
+        Clicks[Total Clicks]
+        Cheats[Hint Count]
+    end
+
+    subgraph "Layer 1: Base Flow Index (Fuzzy Logic)"
+        Norm1[Normalize Time<br/>by level & pairs]
+        Norm2[Calculate Cadence<br/>Variance CV]
+        Memb1[Time Membership<br/>Fast/Medium/Slow]
+        Memb2[Cadence Membership<br/>Stable/Variable]
+        Rules["6 Fuzzy Rules<br/>R1: Fast+Stable (1.0)<br/>R2: Medium+Stable (1.0)<br/>R3: Fast+Variable (0.80)<br/>R4: Slow+Stable (0.75)<br/>R5: Medium+Variable (0.70)<br/>R6: Slow+Variable (0.60)"]
+        Defuzz[Weighted Average<br/>Defuzzification]
+        Base["Base Flow Index<br/>[0.6, 1.0]<br/>0.05 increments"]
+    end
+
+    subgraph "Layer 2: Error Penalty (Additive)"
+        ErrBase["Base Error Penalty<br/>5% per failed match<br/>Max 30% (6 matches)"]
+        ErrCons["Consecutive Error Penalty<br/>3% per error (from 3rd)<br/>Max 15% (8+ errors)"]
+        ErrComb["Combined Error Penalty<br/>Base + Consecutive<br/>Max 45% total"]
+        ErrPen["Error Penalty Factor<br/>1.0 - totalErrorDeduction<br/>Range: 0.55 - 1.0"]
+    end
+
+    subgraph "Layer 3: Cheat Penalty"
+        Cheat["Cheat Penalty<br/>3% per hint<br/>Max 15% (5 hints)"]
+        CheatPen["Cheat Penalty Factor<br/>1.0 - cheatDeduction<br/>Range: 0.85 - 1.0"]
+    end
+
+    subgraph "Output: Final Flow Index"
+        Final["Final Flow Index<br/>= Base × Error × Cheat<br/>Range: 0.0 - 1.0"]
+        Display["Display Flow Index<br/>min 0.3 for display"]
+    end
+
+    Time --> Norm1
+    Intervals --> Norm2
+    Matches --> ErrBase
+    Matches --> ErrCons
+    
+    Norm1 --> Memb1
+    Norm2 --> Memb2
+    Memb1 --> Rules
+    Memb2 --> Rules
+    Rules --> Defuzz
+    Defuzz --> Base
+    
+    ErrBase --> ErrComb
+    ErrCons --> ErrComb
+    ErrComb --> ErrPen
+    
+    Cheats --> Cheat
+    Cheat --> CheatPen
+    
+    Base --> Final
+    ErrPen --> Final
+    CheatPen --> Final
+    Final --> Display
+```
+
+---
+
+## 4. AI Algorithm Flow (Assessment + Adaptation)
 
 ```mermaid
 flowchart TD
     subgraph "Telemetry - Session Events"
-        Evt[Raw telemetry stream]
+        Evt[Raw telemetry stream<br/>start, flip, match, end]
     end
 
     subgraph "Metrics Extraction"
-        M["Extract metrics<br/>(time, errors, clicks, cadence, hints)"]
+        M["Extract metrics<br/>- completionTime<br/>- failedMatches, totalMatches<br/>- flipIntervals<br/>- totalClicks<br/>- cheatCount<br/>- maxConsecutiveErrors"]
     end
 
-    subgraph "Assessment - Fuzzy Logic"
-        N[Normalize signals]
-        R{Rule base}
-        FI[Flow Index 0..1]
+    subgraph "Assessment - Fuzzy Logic (6 Rules)"
+        N["Normalize signals<br/>- Time: by level baseline<br/>- Cadence: CV of intervals"]
+        R["6 Rule Evaluation<br/>Speed × Cadence only<br/>(errors excluded)"]
+        FI["Base Flow Index<br/>[0.6, 1.0]"]
+        EP["Error Penalty<br/>Additive, max 45%"]
+        CP["Cheat Penalty<br/>Linear, max 15%"]
+        FinalFI["Final Flow Index<br/>= Base × Error × Cheat"]
     end
 
     subgraph "Adaptation - Contextual Bandit"
-        Ctx["Context vector<br/>(profile + recent rounds)"]
-        Arm{"Select arm<br/>(0/1/2)"}
-        Cfg["Generate next config<br/>(grid, ripple delay, adjacency)"]
+        Ctx["Context vector<br/>(level, avgFlow, errorRate,<br/>cadence, fatigue, cheatRatio)"]
+        Arm{"Select arm (LinUCB)<br/>Arm 0: Easy<br/>Arm 1: Standard<br/>Arm 2: Challenge"}
+        Grid["Grid Selection Logic<br/>Stage 1 (5×4) default<br/>Stage 2 (6×4) if Flow ≥ 0.7"]
+        Cfg["Generate next config<br/>- gridCols/gridRows<br/>- hideDelay (200-1000ms)<br/>- showScale (0.84-1.4)<br/>- adjacentRate (L2 only)"]
     end
 
     Evt --> M
     M --> N
     N --> R
     R --> FI
-    FI --> Ctx
+    FI --> EP
+    FI --> CP
+    EP --> FinalFI
+    CP --> FinalFI
+    
+    FinalFI --> Ctx
     Ctx --> Arm
-    Arm --> Cfg
+    Arm --> Grid
+    Grid --> Cfg
+    
+    FinalFI -.->|Update bandit| Arm
 ```
 
 ---
 
-## 4. Analytics Pipeline (History + Overall Review)
+## 5. Analytics Pipeline (History + Overall Review)
 
 ```mermaid
 flowchart TD
-    Tel[(telemetry_lvlX)] --> Sum[Per-session summary panel]
-    Hist[(game_history)] --> Dash[analytics.html]
-    Dash --> List[Session list by level]
-    Dash --> Detail[Session details]
-    Dash --> Overall[K-Means overall review]
-    Overall --> Feat["Feature extraction<br/>(Flow, Accuracy, optional Speed)"]
-    Feat --> Norm[Min-max normalization]
-    Norm --> KM[K-Means K=2 or K=3]
-    KM --> Plot[Scatter plot + centroids]
-    KM --> Table[Cluster summary table]
-    KM --> Trend[Recent trend strip]
+    Tel[("telemetry_lvlX<br/>IndexedDB")] --> Sum[Per-session summary panel<br/>Game-over screen]
+    Hist[("game_history<br/>IndexedDB")] --> Dash[analytics.html<br/>Dashboard]
+    Dash --> List[Session list<br/>Sortable by date, level, Flow Index]
+    Dash --> Detail[Session details<br/>Click to view metrics]
+    Dash --> Overall[K-Means Overall Review<br/>Pattern recognition]
+    Overall --> Feat["Feature extraction<br/>- Flow Index<br/>- Accuracy<br/>- Speed (optional)"]
+    Feat --> Norm[Min-max normalization<br/>Per feature]
+    Norm --> KM["K-Means clustering<br/>K=2 or K=3<br/>Based on data size"]
+    KM --> Plot[Scatter plot<br/>+ Centroids visualization]
+    KM --> Table[Cluster summary table<br/>Performance tiers]
+    KM --> Trend[Recent trend analysis<br/>Improving/Declining patterns]
 ```
 
 ---
 
-## 5. Game State Machine (Per Round)
+## 6. Game State Machine (Per Round)
 
 ```mermaid
 stateDiagram-v2
     [*] --> Init
 
-    Init --> Preview : Initialize board
-    Preview --> Playing : Preview ends
+    Init --> Preview : Load cards<br/>Show preview (5s)
+    Preview --> Playing : Preview timer ends
 
     state Playing {
         [*] --> Idle
-        Idle --> OneFlipped : First card flipped
-        OneFlipped --> TwoFlipped : Second card flipped
-        TwoFlipped --> Resolve : Compare
-        Resolve --> Idle : Match resolved
+        Idle --> OneFlipped : First card clicked
+        OneFlipped --> TwoFlipped : Second card clicked
+        TwoFlipped --> Resolve : Compare cards
+        Resolve --> Match : Cards match
+        Resolve --> NoMatch : Cards don't match
+        Match --> Idle : Fade matched cards
+        NoMatch --> HideDelay : Wait hideDelay (1000ms default)
+        HideDelay --> Idle : Flip cards back
     }
 
     Playing --> GameOver : All pairs matched
@@ -194,15 +282,18 @@ stateDiagram-v2
 
     state GameOver {
         [*] --> ComputeMetrics
-        ComputeMetrics --> AIProcessing
-        AIProcessing --> RenderSummary
+        ComputeMetrics --> AIProcessing : Extract telemetry
+        AIProcessing --> FlowCalc : Calculate Flow Index
+        FlowCalc --> ConfigGen : Generate next config
+        ConfigGen --> SaveData : Save to IndexedDB/localStorage
+        SaveData --> RenderSummary : Display analytics
         RenderSummary --> [*]
     }
 ```
 
 ---
 
-## 6. Class Structure (Implementation-Oriented)
+## 7. Class Structure (Implementation-Oriented)
 
 ```mermaid
 classDiagram
@@ -211,9 +302,23 @@ classDiagram
         +ContextualBandit bandit
         +DecisionTree decisionTree
         +Object sessionState
-        +processGameEnd
-        +decideNextConfig
-        +getInitialDifficulty
+        +processGameEnd(gameData) FlowIndex
+        +decideNextConfig(level) Object
+        +updateBandit(reward) void
+        +getInitialDifficulty(signals) number
+        +shouldUseLargeGrid(profile, rounds) boolean
+    }
+
+    class FuzzyLogicSystem {
+        +Object config
+        +Object cardAttributes
+        +computeFlowIndex(context) number
+        +calculateErrorPenalty(failed, total, consecutive, pairs) number
+        +calculateCheatPenalty(cheatCount, pairs) number
+        +normalizeTime(time, level, pairs) number
+        +calculateCadenceStability(intervals) number
+        +calculateClickAccuracy(successful, clicks) number
+        +triangularMembership(value, params) number
     }
 
     class ContextualBandit {
@@ -221,25 +326,31 @@ classDiagram
         +float alpha
         +int d
         +Array arms
-        +selectArm
-        +update
-        +getConfigForArm
-    }
-
-    class FuzzyLogicSystem {
-        +computeFlowIndex
-        +calculateErrorRate
-        +calculateClickAccuracy
+        +Object playCounts
+        +selectArm(playerState) number
+        +update(arm, state, reward) void
+        +getConfigForArm(arm, level) Object
+        +extractContext(state) Array
     }
 
     class DecisionTree {
-        +assessInitialDifficulty
+        +assessInitialDifficulty(signals) number
     }
 
     class Telemetry {
-        +Array events
-        +log
-        +exportAll()
+        +string dbName
+        +IDBDatabase db
+        +log(type, data) Promise
+        +exportAll() Promise~Array~
+        +clearAll() Promise
+    }
+
+    class GameHistory {
+        +string dbName
+        +IDBDatabase db
+        +saveGameSession(data) Promise
+        +getAllSessions(limit) Promise~Array~
+        +getSessionById(gameId) Promise~Object~
     }
 
     AIEngine *-- FuzzyLogicSystem
@@ -249,36 +360,148 @@ classDiagram
 
 ---
 
-## 7. Data Entity Relationship (ERD)
+## 8. Data Entity Relationship (ERD)
 
 ```mermaid
 erDiagram
-    PLAYER_PROFILE {
-        string id
+    TELEMETRY_EVENT {
+        int id
         string type
-        string version
+        object data
+        int ts
     }
 
-    GAME_HISTORY {
+    GAME_SESSION {
         string gameId
         int timestamp
         int level
+        object metrics
+        object summary
+        object aiResult
     }
 
-    TELEMETRY_EVENT {
-        int ts
+    AI_PROFILE {
+        string id
         string type
-        string data
+        string version
+        float avgFlow
+        float errorRate
+        float cadence
+        float fatigue
+        float hiddenDifficulty
+        float cheatRatio
+        int maxConsecutiveErrors
+    }
+
+    BANDIT_STATE {
+        int numArms
+        array arms
+        object playCounts
     }
 
     NEXT_CONFIG {
-        int arm
         int gridCols
         int gridRows
         int totalPairs
+        int initialTime
+        int hideDelay
+        float showScale
+        float adjacentRate
+        int adjacentTarget
     }
 
-    PLAYER_PROFILE ||--o{ GAME_HISTORY : stores
-    GAME_HISTORY ||--o{ TELEMETRY_EVENT : derives_from
-    GAME_HISTORY ||--|| NEXT_CONFIG : includes
+    TELEMETRY_EVENT ||--o{ GAME_SESSION : "comprises"
+    GAME_SESSION ||--|| NEXT_CONFIG : "includes"
+    AI_PROFILE ||--o{ GAME_SESSION : "generates"
+    AI_PROFILE ||--|| BANDIT_STATE : "contains"
 ```
+
+---
+
+## 9. Flow Index Calculation Detailed Flow
+
+```mermaid
+flowchart LR
+    subgraph "Input Normalization"
+        T[Time] -->|"Normalize by<br/>level baseline"| TN[Normalized Time<br/>0.0-1.0]
+        I[Intervals] -->|"Calculate<br/>CV"| CN[Cadence Variance<br/>0.0-1.0]
+    end
+
+    subgraph "Fuzzy Membership"
+        TN -->|Triangular| TF[TimeFast]
+        TN -->|Triangular| TM[TimeMedium]
+        TN -->|Triangular| TS[TimeSlow]
+        CN -->|Binary| CS[Stable<br/>CV < 0.5]
+        CN -->|Binary| CV[Variable<br/>CV ≥ 0.5]
+    end
+
+    subgraph "6 Rules (MIN operator)"
+        TF --> R1["R1: Fast+Stable<br/>weight 1.0"]
+        CS --> R1
+        TF --> R3["R3: Fast+Variable<br/>weight 0.80"]
+        CV --> R3
+        TM --> R2["R2: Medium+Stable<br/>weight 1.0"]
+        CS --> R2
+        TM --> R5["R5: Medium+Variable<br/>weight 0.70"]
+        CV --> R5
+        TS --> R4["R4: Slow+Stable<br/>weight 0.75"]
+        CS --> R4
+        TS --> R6["R6: Slow+Variable<br/>weight 0.60"]
+        CV --> R6
+    end
+
+    subgraph "Defuzzification"
+        R1 --> WA[Weighted Average]
+        R2 --> WA
+        R3 --> WA
+        R4 --> WA
+        R5 --> WA
+        R6 --> WA
+        WA -->|"Clamp & Round"| BFI["Base Flow Index<br/>[0.6, 1.0]<br/>0.05 increments"]
+    end
+
+    subgraph "Penalties"
+        M[Failed Matches] -->|"5% each<br/>max 30%"| EP[Error Penalty]
+        CE[Consecutive Errors] -->|"3% each<br/>from 3rd<br/>max 15%"| EP
+        H[Hints] -->|"3% each<br/>max 15%"| CP[Cheat Penalty]
+    end
+
+    subgraph "Final Calculation"
+        BFI --> FINAL[Final = Base × Error × Cheat]
+        EP --> FINAL
+        CP --> FINAL
+        FINAL --> OUT[Flow Index<br/>0.0-1.0]
+    end
+```
+
+---
+
+## 10. Grid Selection Logic (Level 2 & 3)
+
+```mermaid
+flowchart TD
+    Start[Game End] --> Check{First time<br/>playing level?}
+    Check -->|Yes| Stage1[Stage 1: 5×4 Grid<br/>Default starting size]
+    Check -->|No| Arm{Selected Arm?}
+    
+    Arm -->|Arm 0| ForceS1[Force 5×4 Grid<br/>Always easiest]
+    Arm -->|Arm 1 or 2| Perf{Flow Index<br/>≥ 0.7?}
+    
+    Perf -->|Yes| Profile{Player Profile<br/>conditions met?}
+    Perf -->|No| KeepS1[Keep Stage 1: 5×4]
+    
+    Profile -->|Yes| Stage2[Stage 2: 6×4 Grid<br/>Upgrade to larger]
+    Profile -->|No| KeepS1
+    
+    Stage1 --> Config[Generate Config<br/>with selected grid]
+    ForceS1 --> Config
+    KeepS1 --> Config
+    Stage2 --> Config
+    
+    Config --> Save[Save to localStorage<br/>ai_levelX_config]
+```
+
+---
+
+**Version**: v4.0.1  
+**Last Updated**: 2026-01-21

@@ -299,14 +299,17 @@ Time is normalized by level and total pairs:
 normalizeTime(completionTime, level, totalPairs)
 ```
 
-**Level-specific baselines**:
-- Level 1: 180 seconds baseline
-- Level 2: 180 seconds baseline
-- Level 3: 300 seconds baseline
+**Level-specific baselines** (for time normalization - used to calculate speed):
+- Level 1: 20 seconds per pair (10 pairs = 200s baseline for normalization)
+- Level 2: 15 seconds per pair (10 pairs = 150s baseline for normalization)
+- Level 3: 12 seconds per pair (10 pairs = 120s baseline for normalization)
+
+**Note**: The game timer is fixed at 300 seconds (5 minutes) for all levels, but time normalization uses level-specific baselines to differentiate performance across difficulty levels.
 
 **Normalization formula**:
 ```
-normalizedTime = completionTime / (baseline × (totalPairs / 10))
+expectedTotal = expectedTimePerPair[level] × totalPairs
+normalizedTime = completionTime / expectedTotal
 normalizedTime = clamp(normalizedTime, 0.0, 1.0)
 ```
 
@@ -546,7 +549,7 @@ Ensures fair assessment:
 - Base Flow Index range [0.6, 1.0] prevents overly low base scores
 - 0.05 increments provide clear performance tiers
 - Minimum 0.6 recognizes that even poor performance shows some skill
-- R8 (worst case) still provides 0.6 base score, allowing penalties to reduce final score appropriately
+- R6 (worst case) still provides 0.6 base score, allowing penalties to reduce final score appropriately
 
 ### 10.5 Why Minimum Display Value of 0.3?
 
