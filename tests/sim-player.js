@@ -163,7 +163,12 @@ class SimPlayer {
         }
 
         this.sandbox.gameStart = 1;
-        this.sandbox.actualStartTime = Date.now();
+        
+        // Mock time for realistic simulation
+        this.simulatedTime = Date.now();
+        this.sandbox.Date.now = () => this.simulatedTime;
+        
+        this.sandbox.actualStartTime = this.simulatedTime;
 
         // Get all cards from sandbox
         const cards = this.sandbox.cards;
@@ -207,7 +212,9 @@ class SimPlayer {
             await this.clickCard(c1);
             
             // Simulate think time
-            await sleep(this.getThinkDelayMs() / 10);
+            const thinkDelay = this.getThinkDelayMs();
+            this.simulatedTime += thinkDelay;
+            await sleep(thinkDelay / 10);
 
             // Click Second
             // If random guess, c2 might be null if pickRandomUnknown only picked one
@@ -222,7 +229,9 @@ class SimPlayer {
                 }
             }
 
-            await sleep(this.getClickDelayMs() / 10);
+            const loopDelay = this.getClickDelayMs();
+            this.simulatedTime += loopDelay;
+            await sleep(loopDelay / 10);
             
             // Wait for game logic
             await this.waitForReady();
@@ -280,7 +289,9 @@ class SimPlayer {
         
         card.click();
         this.remember(card);
-        await sleep(this.getClickDelayMs() / 10);
+        const clickDelay = this.getClickDelayMs();
+        this.simulatedTime += clickDelay;
+        await sleep(clickDelay / 10);
     }
 
     getCardKey(card) {

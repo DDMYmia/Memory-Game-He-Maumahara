@@ -4,8 +4,8 @@
 
 The game features a **pure frontend AI** that personalizes difficulty in real-time, keeping cognitive load in the optimal "Flow Zone" (where challenge matches skill).
 
-**Version**: v4.0.2  
-**Last Updated**: 2026-01-21
+**Version**: v4.1.0  
+**Last Updated**: 2026-01-25
 
 ---
 
@@ -51,7 +51,8 @@ The game adapts difficulty based on your performance, using an AI system that ca
 
 ### Key Features
 
-- **Adaptive AI**: Automatically adjusts difficulty to match your skill level
+- **Adaptive AI**: Automatically adjusts difficulty to match your skill level, with new speed-based rewards
+- **Speed Overrides**: Elite performance (≤15s) guarantees high scores, rewarding fast thinking
 - **Privacy First**: All data stored locally in your browser - no data leaves your device
 - **Cultural Integration**: Features Māori language (te reo Māori) and culturally safe imagery
 - **Accessibility**: High contrast design, large touch targets, senior-friendly interface
@@ -108,4 +109,4 @@ Tested and supported in:
 ## License & Contact
 
 - **Project Repository**: https://github.com/DDMYmia/Memory-Game-He-Maumahara
-- **Project Status**: Stable Release (v4.0.0)
+- **Project Status**: Stable Release (v4.1.0)

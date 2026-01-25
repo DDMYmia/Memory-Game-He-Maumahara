@@ -1,33 +1,45 @@
 # He Maumahara Design System
 
-**Version**: v4.0.2  
-**Date**: 2026-01-21
+**Version**: v4.1.0
+**Date**: 2026-01-25
 
 This document describes the implemented frontend design system for the current He Maumahara web build. It includes design goals, global tokens, layout rules, component patterns, and key accessibility constraints.
 
 ## 1. Design Goals
 
-1. Accessibility-first: high contrast, large touch targets, readable typography.
-2. Low cognitive load: minimal choices while playing; consistent placements for controls.
-3. Predictable layout: fixed minimum width and stable spacing.
-4. Clear state cues: the user should immediately understand hidden/shown/matched states.
+1. **Accessibility-first for Elderly Users**: 
+   - Maximized contrast (white on black).
+   - Extra-large touch targets (>48px) to accommodate reduced motor precision.
+   - High-legibility typography (large sizes, bold weights) for users with reduced visual acuity.
+2. **Low cognitive load**: minimal choices while playing; consistent placements for controls.
+3. **Predictable layout**: fixed minimum width and stable spacing.
+4. **Clear state cues**: the user should immediately understand hidden/shown/matched states.
 
 ## 2. Global Tokens
 
 ### 2.1 Typography
 
-- Font family: Roboto (fallback: sans-serif)
-- Primary sizes:
-  - 18px: body and dense UI
-  - 24px: menu/HUD buttons and labels
-  - 96px: titles and timer emphasis
+- **Font family**: Roboto (fallback: sans-serif) - chosen for geometric clarity.
+- **Primary sizes (Responsive Scale)**:
+  - **Large Screens (>=800px)**:
+    - **96px**: Titles / Timer
+    - **48px**: Level Buttons
+    - **36px**: Large Labels
+    - **24px**: Menu Buttons / Instructions
+    - **18px**: Body Text (Minimum)
+  - **Small Screens (<800px)**:
+    - **48px**: Titles / Timer
+    - **36px**: Level Buttons
+    - **24px**: Menu Buttons
+    - **18px**: Body Text (Minimum)
+- **Minimum Size**: Enforced 18px minimum for readability.
 
 ### 2.2 Color
 
-- Background: #000000
-- Text: #ffffff
-- Hover highlight: rgba(0, 147, 255, 0.4)
-- Adaptive toggle:
+- **Background**: #000000 (Pure black for max OLED contrast)
+- **Text**: #ffffff (Pure white)
+- **Hover highlight**: rgba(0, 147, 255, 0.4) (Bright blue overlay)
+- **Adaptive toggle**:
   - ON: #4CAF50
   - OFF: #808080
 
@@ -41,32 +53,53 @@ Used for AI analytics and visual consistency across levels:
 
 ### 2.3 Layout and Spacing
 
-- Global minimum width: 800px
-- Standard gaps:
-  - 30px: menus and button stacks
+- **Global Breakpoint**: 800px (Single switch point for layout).
+- **Global minimum width**: 800px (Layout scales below 800px with horizontal scroll).
+- **Standard gaps**:
+  - 30px (Large) / 16px (Small): menus and button stacks
   - 20px: card grid spacing
-- Grid padding: 20px (game board)
-- Edge margin: 20px (top/left/right anchors for fixed UI elements)
+- **Button Sizing**:
+  - Main Menu: 300px width (Broad target area), 60px height.
+  - Level Select: 250px x 250px (Massive target area)
 
 ## 3. Typography and Color Reference (Implementation Table)
 
-| Element | Selector | Size | Weight | Color | Notes |
+| Element | Selector | Size (Large/Small) | Weight | Color | Notes |
 |---|---:|---:|---:|---:|---|
-| Main title | #title, #title-play | 96px | 100 | #fff | Center aligned |
-| Sub headings | h3 | 96px | 100 | #fff | Large, minimal lines |
-| Menu buttons | .menu-btn | 24px | 300 | #fff | Semi-transparent backgrounds |
-| Level buttons | .lvl-txt | 24px | 300 | #fff | Same sizing as menus |
-| Body text | body | 18px | 400 | #fff | Black background |
-| Game timer | #game-timer | 96px | 100 | #fff | Prominent and stable position |
-| HUD labels | .menu-txt | 24px / 18px | 300 | #fff | Smaller in-game |
+| Main title | #title, #title-play | 96px / 48px | **800 (ExtraBold)** | #fff | Responsive scaling |
+| Menu buttons | .menu-btn | 24px | **600 (SemiBold)** | #fff | Flex centered |
+| Level buttons | .lvl-txt | 48px / 36px | **600 (SemiBold)** | #fff | Balanced boldness |
+| Menu text | .menu-txt | 24px | **600 (SemiBold)** | #fff | |
+| Instructions | #content-1, #content-2 | 24px | **400 (Regular)** | #fff | |
+| Card Text | .card span | 16px-36px | 400 | #fff | **Adaptive**: `clamp(16px, 10cqmin, 36px)` |
+| Body text | body | 18px | 400 | #fff | Minimum size enforced |
+| Game timer | #game-timer | 96px / 48px | 100 | #fff | Prominent and stable position |
 
-## 4. Page Layout Patterns
+## 4. Adaptive Design Strategy (Elderly-Centric)
+
+To support our target demographic (Kaumātua / Elderly), the design system enforces an "Adaptive & Resilient" approach:
+
+### 4.1 Responsive Typography
+- **Container Queries**: Card text uses `container-type: size` and `cqmin` units. This ensures that as cards grow on larger screens, the text size increases proportionally (up to 36px), maintaining readability without breaking layout.
+- **Clamp Functions**: We use `clamp(min, preferred, max)` to ensure text never shrinks below readable thresholds (16px) or grows grotesquely large.
+
+### 4.2 Enhanced Target Areas
+- **Fitts's Law Optimization**: Interactive elements are significantly larger than standard web buttons.
+- **Menu Buttons**: Widen to 300px to allow for imprecise clicking/tapping.
+- **Level Buttons**: Expanded to 250px squares to serve as massive entry points.
+
+### 4.3 Visual Clarity
+- **Bold Weights**: Key navigation and titles use `font-weight: bold` to improve character recognition against backgrounds.
+- **High Contrast**: Pure white on pure black is the default, ensuring maximum contrast ratio (21:1).
+
+## 5. Page Layout Patterns
 
 ### 4.1 Home (index.html)
 
 - Layout: centered vertical stack
 - Interaction: straightforward navigation; no nested menus
 - Buttons: consistent width and spacing to reduce scanning effort
+- **Mobile**: Reduced vertical gap (16px) to fit all buttons on smaller screens without scrolling.
 
 ### 4.2 Level Select (play.html)
 
@@ -74,6 +107,10 @@ Used for AI analytics and visual consistency across levels:
 - Descriptions: hover/focus descriptions provide optional detail without cluttering the default view
 
 ### 4.3 Gameplay Pages (lvl-1.html / lvl-2.html / lvl-3.html)
+
+- **Level 1**: 5x4 grid (20 cards) - "Papatūānuku" (Earth Mother) theme. Fixed layout.
+- **Level 2**: 5x6 grid (30 cards) - "Ranginui" (Sky Father) theme. Uses adjacent pair grouping.
+- **Level 3**: Adaptive grid (Default 5x4, 20 cards) - "Te Ao Mārama" (World of Light) theme. AI adjusts difficulty (grid size, hide delay) based on performance.
 
 Shared UI elements:
 - Primary navigation: Menu

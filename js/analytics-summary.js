@@ -34,13 +34,13 @@ function formatPercent(value) {
  */
 function getFlowInterpretation(flowIndex) {
   if (flowIndex >= 0.8) {
-    return { label: 'Excellent Flow', color: '#4CAF50', comment: 'Excellent' };
+    return { label: 'Excellent Flow', color: '#4CAF50', comment: 'Outstanding!' };
   } else if (flowIndex >= 0.6) {
-    return { label: 'Good Flow', color: '#8BC34A', comment: 'Good' };
+    return { label: 'Good Flow', color: '#8BC34A', comment: 'Well Done!' };
   } else if (flowIndex >= 0.4) {
-    return { label: 'Moderate Challenge', color: '#FFC107', comment: 'Need more practice' };
+    return { label: 'Moderate Challenge', color: '#FFC107', comment: 'Good Effort' };
   } else {
-    return { label: 'Very Hard', color: '#D32F2F', comment: 'Keep going' };
+    return { label: 'High Difficulty', color: '#D32F2F', comment: 'Keep Trying' };
   }
 }
 
@@ -163,7 +163,7 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       html += '<div class="analytics-section" data-section="note">';
       html += createTitle('Data Status');
       html += '<div class="analytics-grid">';
-      html += `<div class="analytics-item"><span class="label">Note</span><span class="value">Telemetry extraction failed</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Status</span><span class="value">N/A</span></div>`;
       html += '</div></div>';
       html += '</div></details>';
       
@@ -320,9 +320,9 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
 
     html += '<div class="analytics-grid">';
     html += `<div class="analytics-item"><span class="label">Time</span><span class="value">${displayTime}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Flips</span><span class="value">${totalClicks}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Accuracy</span><span class="value">${formatPercent(accuracy)}</span></div>`;
-    html += `<div class="analytics-item"><span class="label">Failures</span><span class="value">${validatedFailedMatches}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Flips</span><span class="value">${totalClicks}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Accuracy</span><span class="value">${formatPercent(accuracy)}</span></div>`;
+      html += `<div class="analytics-item"><span class="label">Mistakes</span><span class="value">${validatedFailedMatches}</span></div>`;
     html += `<div class="analytics-item"><span class="label">Error Rate</span><span class="value">${formatPercent(errorRate)}</span></div>`;
     html += `<div class="analytics-item"><span class="label">Hints Used</span><span class="value">${cheatCount}</span></div>`;
     if (gameStats.streak !== undefined) {
@@ -423,7 +423,6 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       html += createTitle('Color Stats');
       html += '<div class="analytics-grid">';
       html += `<div class="analytics-item"><span class="label">Status</span><span class="value">N/A</span></div>`;
-      html += `<div class="analytics-item"><span class="label">Reason</span><span class="value">No flips/matches recorded</span></div>`;
       html += '</div></div>';
     }
 
@@ -450,7 +449,27 @@ async function displayAnalyticsSummary(telemetry, level, aiResult = null, gameSt
       const rippleDelayMap = { 1: 1000, 2: 800, 3: 600 };
       const currentRipple = rippleDelayMap[level] || 1000;
       
+      let recLevel = `lv${level}`;
+      if (level === 3) {
+        const pairs = nextConfig.totalPairs || 10;
+        const totalCards = (nextConfig.gridCols || 5) * (nextConfig.gridRows || 4);
+        if (pairs > 10 || totalCards > 20) {
+          recLevel += "(s2)";
+        } else {
+          recLevel += "(s1)";
+        }
+      } else if (level === 2) {
+         if (nextConfig.adjacentRate && nextConfig.adjacentRate > 0) {
+            recLevel += "(s2)";
+         } else {
+            recLevel += "(s1)";
+         }
+      } else {
+        recLevel += "(s1)";
+      }
+
       html += '<div class="analytics-grid">';
+      html += `<div class="analytics-item"><span class="label">Rec. Level</span><span class="value recommendation-value" title="${recLevel}">${recLevel}</span></div>`;
       html += `<div class="analytics-item"><span class="label">Grid</span><span class="value">${formatChange(`${currentGridCols}×${currentGridRows}`, `${nextGridCols}×${nextGridRows}`)}</span></div>`;
       html += `<div class="analytics-item"><span class="label">Pairs</span><span class="value">${formatChange(String(fromPairs), String(toPairs))}</span></div>`;
       html += `<div class="analytics-item"><span class="label">Ripple Delay</span><span class="value">${currentRipple}ms</span></div>`;

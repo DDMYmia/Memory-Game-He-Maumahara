@@ -1,23 +1,34 @@
 # Changelog
 
-Version: v4.1.0 (2026-01-21)
+Version: v4.1.0 (2026-01-25)
 
-## Score System Updates
-- **10-Point Scale Conversion**: Changed game end score display from 0-1 range to a more user-friendly 10-point scale (e.g., 8.50/10).
-- **Speed Bonus Rule**: Added a special rule where completing a level in **20 seconds or less** automatically awards a **perfect score (10/10)** regardless of errors or hint usage.
-- **Expected Time Calibration**: Updated expected completion time baselines to better reflect difficulty differences:
-  - Level 1: 10s per pair (was 20s)
-  - Level 2: 15s per pair (unchanged)
-  - Level 3: 20s per pair (was 12s)
+## Major UI/UX Overhaul
+- **Responsive Layout**: Standardized to a single breakpoint at **800px**. Removed 500px breakpoint to ensure consistent experience across mobile and tablet.
+- **Typography System**: Implemented new responsive font scale.
+  - **Large Screens (>=800px)**: 96px (Title), 48px, 36px, 24px, 18px.
+  - **Small Screens (<800px)**: 48px (Title), 36px, 24px, 18px.
+  - **Minimum Font Size**: Enforced 18px minimum for readability.
+- **Mobile Optimization**:
+  - Adjusted menu button height to 60px with flexbox centering.
+  - Reduced vertical spacing (gap: 16px) for home/level buttons.
+  - Fixed countdown timer overlap issues.
+- **Localization**: Full standardization to English/Maori. Removed all Chinese characters from codebase and documentation. "用时" replaced with "Time".
 
-## Documentation Updates
-- **FLOW_INDEX_SCORING.md**: Updated to reflect the new 10-point scale, speed bonus rule, and revised expected time parameters.
-- **FUZZY_RULES_EXPLANATION.md**: Updated time normalization examples and parameters.
-- **COMPLETE_TECHNICAL_DOCUMENTATION.md**: Updated Flow Index algorithm section.
+## Gameplay & Scoring V4.1
+- **Level 2 Rebalancing**: Expanded grid from 10 pairs (4x5) to **15 pairs (5x6)** to allow for higher scores and reduced penalty impact.
+- **Speed Override System**:
+  - **Elite Speed (<= 15s)**: Minimum score 9.0/10 (0.9).
+  - **Fast Speed (<= 30s)**: Minimum score 7.0/10 (0.7).
+- **Algorithm Tuning**:
+  - **Error Penalty**: Reduced base penalty to 1% per error (max 10%), consecutive penalty starts at 4th error (max 15%).
+  - **Weights**: Boosted **R3 (Fast + Unstable)** weight from 0.85 to **0.95** to reward speed even with errors.
+
+## Documentation
+- Updated all technical documentation to reflect the codebase state.
 
 ---
 
-Version: v4.0.1 (2026-01-21)
+Version: v4.0.2 (2026-01-21)
 
 ## Documentation Updates
 - **SYSTEM_DIAGRAMS.md**: Comprehensive update of all Mermaid diagrams
@@ -39,8 +50,8 @@ Version: v4.0.0 (2026-01-21)
 ## Flow Index Refactoring
 - **Simplified Fuzzy Rules**: Reduced from 16 rules → 8 rules → **6 rules**, removing all error rate and accuracy dependencies from base Flow Index calculation
 - **Removed Accuracy from Rules**: Click accuracy removed from fuzzy rules to avoid double-penalization (errors already handled via error penalty mechanism)
-- **Base Flow Index Range**: Adjusted to [0.6, 1.0] with 0.05 increments, ensuring minimum base score of 0.6
-- **Rule Weights Updated**: R1 and R2 both set to 1.0 (optimal/good performance), R6 set to 0.6 (minimum)
+- **Base Flow Index Range**: Adjusted to [0.7, 1.0] with 0.05 increments, ensuring minimum base score of 0.7
+- **Rule Weights Updated**: R1 and R2 set to 1.0, R3 to 0.85, R4 to 0.80, R5 to 0.75, R6 to 0.70 (minimum)
 - **New 6-Rule System**: Focuses purely on speed and cadence stability
 - **Error Penalty Mechanism**: Changed to additive calculation (not multiplicative)
   - Base error penalty: 5% per failed match, maximum 30% (6 failed matches)

@@ -70,7 +70,7 @@ body {
     color: #fff;
     font-size: 24px;
     padding: 12px 16px;
-    font-weight: 300;
+    font-weight: 200;
     line-height: 1.25;
     border-radius: 26px;
     transition: 0.5s;
@@ -108,7 +108,7 @@ body {
 #title {
     position: static;
     font-size: 96px;
-    font-weight: 100;
+    font-weight: 400;
     line-height: 1;
     text-align: center;
     color: #fff;
@@ -167,11 +167,11 @@ body {
 
 .kmeans-title {
     font-size: 18px;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .kmeans-badge {
-    font-size: 13px;
+    font-size: 18px;
     padding: 6px 10px;
     border-radius: 999px;
     border: 1px solid rgba(255,255,255,0.25);
@@ -180,7 +180,7 @@ body {
 }
 
 .kmeans-subtitle {
-    font-size: 12px;
+    font-size: 18px;
     color: rgba(255,255,255,0.75);
     margin-bottom: 10px;
 }
@@ -204,15 +204,15 @@ body {
 }
 
 .kmeans-metric-label {
-    font-size: 11px;
+    font-size: 18px;
     color: rgba(255,255,255,0.72);
     letter-spacing: 0.2px;
     text-transform: uppercase;
 }
 
 .kmeans-metric-value {
-    font-size: 14px;
-    font-weight: 700;
+    font-size: 18px;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -255,7 +255,7 @@ body {
 .kmeans-axis {
     display: flex;
     justify-content: space-between;
-    font-size: 11px;
+    font-size: 18px;
     color: rgba(255,255,255,0.7);
     margin-top: 6px;
     padding: 0 2px;
@@ -291,7 +291,7 @@ body {
 }
 
 .kmeans-legend-text {
-    font-size: 13px;
+    font-size: 18px;
     color: rgba(255,255,255,0.9);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -299,7 +299,7 @@ body {
 }
 
 .kmeans-legend-pct {
-    font-size: 13px;
+    font-size: 18px;
     color: rgba(255,255,255,0.8);
     font-variant-numeric: tabular-nums;
 }
@@ -332,7 +332,7 @@ body {
 
 .kmeans-table-head {
     padding: 10px 12px;
-    font-size: 11px;
+    font-size: 18px;
     color: rgba(255,255,255,0.75);
     text-transform: uppercase;
     letter-spacing: 0.25px;
@@ -340,8 +340,8 @@ body {
 
 .kmeans-cell {
     padding: 10px 12px;
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 18px;
+    font-weight: 400;
     color: rgba(255,255,255,0.92);
     border-top: 1px solid rgba(255,255,255,0.06);
     min-width: 0;
@@ -355,8 +355,8 @@ body {
 }
 
 .kmeans-subval {
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 18px;
+    font-weight: 400;
     color: rgba(255,255,255,0.62);
     margin-left: 6px;
 }
@@ -378,8 +378,8 @@ body {
     padding: 2px 8px;
     border-radius: 999px;
     border: 1px solid rgba(255,255,255,0.25);
-    font-size: 11px;
-    font-weight: 800;
+    font-size: 18px;
+    font-weight: 400;
     letter-spacing: 0.2px;
     background: rgba(0,0,0,0.18);
 }
@@ -410,7 +410,7 @@ body {
 .mode-btn.active, .level-btn.active {
     background: #fff;
     color: #333;
-    font-weight: bold;
+    font-weight: 400;
 }
 
 .history-wrap {
@@ -462,19 +462,19 @@ body {
 }
 
 .history-item-date {
-    font-size: 11px;
+    font-size: 18px;
     color: rgba(255,255,255,0.7);
     margin-bottom: 5px;
 }
 
 .history-item-main {
-    font-size: 16px;
+    font-size: 18px;
     margin-bottom: 0;
     font-variant-numeric: tabular-nums;
 }
 
 .history-item-sub {
-    font-size: 11px;
+    font-size: 18px;
     color: rgba(255,255,255,0.8);
     line-height: 1.4;
     display: grid;
@@ -509,7 +509,7 @@ body {
 
 .analytics-score {
     font-size: 48px;
-    font-weight: bold;
+    font-weight: 400;
     margin-bottom: 5px;
     text-shadow: 0 0 10px rgba(255,255,255,0.5);
 }
@@ -540,8 +540,8 @@ body {
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: rgba(255, 255, 255, 0.9);
-    font-size: 16px;
-    font-weight: 800;
+    font-size: 18px;
+    font-weight: 400;
     margin-bottom: 8px;
     position: relative;
 }
@@ -596,13 +596,13 @@ body {
 }
 
 .analytics-color-chip .chip-label {
-    font-size: 14px;
+    font-size: 18px;
     color: rgba(255, 255, 255, 0.95);
-    font-weight: 600;
+    font-weight: 400;
 }
 
 .analytics-color-chip .chip-metric {
-    font-size: 13px;
+    font-size: 18px;
     color: rgba(255, 255, 255, 0.75);
 }
 
@@ -619,15 +619,15 @@ body {
 }
 
 .analytics-item .label {
-    font-size: 11px; /* Compacted */
+    font-size: 18px; /* Compacted */
     color: #aaa;
     margin-bottom: 1px; /* Compacted */
     display: block;
 }
 
 .analytics-item .value {
-    font-size: 15px; /* Compacted */
-    font-weight: bold;
+    font-size: 18px; /* Compacted */
+    font-weight: 400;
 }
 
 .analytics-card {
@@ -638,7 +638,7 @@ body {
 }
 
 .analytics-card-title {
-    font-size: 14px;
+    font-size: 18px;
     color: #aaa;
     margin-bottom: 8px;
     text-transform: uppercase;
@@ -646,7 +646,7 @@ body {
 
 .analytics-card-value {
     font-size: 24px;
-    font-weight: bold;
+    font-weight: 400;
 }
 
 .analytics-section {
@@ -657,7 +657,7 @@ body {
 }
 
 .analytics-section-title {
-    font-size: 16px; /* Compacted */
+    font-size: 18px; /* Compacted */
     margin-bottom: 3px; /* Compacted */
     border-bottom: 1px solid rgba(255,255,255,0.2);
     padding-bottom: 2px; /* Compacted */
@@ -684,7 +684,7 @@ body {
     bottom: -25px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 12px;
+    font-size: 18px;
     white-space: nowrap;
 }
 
@@ -703,7 +703,7 @@ body {
 .flow-meter-labels {
     display: flex;
     justify-content: space-between;
-    font-size: 12px;
+    font-size: 18px;
     color: #aaa;
     margin-bottom: 5px;
 }
@@ -730,7 +730,7 @@ body {
 .flow-meter-value {
     text-align: center;
     font-size: 18px;
-    font-weight: bold;
+    font-weight: 400;
 }
 
 /* Adaptive Diff Styles */
@@ -740,7 +740,7 @@ body {
 }
 
 .adaptive-diff-title {
-    font-size: 0.85em;
+    font-size: 18px;
     color: #aaa;
     margin-bottom: 8px;
     text-transform: uppercase;
@@ -773,15 +773,15 @@ body {
 }
 
 .adaptive-diff-label {
-    font-size: 0.8em;
+    font-size: 18px;
     color: #ccc;
     margin-bottom: 4px;
     text-transform: uppercase;
-    font-weight: 500;
+    font-weight: 400;
 }
 
 .adaptive-diff-values {
-    font-weight: bold;
+    font-weight: 400;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -790,14 +790,14 @@ body {
 
 .val-from {
     color: #999;
-    font-size: 0.9em;
+    font-size: 18px;
     text-decoration: line-through;
     opacity: 0.7;
 }
 
 .val-to {
     color: #fff;
-    font-weight: bold;
+    font-weight: 400;
     text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
 }
 
@@ -810,7 +810,7 @@ body {
 @media (max-width: 800px) {
     html,
     body {
-        min-width: 300px;
+        min-width: 400px;
     }
 
     #rkct-menu {
@@ -888,19 +888,5 @@ body {
 
     .adaptive-diff-grid {
         grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 500px) {
-    #title {
-        font-size: 44px;
-    }
-
-    .history-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .adaptive-diff-grid {
-        grid-template-columns: 1fr;
     }
 }

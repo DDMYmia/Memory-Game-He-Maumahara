@@ -1,7 +1,7 @@
 # He Maumahara - Complete Technical Documentation
 
-**Version**: v4.0.2  
-**Date**: 2026-01-21  
+**Version**: v4.1.0
+**Last Updated**: 2026-01-25
 **Status**: Comprehensive Technical Reference
 
 ---
@@ -33,6 +33,7 @@
 - **Adaptive AI**: Combines Fuzzy Logic (Flow Index) with Contextual Bandit (LinUCB) for difficulty adaptation
 - **Tested**: Comprehensive automated testing suite using Node.js VM sandboxing
 - **Lightweight**: Zero external dependencies for core gameplay; vanilla JavaScript only
+- **Elderly-Centric UI**: High contrast, large touch targets, and standardized typography (200/400/600 weights).
 
 ### 1.1 Design Philosophy
 
@@ -72,7 +73,7 @@ Key choices reflect senior-friendly design:
 ├─────────────────────────────────────────────────────────────┤
 │  Presentation Layer (HTML/CSS)                              │
 │  ├── index.html, play.html, lvl-1.html, lvl-2.html, etc.   │
-│  └── Responsive CSS with fixed 800px min-width              │
+│  └── Responsive CSS (Adaptive: Desktop 800px+ / Compact <800px) │
 ├─────────────────────────────────────────────────────────────┤
 │  Game Logic Layer (Vanilla JavaScript)                      │
 │  ├── js/lvl1.js, js/lvl2.js, js/lvl3.js                    │
@@ -96,7 +97,7 @@ Key choices reflect senior-friendly design:
 |-----------|-----------|---------|
 | **Frontend Framework** | Vanilla JavaScript (ES6+) | Zero dependencies, maximum compatibility |
 | **Markup** | HTML5 | Semantic markup with accessibility features |
-| **Styling** | CSS3 (Grid, Flexbox) | Responsive layout, fixed 800px minimum width |
+| **Styling** | CSS3 (Grid, Flexbox) | Responsive layout (800px breakpoint, min width 800px) |
 | **Storage** | IndexedDB API | Game history, telemetry, AI profiles |
 | **Local Storage** | localStorage API | Settings, adaptive configs |
 | **AI Algorithms** | Custom implementations | Fuzzy Logic, LinUCB Bandit, K-Means |
@@ -134,11 +135,15 @@ Memory-Game-He-Maumahara/
 
 ## 3. Frontend Implementation
 
-### 3.1 Responsive Design Strategy
+### 3.1 Adaptive Design Strategy (Elderly-Centric)
 
-- **Fixed Minimum Width**: The application enforces a `min-width: 800px` to maintain consistent spatial memory layouts (avoiding card reflow).
-- **Scale Transformation**: Background elements scale using CSS transforms (`scale(2.2)`) rather than resizing, preserving aspect ratios.
-- **Grid Layout**: CSS Grid is used for card placement, ensuring precise alignment regardless of screen size.
+- **Primary Layout**: Optimized for desktop/tablet (min-width 800px) with consistent spatial memory layouts.
+- **Responsive Adaptations**: 
+  - **Compact Layout (< 800px)**: Adjusted font sizes (18px-96px) and button dimensions, with horizontal scroll to preserve the 800px minimum width.
+  - **Font Weights**: Standardized to Light (200), Regular (400), and Semi-Bold (600) for clarity without visual heaviness.
+- **Scale Transformation**: Background elements scale using CSS transforms (`scale(2.2)`) to preserve aspect ratios while filling screens.
+- **Grid Layout**: CSS Grid ensures precise card alignment. Level 1 is fixed at 5x4, Level 2 defaults to 5x6 with optional 6x4, and Level 3 defaults to 5x4 with optional 6x4.
+- **Container Queries**: Utilizes `container-type: size` for cards to ensure text remains readable (clamp sizing) regardless of card dimensions.
 
 ### 3.2 UI Components
 
@@ -239,21 +244,20 @@ card.addEventListener('click', function() {
 
 #### Level 2: Adaptive Challenge (Variable Grid)
 
-- **Grid**: 5×4 (Stage 1) or 6×4 (Stage 2) - adaptive based on performance
+- **Grid**: 5×6 (30 cards, 15 pairs)
 - **Card Type**: Image-to-image matching
 - **Initial Time**: 300 seconds (5 minutes countdown)
 - **Layout**: Adjacency-driven placement
 - **Neighbor Mode**: 8-directional adjacency check
 - **Special Features**:
   - Adjacency-based placement (target percentage of pairs placed adjacent)
-  - Grid size adaptation (AI-controlled based on Flow Index >= 0.7)
+  - Expanded Grid: Default 5x6 (30 cards), AI can switch to 6x4 when configured
   - Shuffled card positions each game
   - Show Cards cooldown: 4 seconds
   - **Hide Delay**: Default 1000ms, configurable via AI (minimum 200ms)
 
 **Progression Logic**:
-- **Stage 1 (5×4)**: Default starting grid, used on first play of level
-- **Stage 2 (6×4)**: Unlocked when `shouldUseLargeGrid()` returns true (requires Flow Index >= 0.7)
+- **Grid Size**: Defaults to 15 pairs (30 cards). AI config can adjust grid size when needed.
 - **Adjacency Targets**: Configurable by Arm (Arm 0: 60%, Arm 1: 40%, Arm 2: 20%)
 - **Adjacency Tracking**: Actual adjacent pairs counted and logged for analytics
 
@@ -261,10 +265,10 @@ card.addEventListener('click', function() {
 
 ```javascript
 // Grid configuration
-let GRID_COLS_RUNTIME = 5;         // Starts at 5, can upgrade to 6
-let GRID_ROWS_RUNTIME = 4;         // Fixed at 4
+let GRID_COLS_RUNTIME = 5;
+let GRID_ROWS_RUNTIME = 6;
 let ADJACENT_RATE_RUNTIME = 0.5;   // Default 50% adjacent target
-let ADJACENT_TARGET_RUNTIME = 5;   // Target number of adjacent pairs (10 pairs × 0.5)
+let ADJACENT_TARGET_RUNTIME = Math.floor(totalPairs * ADJACENT_RATE_RUNTIME);
 ```
 
 #### Level 3: Mastery (Image-Text Pairs)
@@ -348,29 +352,33 @@ The normalized inputs are processed through a Fuzzy Logic Inference System:
     -   **Cadence**: Stable (Peak 0.0), Variable (Peak 1.0)
 
 2.  **Rule Evaluation** (Simplified Rule Base):
-    -   IF Time is Fast AND Cadence is Stable THEN Flow is High
-    -   IF Time is Medium AND Cadence is Stable THEN Flow is High
-    -   IF Time is Fast AND Cadence is Variable THEN Flow is Medium
-    -   IF Time is Slow THEN Flow is Low (Time Deduction Mechanism)
+    -   **R1**: IF Time is **Fast** AND Cadence is **Stable** THEN Flow is **High** (1.0)
+    -   **R2**: IF Time is **Medium** AND Cadence is **Stable** THEN Flow is **High** (1.0)
+    -   **R3**: IF Time is **Fast** AND Cadence is **Variable** THEN Flow is **High** (0.95)
+    -   **R4**: IF Time is **Slow** AND Cadence is **Stable** THEN Flow is **Medium** (0.80)
+    -   **R5**: IF Time is **Medium** AND Cadence is **Variable** THEN Flow is **Medium** (0.75)
+    -   **R6**: IF Time is **Slow** AND Cadence is **Variable** THEN Flow is **Low** (0.70)
 
-3.  **Defuzzification**: Center of Gravity (Centroid) method is used to combine rule outputs into a crisp `BaseFlowIndex` [0, 1].
+3.  **Defuzzification**: Weighted Average method is used to combine rule outputs into a crisp `BaseFlowIndex` [0.7, 1.0].
 
 #### 5.2.3 Stage 3: Penalties & Overrides
 The `BaseFlowIndex` is adjusted based on specific gameplay events:
 
-1.  **Error Penalty** (Additive):
-    -   Deducts points based on `ErrorRate` (Failed Matches / Total Matches).
-    -   Max Penalty: 0.45 (at 100% error rate).
-    -   Formula: `BaseFlowIndex = BaseFlowIndex - (ErrorRate * 0.45)`
+1.  **Error Penalty** (Multiplicative Application):
+    -   Base deduction: 1% per failed match (max 10%).
+    -   Consecutive deduction: starts at 4th consecutive error, +3% each, max 15%.
+    -   Max total deduction: 25% (Penalty Factor 0.75).
+    -   Formula: `FlowIndex = BaseFlowIndex * ErrorFactor`
 
-2.  **Cheat Penalty** (Multiplicative):
+2.  **Cheat Penalty** (Multiplicative Application):
     -   Deducts points based on `CheatCount` (Hint usage).
-    -   Max Penalty: 15% reduction.
-    -   Formula: `BaseFlowIndex = BaseFlowIndex * (1 - min(0.15, CheatCount * 0.05))`
+    -   Max Penalty: 15% reduction (Penalty Factor 0.85).
+    -   Formula: `FlowIndex = BaseFlowIndex * CheatFactor`
 
-3.  **Speed Bonus Override (The "20-Second Rule")**:
-    -   **Rule**: If the player completes the level in **≤ 20 seconds**, all penalties are bypassed.
-    -   **Result**: `FlowIndex = 1.0` (Perfect Score).
+3.  **Speed Overrides**:
+    -   **Elite Speed (≤ 15s)**: Minimum Flow Index 0.9.
+    -   **Fast Speed (≤ 30s)**: Minimum Flow Index 0.7.
+    -   **Rule**: Applied after penalties; higher of calculated score or minimum is kept.
 
 #### 5.2.4 Final Scoring
 The internal 0-1 Flow Index is scaled for display:
@@ -386,13 +394,13 @@ The difficulty selection engine uses the **LinUCB (Linear Upper Confidence Bound
 #### 5.3.1 Algorithm Components
 -   **Arms (Actions)**: 3 difficulty configurations (Easy, Standard, Challenge).
 -   **Context (State)**: A 7-dimensional vector ($d=7$) representing the game state:
-    1.  Bias term (1.0)
-    2.  Level (normalized)
-    3.  Recent Flow Index
-    4.  Recent Error Rate
-    5.  Recent Cadence
-    6.  Recent Cheat Count
-    7.  Previous Difficulty Level
+    1.  Level (normalized: 1=0.33, 2=0.66, 3=1.0)
+    2.  Recent Flow Index (0.0-1.0)
+    3.  Recent Error Rate (0.0-1.0)
+    4.  Recent Cadence Stability (0.0-1.0)
+    5.  Fatigue (0.0-1.0)
+    6.  Hidden Difficulty Parameter (0.0-1.0)
+    7.  Cheat Ratio (0.0-1.0)
 
 #### 5.3.2 Model Parameters
 For each Arm $a$, the algorithm maintains:
@@ -425,10 +433,10 @@ Based on the selected Arm, the AI generates a JSON config for the next round:
 ```javascript
 {
   gridCols: 5 or 6,              // Level 1: always 5, Level 2/3: 5 or 6 based on performance
-  gridRows: 4,                   // Always 4 rows
+  gridRows: 4 or 6,              // Level 1/3: 4 rows, Level 2: 6 rows by default
   initialTime: 300,              // Fixed 300 seconds (5 minutes)
-  hideDelay: 200-1000,           // Configurable, min 200ms, default varies by arm
-  showScale: 0.84-1.4,           // Card reveal animation scale (0.6x to 1.0x of base 1.4)
+  hideDelay: 240-600,            // Based on Hidden Difficulty (240ms, 300ms, 400ms, 600ms)
+  showScale: 1.1-1.5,            // Based on Hidden Difficulty (1.1, 1.2, 1.3, 1.5)
   adjacentRate: 0.2-0.6,         // Level 2 only: target adjacent pair rate
   adjacentTarget: 2-6,           // Level 2 only: target number of adjacent pairs
   matchRewardSeconds: 3,         // Seconds added on successful match
@@ -437,9 +445,9 @@ Based on the selected Arm, the AI generates a JSON config for the next round:
 ```
 
 **Grid Selection Logic** (Level 2 & 3):
-- First play of level: Always Stage 1 (5×4 grid)
-- Subsequent plays: Upgrade to Stage 2 (6×4) only if `shouldUseLargeGrid()` returns true (requires Flow Index >= 0.7 and player profile conditions)
-- Arm 0: Always forces 5×4 grid (easiest)
+- Level 2 default: 5×6 grid with adjacency targets; AI can switch to 6×4 if configured
+- Level 3 default: 5×4 grid; upgrade to 6×4 only if `shouldUseLargeGrid()` returns true (requires Flow Index >= 0.7 and player profile conditions)
+- Arm 0: Forces the easier grid option for the current level
 
 **File**: `js/ai-engine.js` - `AIEngine.decideNextConfig(level)`
 
@@ -769,6 +777,14 @@ Use Analytics dashboard:
 
 - `extractPerformanceMetrics(telemetry, level)`: Returns structured metrics object
 - `runAdaptiveGameEnd(telemetry, level, aiEngine)`: Orchestrator function
+
+### 11.4 Game Core Functions
+
+*   **Description**: Core game logic (state machine, card handling, timer, scoring).
+*   **Key Functions**:
+    *   `startGame()`: Initializes game state.
+    *   `flipCard()`: Handles card interaction.
+    *   `checkMatch()`: Evaluates selected cards.
 
 ---
 

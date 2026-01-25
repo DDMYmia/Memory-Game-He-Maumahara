@@ -1,7 +1,7 @@
 # Automated Testing Framework Documentation
 
-**Version**: v4.0.2  
-**Date**: 2026-01-21  
+**Version**: v4.1.0
+**Date**: 2026-01-25  
 **Status**: Comprehensive Testing Framework Reference
 
 ---
@@ -38,7 +38,7 @@ The He Maumahara testing framework provides a comprehensive automated testing sy
 
 - ✅ All three game levels (Level 1, 2, 3)
 - ✅ 12 different player profiles (Perfect, Average, Bad, Speed Accurate, etc.)
-- ✅ Flow Index calculation validation
+- ✅ Flow Index calculation validation (including Speed Overrides)
 - ✅ AI adaptation logic verification
 - ✅ Telemetry event generation
 - ✅ Game completion and error handling
@@ -369,10 +369,10 @@ node tests/run-batch.js
 ```
 
 **Features**:
-- Higher iteration count (50 runs per profile)
-- Statistical analysis
-- Useful for regression testing
-- Identifies edge cases and outliers
+- **Virtual Clock**: Uses a virtual event loop to simulate time instantly (decoupled from real time), allowing for thousands of moves per second.
+- **High Iteration**: 50 runs per profile for robust statistical significance.
+- **Profile Subset**: Defaults to testing core profiles (Perfect, Average, Bad) to ensure baseline stability.
+- **Regression Focus**: Identifies edge cases and outliers in core logic.
 
 ---
 
@@ -724,6 +724,6 @@ For questions or improvements, refer to the code in `tests/` directory.
 
 ---
 
-**Version**: v4.0.0  
-**Last Updated**: 2026-01-21  
+**Version**: v4.1.0  
+**Last Updated**: 2026-01-25  
 **Maintained By**: He Maumahara Development Team

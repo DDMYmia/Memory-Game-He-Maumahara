@@ -60,12 +60,12 @@
 </div>
 </div>
 
-<script src="js/game-core.js?v=4"></script>
-<script src="js/ai-engine.js?v=3"></script>
-<script src="js/ai-helper.js?v=2"></script>
-<script src="js/game-history.js?v=2"></script>
-<script src="js/mock-data.js?v=2"></script>
-<script src="js/analytics-summary.js?v=5"></script>
+<script src="js/game-core.js?v=4.1.0"></script>
+<script src="js/ai-engine.js?v=4.1.0"></script>
+<script src="js/ai-helper.js?v=4.1.0"></script>
+<script src="js/game-history.js?v=4.1.0"></script>
+<script src="js/mock-data.js?v=4.1.0"></script>
+<script src="js/analytics-summary.js?v=4.1.0"></script>
 <script>
   let currentLevel = 1;
   let currentMode = 'history'; // 'history' or 'demo'
@@ -380,7 +380,7 @@
   async function downloadAnalyticsJson() {
     const payload = window.currentAnalyticsExport;
     if (!payload || !payload.telemetry || typeof payload.telemetry.exportAll !== 'function') {
-      alert('请先打开一条记录再导出');
+      alert('Please open a record before exporting');
       return;
     }
     try {
@@ -407,7 +407,7 @@
       document.body.removeChild(jsonLink);
       setTimeout(() => URL.revokeObjectURL(jsonLink.href), 1000);
     } catch (e) {
-      alert('导出失败，请重试');
+      alert('Export failed, please try again');
     }
   }
 

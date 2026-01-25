@@ -345,19 +345,19 @@ class FuzzyLogicSystem {
    * @returns {number} Penalty factor [0, 1], where 1 = no penalty, 0 = maximum penalty
    */
   calculateErrorPenalty(failedMatches, totalMatches, maxConsecutiveErrors, totalPairs) {
-    // Base error penalty: 5% per failed match, max 30% (6 failed matches)
-    // One match = one attempt to pair two cards
-    const baseErrorDeduction = Math.min(failedMatches, 6) * 0.05;
+    // Base error penalty: 1% per failed match, max 10% (was 5% / 30%)
+    // Reduced to avoid penalizing natural exploration (guessing)
+    const baseErrorDeduction = Math.min(failedMatches, 10) * 0.01;
 
-    // Consecutive error penalty: starts from 3rd consecutive error
-    // 3rd = 3%, 4th = 6%, 5th = 9%, 6th = 12%, 7th = 15%, 8th+ = 15% (capped)
+    // Consecutive error penalty: starts from 4th consecutive error (was 3rd)
+    // 4th = 3%, 5th = 6%, etc.
     let consecutiveErrorDeduction = 0;
-    if (maxConsecutiveErrors > 2) {
-      consecutiveErrorDeduction = Math.min(0.15, (maxConsecutiveErrors - 2) * 0.03);
+    if (maxConsecutiveErrors > 3) {
+      consecutiveErrorDeduction = Math.min(0.15, (maxConsecutiveErrors - 3) * 0.03);
     }
 
-    // Total error deduction: additive (base + consecutive), max 45% total
-    const totalErrorDeduction = Math.min(0.45, baseErrorDeduction + consecutiveErrorDeduction);
+    // Total error deduction: additive, max 25% total (was 45%)
+    const totalErrorDeduction = Math.min(0.25, baseErrorDeduction + consecutiveErrorDeduction);
 
     return 1.0 - totalErrorDeduction;
   }
@@ -479,10 +479,10 @@ class FuzzyLogicSystem {
     const weights = [
       1.0,   // R1: Fast + Stable - Optimal
       1.0,   // R2: Medium + Stable - Good
-      0.80,  // R3: Fast but Unstable
-      0.75,  // R4: Slow but Stable
-      0.70,  // R5: Medium + Unstable
-      0.60   // R6: Slow + Unstable (minimum base score)
+      0.95,  // R3: Fast but Unstable (Boosted from 0.85 to reward speed)
+      0.80,  // R4: Slow but Stable
+      0.75,  // R5: Medium + Unstable
+      0.70   // R6: Slow + Unstable (minimum base score)
     ];
     
     let numerator = 0;
@@ -497,10 +497,10 @@ class FuzzyLogicSystem {
 
     let baseFlowIndex = denominator > 0
       ? numerator / denominator
-      : 0.6; // Default fallback (minimum base score)
+      : 0.7; // Default fallback (minimum base score)
 
     if (denominator === 0) {
-      aiWarn('Flow Index: denominator is 0, using default 0.6');
+      aiWarn('Flow Index: denominator is 0, using default 0.7');
     } else {
       aiLog('Flow Index calculation:', {
         numerator,
@@ -510,18 +510,23 @@ class FuzzyLogicSystem {
       });
     }
 
-    // Ensure base Flow Index is in range [0.6, 1.0] with 0.05 increments
-    baseFlowIndex = Math.max(0.6, Math.min(1.0, baseFlowIndex));
+    // Ensure base Flow Index is in range [0.7, 1.0] with 0.05 increments
+    baseFlowIndex = Math.max(0.7, Math.min(1.0, baseFlowIndex));
     // Round to nearest 0.05 increment (0.60, 0.65, 0.70, ..., 0.95, 1.00)
     baseFlowIndex = Math.round(baseFlowIndex * 20) / 20;
 
     // Apply error penalty and cheat penalty multiplicatively
     let flowIndexRaw = baseFlowIndex * errorPenalty * cheatPenalty;
 
-    // Special rule: if completed in 20 seconds or less, force max score
-    if (completionTime !== undefined && completionTime <= 20) {
-      aiLog('Perfect speed bonus applied (<= 20s)');
-      flowIndexRaw = 1.0;
+    // Special rule: Speed Overrides (User requested updates)
+    // <= 15s: Minimum 0.9 (Excellent)
+    // <= 30s: Minimum 0.7 (Good)
+    if (completionTime !== undefined && completionTime <= 15) {
+      aiLog('Elite speed bonus applied (<= 15s)');
+      flowIndexRaw = Math.max(0.9, flowIndexRaw);
+    } else if (completionTime !== undefined && completionTime <= 30) {
+      aiLog('Fast speed bonus applied (<= 30s)');
+      flowIndexRaw = Math.max(0.7, flowIndexRaw);
     }
 
     const trueFlowIndex = Math.max(0, Math.min(1, flowIndexRaw));

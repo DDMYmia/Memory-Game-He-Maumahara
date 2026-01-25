@@ -6,7 +6,7 @@ let actualStartTime = null;
 let gameStart = 0;
 let gameStop = 0;
 
-let totalPairs = 10;
+let totalPairs = 15;
 let cards = [];
 let flippedCards = [];
 let matchedPairs = 0;
@@ -26,7 +26,7 @@ let telemetry;
 let aiEngine = null;
 
 const GRID_COLS = 5;
-const GRID_ROWS = 4;
+const GRID_ROWS = 6;
 let GRID_COLS_RUNTIME = GRID_COLS;
 let GRID_ROWS_RUNTIME = GRID_ROWS;
 let ADJACENT_RATE_RUNTIME = 0.5;
@@ -389,12 +389,19 @@ function showConsentModal(callback) {
 }
 
 function proceedWithGameInitialization() {
-  const arr = Array.from({ length: IMAGE_POOL_MAX }, (_, i) => i + 1);
-  for (let i = arr.length - 1; i > 0; i--) {
+  const pool = Array.from({ length: IMAGE_POOL_MAX }, (_, i) => i + 1);
+  // Shuffle pool
+  for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  IMAGE_SELECTION = arr.slice(0, totalPairs);
+  
+  // Select images with reuse if totalPairs > pool size
+  const selection = [];
+  for(let i = 0; i < totalPairs; i++) {
+    selection.push(pool[i % pool.length]);
+  }
+  IMAGE_SELECTION = selection;
 
   const gameBoard = document.getElementById("game-board");
   const cols = GRID_COLS_RUNTIME;

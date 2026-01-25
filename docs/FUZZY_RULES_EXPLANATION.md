@@ -1,7 +1,7 @@
 # Fuzzy Rules Decision Process - Detailed Explanation
 
-**Version**: v4.0.2  
-**Date**: 2026-01-21  
+**Version**: v4.1.0
+**Date**: 2026-01-25
 **Status**: Comprehensive Guide to Fuzzy Logic Rule Evaluation
 
 ---
@@ -21,17 +21,18 @@
 
 ## 1. Overview
 
-This document explains in detail how the fuzzy logic system evaluates and calculates the base Flow Index. The fuzzy rules system uses **6 simplified rules** to transform game performance data into a base score ranging from 0.6 to 1.0 through a multi-step process.
+This document explains in detail how the fuzzy logic system evaluates and calculates the base Flow Index. The fuzzy rules system uses **6 simplified rules** to transform game performance data into a base score ranging from 0.7 to 1.0 through a multi-step process.
 
 ### System Architecture
 
-The Flow Index calculation follows a **three-layer scoring system**:
+The Flow Index calculation follows a **four-layer scoring system**:
 
 1. **Base Flow Index**: Calculated using fuzzy logic (6 rules based on speed and cadence stability)
 2. **Error Penalty**: Applied multiplicatively to penalize mistakes (separate mechanism)
 3. **Cheat Penalty**: Applied multiplicatively to penalize hint usage (separate mechanism)
+4. **Speed Overrides**: Guaranteed minimum scores for elite speed performance
 
-**Final Flow Index = Base Flow Index × Error Penalty × Cheat Penalty**
+**Final Flow Index = (Base Flow Index × Error Penalty × Cheat Penalty) -> Apply Overrides**
 
 ---
 
@@ -147,9 +148,9 @@ triangularMembership(value, { min, max, peak }) {
 | normalizedTime | timeFast | timeMedium | timeSlow |
 |----------------|----------|------------|----------|
 | 0.0 (very fast) | 1.0 | 0.0 | 0.0 |
-| 0.2 (fast) | 0.6 | 0.67 | 0.0 |
+| 0.2 (fast) | 0.6 | 0.0 | 0.0 |
 | 0.5 (medium) | 0.0 | 1.0 | 0.0 |
-| 0.8 (slow) | 0.0 | 0.33 | 0.4 |
+| 0.8 (slow) | 0.0 | 0.0 | 0.6 |
 | 1.0 (very slow) | 0.0 | 0.0 | 1.0 |
 
 **Example**: `normalizedTime = 0.3`
@@ -182,14 +183,14 @@ Each rule uses the **MIN operator** to combine multiple conditions. **Note**: Ac
 
 | Rule | Condition Combination | Weight | Activation Formula |
 |------|----------------------|--------|-------------------|
-| **R1** | Fast + Stable | 1.0 | `min(timeFast, cadenceStable)` |
-| **R2** | Medium + Stable | 1.0 | `min(timeMedium, cadenceStable)` |
-| **R3** | Fast + Variable | 0.80 | `min(timeFast, cadenceVariable)` |
-| **R4** | Slow + Stable | 0.75 | `min(timeSlow, cadenceStable)` |
-| **R5** | Medium + Variable | 0.70 | `min(timeMedium, cadenceVariable)` |
-| **R6** | Slow + Variable | 0.60 | `min(timeSlow, cadenceVariable)` |
+| **R1** | Fast + Stable | 1.00 | `min(timeFast, cadenceStable)` |
+| **R2** | Medium + Stable | 1.00 | `min(timeMedium, cadenceStable)` |
+| **R3** | Fast + Variable | 0.95 | `min(timeFast, cadenceVariable)` |
+| **R4** | Slow + Stable | 0.80 | `min(timeSlow, cadenceStable)` |
+| **R5** | Medium + Variable | 0.75 | `min(timeMedium, cadenceVariable)` |
+| **R6** | Slow + Variable | 0.70 | `min(timeSlow, cadenceVariable)` |
 
-**Design Rationale**: The base Flow Index focuses only on speed and cadence stability. Errors are handled via a separate error penalty mechanism to avoid double-penalization of the same mistakes.
+**Design Rationale**: The base Flow Index focuses only on speed and cadence stability. Errors are handled via a separate error penalty mechanism to avoid double-penalization of the same mistakes. R3 (Fast + Variable) weight was increased to 0.95 to reward high speed even if cadence is irregular.
 
 ### 4.2 MIN Operator Meaning
 
@@ -229,44 +230,63 @@ rules.forEach((rule, i) => {
 baseFlowIndex = numerator / denominator;
 ```
 
-### 5.2 Calculation Example
+### 5.2 Detailed Calculation Example
 
-**Scenario**: Player Performance
-- `normalizedTime = 0.3` → `timeFast = 0.4`, `timeMedium = 0.67`
-- `cadenceVariance = 0.3` → `cadenceStable = 1.0`, `cadenceVariable = 0.0`
+Let's trace a specific scenario:
 
-**Rule Activation**:
-```javascript
-R1 = min(0.4, 1.0) = 0.4        // Fast + Stable
-R2 = min(0.67, 1.0) = 0.67      // Medium + Stable
-R3 = min(0.4, 0.0) = 0.0        // Fast + Variable (not activated)
-R4 = min(0.0, 1.0) = 0.0        // Slow + Stable (not activated)
-R5 = min(0.67, 0.0) = 0.0       // Medium + Variable (not activated)
-R6 = min(0.0, 0.0) = 0.0        // Slow + Variable (not activated)
-```
+- **Inputs**:
+  - `normalizedTime = 0.3` (Between Fast and Medium)
+  - `cadenceVariance = 0.0` (Perfectly Stable)
 
-**Weight Calculation**:
-```javascript
-numerator = 0.4 × 1.0 + 0.67 × 1.0
-         = 0.4 + 0.67
-         = 1.07
+#### Step 1: Membership Calculation
 
-denominator = 0.4 + 0.67 = 1.07
+1.  **Time Membership**:
+    -   **Fast** (0.0 - 0.5): `(0.5 - 0.3) / 0.5 = 0.40`
+    -   **Medium** (0.2 - 0.8): `(0.3 - 0.2) / 0.3 = 0.33`
+    -   **Slow**: `0.0`
+2.  **Cadence Membership**:
+    -   **Stable** (< 0.5): `1.0`
+    -   **Variable** (>= 0.5): `0.0`
 
-baseFlowIndex = 1.07 / 1.07 = 1.0
-```
+#### Step 2: Rule Evaluation
+
+-   **R1 (Fast + Stable)**: `min(0.40, 1.0) = 0.40` (Weight 1.0)
+-   **R2 (Medium + Stable)**: `min(0.33, 1.0) = 0.33` (Weight 1.0)
+-   **R3 (Fast + Variable)**: `min(0.40, 0.0) = 0.0`
+-   **R4 (Slow + Stable)**: `0.0`
+-   **R5 (Medium + Variable)**: `0.0`
+-   **R6 (Slow + Variable)**: `0.0`
+
+#### Step 3: Defuzzification (Weighted Average)
+
+-   **Numerator**:
+    ```
+    (0.40 × 1.0) + (0.33 × 1.0)
+    = 0.40 + 0.33
+    = 0.73
+    ```
+-   **Denominator**:
+    ```
+    0.40 + 0.33 = 0.73
+    ```
+-   **Result**:
+    ```
+    0.73 / 0.73 = 1.00
+    ```
+
+**Base Flow Index**: **1.00** (Optimal Performance)
 
 ### 5.3 Range and Precision Constraints
 
 ```javascript
-// Constrain to [0.6, 1.0] range
-baseFlowIndex = Math.max(0.6, Math.min(1.0, baseFlowIndex));
+// Constrain to [0.7, 1.0] range
+baseFlowIndex = Math.max(0.7, Math.min(1.0, baseFlowIndex));
 
 // Round to nearest 0.05 increment
 baseFlowIndex = Math.round(baseFlowIndex * 20) / 20;
 ```
 
-**Result**: `1.0` (no rounding needed)
+**Result**: `0.80` (Rounded from 0.806)
 
 ---
 
@@ -276,30 +296,33 @@ baseFlowIndex = Math.round(baseFlowIndex * 20) / 20;
 
 **Input**:
 - Level 1, 10 pairs
-- Completion time: 90 seconds
+- Completion time: 45 seconds
 - Flip intervals: Stable 1500ms (low variance)
 - Click accuracy: 95% (for logging only)
 
 **Processing**:
 1. **Normalization**:
-   - `normalizedTime = 90 / (20 × 10) = 0.45`
+   - `normalizedTime = 45 / (10 × 10) = 0.45`
    - `cadenceVariance = 0.2 < 0.5` → Stable
 
 2. **Membership**:
    - `timeFast = 0.1` (when peak=0, `timeFast = 1 - (0.45/0.5) = 0.1`)
-   - `timeMedium = 0.67` (closer to peak=0.5)
+   - `timeMedium = 0.83` (closer to peak=0.5)
    - `cadenceStable = 1.0`
 
 3. **Rule Activation**:
    - R1 = `min(0.1, 1.0) = 0.1` (Fast + Stable)
-   - R2 = `min(0.67, 1.0) = 0.67` ⭐ **Primary activation** (Medium + Stable)
+   - R2 = `min(0.83, 1.0) = 0.83` ⭐ **Primary activation** (Medium + Stable)
 
 4. **Calculation**:
    ```
-   numerator = 0.1×1.0 + 0.67×1.0 = 0.77
-   denominator = 0.1 + 0.67 = 0.77
-   baseFlowIndex = 0.77 / 0.77 = 1.0
+   numerator = 0.1×1.00 + 0.83×1.00 = 0.10 + 0.83 = 0.93
+   denominator = 0.1 + 0.83 = 0.93
+   baseFlowIndex = 0.93 / 0.93 = 1.00
    ```
+
+5. **Rounding**:
+   - `1.00` -> Remains `1.00`
 
 **Note**: Accuracy does not affect the calculation, as errors are handled via the error penalty mechanism.
 
@@ -326,10 +349,13 @@ baseFlowIndex = Math.round(baseFlowIndex * 20) / 20;
 
 4. **Calculation**:
    ```
-   baseFlowIndex = 1.0 × 0.60 / 1.0 = 0.60
+   baseFlowIndex = 1.0 × 0.70 / 1.0 = 0.70
    ```
 
-**Result**: Base score equals the minimum value of 0.60
+5. **Clamping**:
+   - `0.70` is equal to min 0.7, so remains `0.70`.
+
+**Result**: Base score equals the minimum value of 0.70
 
 ---
 
@@ -346,13 +372,13 @@ The MIN operator ensures that rule activation value is determined by the **weake
 
 Weights reflect the "idealness" of each rule:
 
-- **R1 (1.0)**: Optimal performance (Fast + Stable)
-- **R2 (1.0)**: Good performance (Medium + Stable) → Equally ideal
-- **R6 (0.60)**: Poor performance (Slow + Variable) → Minimum score
+- **R1 (1.00)**: Optimal performance (Fast + Stable)
+- **R2 (1.00)**: Good performance (Medium + Stable)
+- **R6 (0.70)**: Poor performance (Slow + Variable)
 
-### 7.3 Why Base Score Range is [0.6, 1.0]?
+### 7.3 Why Base Score Range is [0.7, 1.0]?
 
-- **Fairness**: Even worst performance receives 0.6 base score
+- **Fairness**: Even worst performance receives 0.7 base score
 - **Penalty Space**: Error and cheat penalties can reduce from this base
 - **Avoid Over-Penalization**: Prevents discouragement from extremely low base scores
 
@@ -360,7 +386,7 @@ Weights reflect the "idealness" of each rule:
 
 - **Clear Tiers**: Reduces minor score differences
 - **Fair Assessment**: Similar performance receives same score
-- **Easy to Understand**: 0.60, 0.65, 0.70... are easily recognizable
+- **Easy to Understand**: 0.70, 0.75, 0.80... are easily recognizable
 
 ### 7.5 Why Exclude Accuracy from Rules?
 
@@ -379,7 +405,9 @@ The fuzzy rules decision system transforms game performance into base Flow Index
 3. **Fuzzy Membership Mapping** → Calculate membership degrees using triangular membership functions
 4. **Rule Activation** → Combine conditions using MIN operator
 5. **Defuzzification** → Calculate base score using weighted average
-6. **Range Constraint** → Constrain to [0.6, 1.0] and round to 0.05 increments
+6. **Range Constraint** → Constrain to [0.7, 1.0] and round to 0.05 increments
+7. **Penalty Application** → Apply Error and Cheat penalties (Base 1% per error, max 25%)
+8. **Speed Overrides** → Apply minimum score guarantees for elite speed (≤15s: 0.9, ≤30s: 0.7)
 
 This system provides fair and comprehensive evaluation of player performance while establishing a reasonable base score for subsequent penalty mechanisms.
 
@@ -387,6 +415,9 @@ The base Flow Index is then combined with error penalty and cheat penalty multip
 
 ```javascript
 finalFlowIndex = baseFlowIndex × errorPenalty × cheatPenalty
+// Then apply speed overrides
+if (time <= 15s) finalFlowIndex = max(0.9, finalFlowIndex)
+if (time <= 30s) finalFlowIndex = max(0.7, finalFlowIndex)
 ```
 
 ---
@@ -399,5 +430,5 @@ finalFlowIndex = baseFlowIndex × errorPenalty × cheatPenalty
 
 ---
 
-**Version**: v4.0.0  
-**Last Updated**: 2026-01-21
+**Version**: v4.1.0
+**Last Updated**: 2026-01-25

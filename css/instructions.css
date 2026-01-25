@@ -75,7 +75,7 @@ body {
 }
 #title {
   font-size: 96px;
-  font-weight: 100;
+  font-weight: 400;
   line-height: 1;
   text-align: center;
   color: #fff;
@@ -98,7 +98,7 @@ body {
   width: 550px;
   color: #fff;
   font-size: 24px;
-  font-weight: 100;
+  font-weight: 200;
   text-align: center;
   line-height: 36px;
 }
@@ -106,7 +106,7 @@ body {
   width: 600px;
   color: #fff;
   font-size: 24px;
-  font-weight: 100;
+  font-weight: 200;
   text-align: center;
   line-height: 36px;
 }
@@ -141,7 +141,7 @@ body {
 .menu-txt {
   font-size: 24px;
   color: #fff;
-  font-weight: 100;
+  font-weight: 400;
   margin-left: 20px;
   text-shadow: 0px 0px 10px #000;
 }
@@ -186,7 +186,7 @@ body {
 @media (max-width: 800px) {
   html,
   body {
-    min-width: 300px;
+    min-width: 400px;
   }
 
   #rkct-menu {
@@ -211,7 +211,7 @@ body {
   }
 
   #title {
-    font-size: 56px;
+    font-size: 44px;
   }
 
   #content-1,
@@ -221,20 +221,14 @@ body {
     width: min(600px, 92vw);
   }
 
-  #instructions {
-    height: auto;
-    aspect-ratio: 16 / 9;
-  }
-}
-
-@media (max-width: 500px) {
-  #title {
-    font-size: 44px;
-  }
-
   #content-1,
   #content-2 {
     font-size: 18px;
     line-height: 28px;
+  }
+
+  #instructions {
+    height: auto;
+    aspect-ratio: 16 / 9;
   }
 }

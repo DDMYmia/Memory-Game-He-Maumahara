@@ -2,8 +2,8 @@
 
 This document contains visual representations of the He Maumahara system architecture, gameplay lifecycle, AI workflow, analytics pipeline, and local persistence model. All diagrams are written in Mermaid.js syntax.
 
-**Version**: v4.0.2  
-**Date**: 2026-01-21
+**Version**: v4.1.0  
+**Date**: 2026-01-25
 
 ---
 
@@ -12,7 +12,7 @@ This document contains visual representations of the He Maumahara system archite
 ```mermaid
 flowchart TD
     subgraph "Presentation Layer - Browser"
-        UI["Adaptive UI / DOM"]
+        UI["Adaptive UI (Desktop 800px+ / Compact <800px) / DOM"]
         Levels["Game Levels: L1, L2, L3"]
         Audio[Audio System]
     end
@@ -26,7 +26,7 @@ flowchart TD
 
     subgraph "AI Core - Local Inference"
         Engine[AI Engine]
-        Fuzzy[Fuzzy Logic System<br/>6 Rules]
+        Fuzzy["Fuzzy Logic System<br/>6 Rules"]
         Bandit["Contextual Bandit: LinUCB<br/>3 Arms"]
         DT["Decision Tree: Onboarding"]
     end
@@ -108,6 +108,7 @@ sequenceDiagram
       Helper->>Helper: extractPerformanceMetrics()
       Helper->>Engine: processGameEnd(metrics)
       Engine->>Engine: Compute Flow Index (Fuzzy Logic)
+      Engine->>Engine: Apply Speed Overrides (Elite/Fast)
       Engine->>Engine: Update player profile
       Engine->>Profile: Persist AI profile and bandit state
       Helper->>Engine: decideNextConfig(level)
@@ -141,25 +142,28 @@ flowchart TD
         Norm2[Calculate Cadence<br/>Variance CV]
         Memb1[Time Membership<br/>Fast/Medium/Slow]
         Memb2[Cadence Membership<br/>Stable/Variable]
-        Rules["6 Fuzzy Rules<br/>R1: Fast+Stable (1.0)<br/>R2: Medium+Stable (1.0)<br/>R3: Fast+Variable (0.80)<br/>R4: Slow+Stable (0.75)<br/>R5: Medium+Variable (0.70)<br/>R6: Slow+Variable (0.60)"]
+        Rules["6 Fuzzy Rules<br/>R1: Fast+Stable (1.0)<br/>R2: Medium+Stable (1.0)<br/>R3: Fast+Variable (0.95)<br/>R4: Slow+Stable (0.80)<br/>R5: Medium+Variable (0.75)<br/>R6: Slow+Variable (0.70)"]
         Defuzz[Weighted Average<br/>Defuzzification]
-        Base["Base Flow Index<br/>[0.6, 1.0]<br/>0.05 increments"]
+        Base["Base Flow Index<br/>[0.7, 1.0]<br/>0.05 increments"]
     end
 
-    subgraph "Layer 2: Error Penalty (Additive)"
-        ErrBase["Base Error Penalty<br/>5% per failed match<br/>Max 30% (6 matches)"]
-        ErrCons["Consecutive Error Penalty<br/>3% per error (from 3rd)<br/>Max 15% (8+ errors)"]
-        ErrComb["Combined Error Penalty<br/>Base + Consecutive<br/>Max 45% total"]
-        ErrPen["Error Penalty Factor<br/>1.0 - totalErrorDeduction<br/>Range: 0.55 - 1.0"]
-    end
-
-    subgraph "Layer 3: Cheat Penalty"
+    subgraph "Layer 2: Penalties (Additive)"
+        ErrBase["Base Error Penalty<br/>1% per failed match<br/>Max 10% (10 matches)"]
+        ErrCons["Consecutive Error Penalty<br/>3% per error (from 4th)<br/>Max 15%"]
+        ErrComb["Combined Error Penalty<br/>Base + Consecutive<br/>Max 25% total"]
+        ErrPen["Error Penalty Factor<br/>1.0 - totalErrorDeduction"]
+        
         Cheat["Cheat Penalty<br/>3% per hint<br/>Max 15% (5 hints)"]
-        CheatPen["Cheat Penalty Factor<br/>1.0 - cheatDeduction<br/>Range: 0.85 - 1.0"]
+        CheatPen["Cheat Penalty Factor<br/>1.0 - cheatDeduction"]
+    end
+    
+    subgraph "Layer 3: Speed Overrides"
+        Override1["Elite Speed (≤15s)<br/>Min Score 0.9"]
+        Override2["Fast Speed (≤30s)<br/>Min Score 0.7"]
     end
 
     subgraph "Output: Final Flow Index"
-        Final["Final Flow Index<br/>= Base × Error × Cheat<br/>Range: 0.0 - 1.0"]
+        Final["Final Flow Index<br/>= Base × Error × Cheat<br/>Then Apply Overrides"]
         Display["Display Flow Index<br/>min 0.3 for display"]
     end
 
@@ -185,7 +189,11 @@ flowchart TD
     Base --> Final
     ErrPen --> Final
     CheatPen --> Final
-    Final --> Display
+    
+    Final --> Override1
+    Final --> Override2
+    Override1 --> Display
+    Override2 --> Display
 ```
 
 ---
@@ -205,16 +213,17 @@ flowchart TD
     subgraph "Assessment - Fuzzy Logic (6 Rules)"
         N["Normalize signals<br/>- Time: by level baseline<br/>- Cadence: CV of intervals"]
         R["6 Rule Evaluation<br/>Speed × Cadence only<br/>(errors excluded)"]
-        FI["Base Flow Index<br/>[0.6, 1.0]"]
-        EP["Error Penalty<br/>Additive, max 45%"]
+        FI["Base Flow Index<br/>[0.7, 1.0]"]
+        EP["Error Penalty<br/>Additive, max 25%"]
         CP["Cheat Penalty<br/>Linear, max 15%"]
-        FinalFI["Final Flow Index<br/>= Base × Error × Cheat"]
+        SO["Speed Overrides<br/>≤15s -> 0.9 min<br/>≤30s -> 0.7 min"]
+        FinalFI["Final Flow Index<br/>= Base × Error × Cheat<br/>(with overrides)"]
     end
 
     subgraph "Adaptation - Contextual Bandit"
-        Ctx["Context vector<br/>(level, avgFlow, errorRate,<br/>cadence, fatigue, cheatRatio)"]
+        Ctx["Context vector<br/>(level, avgFlow, errorRate,<br/>cadence, fatigue, hiddenDiff, cheatRatio)"]
         Arm{"Select arm (LinUCB)<br/>Arm 0: Easy<br/>Arm 1: Standard<br/>Arm 2: Challenge"}
-        Grid["Grid Selection Logic<br/>Stage 1 (5×4) default<br/>Stage 2 (6×4) if Flow ≥ 0.7"]
+        Grid["Grid Selection Logic<br/>L2: 5x6 (30 cards) if Flow ≥ 0.7<br/>L3: 4x5 (20 cards)"]
         Cfg["Generate next config<br/>- gridCols/gridRows<br/>- hideDelay (200-1000ms)<br/>- showScale (0.84-1.4)<br/>- adjacentRate (L2 only)"]
     end
 
@@ -226,6 +235,8 @@ flowchart TD
     FI --> CP
     EP --> FinalFI
     CP --> FinalFI
+    FinalFI --> SO
+    SO --> FinalFI
     
     FinalFI --> Ctx
     Ctx --> Arm
@@ -436,17 +447,17 @@ flowchart LR
     end
 
     subgraph "6 Rules (MIN operator)"
-        TF --> R1["R1: Fast+Stable<br/>weight 1.0"]
+        TF --> R1["R1: Fast+Stable<br/>weight 1.00"]
         CS --> R1
-        TF --> R3["R3: Fast+Variable<br/>weight 0.80"]
+        TF --> R3["R3: Fast+Variable<br/>weight 0.95"]
         CV --> R3
-        TM --> R2["R2: Medium+Stable<br/>weight 1.0"]
+        TM --> R2["R2: Medium+Stable<br/>weight 1.00"]
         CS --> R2
-        TM --> R5["R5: Medium+Variable<br/>weight 0.70"]
+        TM --> R5["R5: Medium+Variable<br/>weight 0.75"]
         CV --> R5
-        TS --> R4["R4: Slow+Stable<br/>weight 0.75"]
+        TS --> R4["R4: Slow+Stable<br/>weight 0.80"]
         CS --> R4
-        TS --> R6["R6: Slow+Variable<br/>weight 0.60"]
+        TS --> R6["R6: Slow+Variable<br/>weight 0.70"]
         CV --> R6
     end
 
@@ -457,12 +468,12 @@ flowchart LR
         R4 --> WA
         R5 --> WA
         R6 --> WA
-        WA -->|"Clamp & Round"| BFI["Base Flow Index<br/>[0.6, 1.0]<br/>0.05 increments"]
+        WA -->|"Clamp & Round"| BFI["Base Flow Index<br/>[0.7, 1.0]<br/>0.05 increments"]
     end
 
     subgraph "Penalties"
-        M[Failed Matches] -->|"5% each<br/>max 30%"| EP[Error Penalty]
-        CE[Consecutive Errors] -->|"3% each<br/>from 3rd<br/>max 15%"| EP
+        M[Failed Matches] -->|"1% each<br/>max 10%"| EP[Error Penalty]
+        CE[Consecutive Errors] -->|"3% each<br/>from 4th<br/>max 15%"| EP
         H[Hints] -->|"3% each<br/>max 15%"| CP[Cheat Penalty]
     end
 
@@ -470,7 +481,8 @@ flowchart LR
         BFI --> FINAL[Final = Base × Error × Cheat]
         EP --> FINAL
         CP --> FINAL
-        FINAL --> OUT[Flow Index<br/>0.0-1.0]
+        FINAL --> SO["Speed Overrides<br/>(≤15s: 0.9, ≤30s: 0.7)"]
+        SO --> OUT[Flow Index<br/>0.0-1.0]
     end
 ```
 
@@ -481,16 +493,16 @@ flowchart LR
 ```mermaid
 flowchart TD
     Start[Game End] --> Check{First time<br/>playing level?}
-    Check -->|Yes| Stage1[Stage 1: 5×4 Grid<br/>Default starting size]
+    Check -->|Yes| Stage1[Default Grid<br/>L2: 5×6, L3: 5×4]
     Check -->|No| Arm{Selected Arm?}
     
-    Arm -->|Arm 0| ForceS1[Force 5×4 Grid<br/>Always easiest]
+    Arm -->|Arm 0| ForceS1[Force Default Grid<br/>Always easiest]
     Arm -->|Arm 1 or 2| Perf{Flow Index<br/>≥ 0.7?}
     
     Perf -->|Yes| Profile{Player Profile<br/>conditions met?}
-    Perf -->|No| KeepS1[Keep Stage 1: 5×4]
+    Perf -->|No| KeepS1[Keep Default Grid]
     
-    Profile -->|Yes| Stage2[Stage 2: 6×4 Grid<br/>Upgrade to larger]
+    Profile -->|Yes| Stage2[Alternate Grid<br/>L2: 6×4, L3: 6×4]
     Profile -->|No| KeepS1
     
     Stage1 --> Config[Generate Config<br/>with selected grid]
@@ -503,5 +515,5 @@ flowchart TD
 
 ---
 
-**Version**: v4.0.1  
-**Last Updated**: 2026-01-21
+**Version**: v4.1.0  
+**Last Updated**: 2026-01-25
