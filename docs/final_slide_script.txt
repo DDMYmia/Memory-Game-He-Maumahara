@@ -1,0 +1,270 @@
+He Maumahara (v4.1.0) — Final 30-Slide Script
+
+Overall (Slides 1–6)
+
+Slide 1 — He Maumahara (v4.1.0)
+- Cultural memory‑training game grounded in Te Reo Māori values
+- Pure frontend stack (HTML/CSS/JS), zero‑dependency deployment
+- Runs fully offline; data stays local for privacy and trust
+- Designed for older adults with large targets and low visual noise
+- Project focus: confidence in memory rather than score optimization
+
+Slide 2 — Community Context & Partnership
+- Built in partnership with Rauawaawa Trust and community feedback loops
+- Design choices prioritize dignity, accessibility, and cultural resonance
+- Thematic assets reflect Māori imagery to strengthen emotional connection
+- Team aligned milestones with stakeholder reviews and adjustments
+- Contribution: kept cultural intent central to technical decisions
+
+Slide 3 — Problem & Design Goals
+- Engagement‑based cognitive training without medical claims
+- Core objective: sustain attention and recall through meaningful content
+- Integrated Te Reo Māori vocabulary to deepen semantic memory
+- Iterated narrative tone to feel supportive, not clinical
+- Contribution: balanced design ambition with real usability constraints
+
+Slide 4 — Gameplay Overview (3 Levels)
+- Level 1: fixed layout for baseline learning and stability
+- Level 2: adjacency rate 0.2–0.6 to challenge spatial recall
+- Level 3: image‑text pairs for semantic memory integration
+- Difficulty progression shifts strategies, not just workload
+- Contribution: mapped cognitive goals to concrete rule sets
+
+Slide 5 — System Architecture
+- Four layers: Presentation → Game Logic → AI/Analytics → Storage
+- IndexedDB stores telemetry/history; localStorage stores AI config
+- No server dependency reduces friction and preserves privacy
+- Modular JS structure enables isolated updates and testing
+- Mermaid: High‑Level System Architecture
+
+Slide 6 — End‑to‑End Gameplay Lifecycle
+- Telemetry captures start, flip, match, end, flow_index events
+- Game‑end pipeline computes Flow Index and generates next config
+- Metrics extracted per session to avoid cross‑run contamination
+- Adaptive loop reinforces individualized pacing across sessions
+- Mermaid: Gameplay Lifecycle (End‑to‑End)
+
+LIU, Yang — AI & Algorithm Researcher (Slides 7–12)
+
+Slide 7 — Role & Leadership
+- Led AI system design and adaptive difficulty architecture
+- Integrated Flow Index + LinUCB bandit into game loop
+- Coordinated algorithm alignment with UX and cultural framing
+- Tuned parameters to avoid frustration while improving challenge fit
+- Contribution: end‑to‑end AI ownership from math to integration
+
+Slide 8 — Flow Index (Fuzzy Logic Core)
+- Inputs: completion time, cadence stability, errors, cheat usage
+- Cadence CV threshold = 0.5 to allow natural human variation
+- Triangular memberships normalize speed into fast/medium/slow sets
+- Fuzzy rules produce base Flow Index from performance context
+- Mermaid: Flow Index Calculation Flow (Three‑Layer System)
+
+Slide 9 — Cadence & Error Penalties
+- Cadence stability uses CV = stdDev/mean of flip intervals
+- Error penalty capped at 25% to avoid over‑punishment
+- Cheat penalty capped at 15% to discourage repeated hints
+- Final Flow Index blends base + penalties + override rules
+- Mermaid: Flow Index Calculation Detailed Flow
+
+Slide 10 — Adaptive Configuration
+- hideDelay ranges 240–600ms based on hidden difficulty
+- showScale ranges 1.1–1.5 to balance visual ease and challenge
+- Bandit arms control difficulty multiplier and hint policy
+- Micro‑adjustments reduce perceived “difficulty jumps”
+- Mermaid: Grid Selection Logic (Level 2 & 3)
+
+Slide 11 — Config Generation Logic
+- difficultyMultiplier = arm/2 scales hideDelay and showScale
+- Level 2 computes adjacentRate and adjacentTarget from arm
+- Grid size shifts between 5×4, 5×6, and 6×4 by level
+- Total pairs derived directly from gridCols × gridRows
+- Mermaid: Data Entity Relationship (ERD)
+
+Slide 12 — Lessons & Growth (Liu)
+- Explainable AI made tuning and debugging feasible
+- Fuzzy + bandit hybrid improved adaptation stability
+- Learned to translate theory into player‑visible behavior
+- Emphasized fairness and pacing over maximizing difficulty
+- Future idea: add affective signals to enrich Flow modeling
+
+Chandra & Aman — AI & Data Analyst (Slides 13–18)
+
+Slide 13 — Role & Team Leadership
+- Led level tuning, progression flow, and analytics alignment
+- Coordinated team delivery timelines and stakeholder updates
+- Translated community feedback into measurable design targets
+- Ensured AI adaptation stayed aligned with gameplay goals
+- Contribution: kept the project coherent across disciplines
+
+Slide 14 — Level Design & Difficulty Curves
+- Level 2 adjacency targets (2–6) guide spatial strategy shifts
+- Level 3 grid upgrade requires Flow Index ≥ 0.7
+- Difficulty shaped by spacing, timing, and pairing type
+- Focused on cognitive variety, not just speed pressure
+- Mermaid: Game State Machine (Per Round)
+
+Slide 15 — Analytics Pipeline
+- Telemetry summary panel provides immediate session feedback
+- Dashboard aggregates sessions for trend review
+- K‑Means clustering (k=2 or 3) surfaces behavior patterns
+- Cluster labels mapped into interpretable performance tiers
+- Mermaid: Analytics Pipeline (History + Overall Review)
+
+Slide 16 — Metrics & Data Quality
+- Session filtering prevents cross‑game metric noise
+- Flow Index used as single reward signal for bandit updates
+- Error rates, cadence, and completion time normalized consistently
+- Data pipeline designed for explainability and usability
+- Mermaid: Gameplay Lifecycle (End‑to‑End)
+
+Slide 17 — Lessons Learned (Chandra & Aman)
+- Over‑reliance on one metric can mislead tuning
+- Balanced analytics depth with readability for non‑technical users
+- Built leadership habits in planning and technical negotiation
+- Learned to align AI outputs with human expectations
+- Proposed future addition: player self‑rating for richer signals
+
+Slide 18 — Theory, Attributes, Insights
+- Applied data mining, clustering, and HCI theory in practice
+- Strengthened systems thinking across AI, UX, and delivery
+- Framed analytics as a guide, not an absolute truth
+- Emphasized clarity and trust in player‑facing reports
+- Recommendation: keep analytics minimal and actionable
+
+Wang, Xiaoyang — Front‑End Engineer (Slides 19–24)
+
+Slide 19 — Role & UI Ownership
+- Designed layout structure and interaction flow for all screens
+- Integrated cultural imagery into consistent visual language
+- Optimized layout for large cards and clear spacing
+- Ensured menu and navigation felt predictable
+- Contribution: UI coherence across all game states
+
+Slide 20 — Accessibility‑First UI
+- Large hit targets reduce precision demands for older users
+- High contrast text on dark backgrounds improves legibility
+- Fixed control placement lowers cognitive load
+- Motion kept minimal to avoid distraction
+- Contribution: accessibility treated as baseline, not add‑on
+
+Slide 21 — Interaction & Feedback Design
+- Show/Hide Cards adds controlled hint strategy
+- Input locking avoids errors during animations
+- Feedback loops combine visual, timing, and layout cues
+- Short animations preserve rhythm without slowing play
+- Contribution: interaction timing tuned to user comfort
+
+Slide 22 — Visual Assets & Theming
+- Māori imagery strengthens memory associations
+- Color system supports clarity and cultural tone
+- Assets organized to maintain consistency across levels
+- Card naming aligns imagery with language learning goals
+- Contribution: visual narrative aligned with gameplay goals
+
+Slide 23 — Lessons Learned (Wang)
+- Simplification means removing distractions, not removing meaning
+- Design decisions must match cognitive constraints
+- Built stronger sense for UX pacing and flow
+- Learned to translate cultural intent into UI details
+- Future idea: user‑selectable themes to improve ownership
+
+Slide 24 — Theory, Attributes, Insights
+- Applied cognitive load theory to layout hierarchy
+- Balanced aesthetics with strict readability requirements
+- Strengthened cross‑discipline communication with AI team
+- Focused on calmness and reassurance in interface tone
+- Recommendation: keep layout stable even as features grow
+
+Halai, Shvet — Front‑End & QA Engineer (Slides 25–30)
+
+Slide 25 — Role & QA Focus
+- Supported frontend implementation and reliability testing
+- Verified smooth state transitions across menus and gameplay
+- Ensured consistent behavior across levels and screens
+- Built checklists for regression testing after updates
+- Mermaid: Class Structure (Implementation‑Oriented)
+
+Slide 26 — Automated Testing
+- Node VM simulates players for AI + gameplay validation
+- Multi‑run test suite checks consistency across scenarios
+- Detected edge‑case failures in timing and state changes
+- Reinforced confidence in adaptive pipeline stability
+- Contribution: testing strategy for AI‑driven behavior
+
+Slide 27 — UX Reliability Checks
+- Verified input locking during animations and hint usage
+- Ensured no dead‑end states in pause, end, and summary
+- Checked UI response under rapid user actions
+- Reduced glitch risk during high‑cadence play
+- Contribution: stability as a core user experience feature
+
+Slide 28 — Asset QA & Consistency
+- Validated image‑text mapping across levels
+- Ensured asset naming consistency for maintainability
+- Checked resolution and layout consistency across screens
+- Reduced confusion caused by mis‑paired assets
+- Contribution: detail‑oriented asset QA
+
+Slide 29 — Lessons Learned (Halai)
+- State machine clarity improves QA coverage
+- Most UX bugs come from edge conditions
+- Learned to align QA priorities with user frustration points
+- Strengthened structured testing habits for dynamic systems
+- Future idea: expand player simulation behaviors
+
+Slide 30 — Theory, Attributes, Insights
+- Applied usability engineering in QA workflow
+- Balanced test rigor with design intent
+- Built empathy for older users in testing decisions
+- Focused on preventing subtle friction, not only crashes
+- Recommendation: treat QA as a design responsibility
+
+
+
+
+
+
+Mermaid Diagram Placement
+- Slide 5: High‑Level System Architecture
+- Slide 6: Gameplay Lifecycle (End‑to‑End)
+- Slide 8: Flow Index Calculation Flow (Three‑Layer System)
+- Slide 9: Flow Index Calculation Detailed Flow
+- Slide 10: Grid Selection Logic (Level 2 & 3)
+- Slide 11: Data Entity Relationship (ERD)
+- Slide 14: Game State Machine (Per Round)
+- Slide 15: Analytics Pipeline (History + Overall Review)
+- Slide 16: Gameplay Lifecycle (End‑to‑End)
+- Slide 25: Class Structure (Implementation‑Oriented)
+
+Image / Screenshot Resource Checklist (by Slide)
+- Slide 1: Title card with logo + dark background motif
+- Slide 2: Partner organization visual (Rauawaawa Trust branding)
+- Slide 3: Problem statement visual with Te Reo Māori motif collage
+- Slide 4: Level 1/2/3 gameplay composite (three panels)
+- Slide 5: No screenshot needed (Mermaid only)
+- Slide 6: No screenshot needed (Mermaid only)
+- Slide 7: AI workflow visual (UI + config overlay mockup)
+- Slide 8: No screenshot needed (Mermaid only)
+- Slide 9: No screenshot needed (Mermaid only)
+- Slide 10: No screenshot needed (Mermaid only)
+- Slide 11: No screenshot needed (Mermaid only)
+- Slide 12: Team member photo or role‑focused illustration
+- Slide 13: Team leadership visual (collaboration/kanban snapshot)
+- Slide 14: No screenshot needed (Mermaid only)
+- Slide 15: No screenshot needed (Mermaid only)
+- Slide 16: No screenshot needed (Mermaid only)
+- Slide 17: Team member photo or retrospective visual
+- Slide 18: Team member photo or insights graphic
+- Slide 19: UI overview (home screen + menu)
+- Slide 20: Accessibility emphasis (large fonts/buttons close‑up)
+- Slide 21: Interaction demo (Show/Hide cards state)
+- Slide 22: Asset collage (card images + colors)
+- Slide 23: Team member photo or UI iteration before/after
+- Slide 24: Layout grid or typography system visual
+- Slide 25: No screenshot needed (Mermaid only)
+- Slide 26: Test result table or automated test console snapshot
+- Slide 27: UX edge‑case checklist graphic
+- Slide 28: Asset naming/mapping table snapshot
+- Slide 29: Team member photo or QA workflow diagram
+- Slide 30: Team member photo or summary highlight visual
